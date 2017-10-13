@@ -1,3 +1,7 @@
+# ====================================================================
+# The file below has been redistributed with permission.
+# Joe Del Rocco - University of Central Florida
+# ====================================================================
 # angle_utilities.py
 # Provides functionality to convert between UV coordinates and angles as well
 #   as other useful angle utilities. 
