@@ -137,7 +137,7 @@ class SkyDataViewer(QMainWindow):
 
         # render pane
         self.wgtRender = ViewFisheye()
-        #self.wgtRender.setPhoto("sky.jpg")
+        #self.wgtRender.setPhoto("res/sky.jpg")
 
         # info view
         self.wgtInfo = QTextEdit()
@@ -184,7 +184,7 @@ class SkyDataViewer(QMainWindow):
         # self.setGeometry(0, 0, 1024, 768)
         self.resize(self.Settings["WindowWidth"], self.Settings["WindowHeight"])
         self.setWindowTitle("Sky Data Viewer")
-        self.setWindowIcon(QIcon('icon.png'))
+        self.setWindowIcon(QIcon('res/icon.png'))
         self.statusBar().showMessage('Ready')
 
     def drawRenderFrame(self, event):
