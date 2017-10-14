@@ -25,6 +25,7 @@
 # @since: 10/13/2017
 # @summary: A widget for displaying the fisheye view of the HDR data
 # ====================================================================
+import os
 from PyQt5.QtCore import Qt, QRect
 from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QBrush, QImage
 from PyQt5.QtWidgets import QWidget
@@ -38,9 +39,16 @@ class ViewFisheye(QWidget):
         self.myPhoto = QImage()
         self.srcRect = QRect()
 
+    def clear(self):
+        self.myPhoto = QImage()
+        self.srcRect = QRect()
+
     def setPhoto(self, path):
-        self.myPhoto = QImage(path)
-        self.srcRect = QRect(0, 0, self.myPhoto.width(), self.myPhoto.height())
+        if os.path.exists(path):
+            self.myPhoto = QImage(path)
+            self.srcRect = QRect(0, 0, self.myPhoto.width(), self.myPhoto.height())
+        else:
+            self.clear()
 
     def paintEvent(self, event):
         super().paintEvent(event)
