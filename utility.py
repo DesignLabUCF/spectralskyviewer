@@ -33,6 +33,8 @@ import shutil
 import subprocess
 import shlex
 import logging
+import exifread
+from datetime import datetime
 from threading import Timer
 from datetime import datetime
 
@@ -62,37 +64,76 @@ def verifyDateTime(datestr, datefmtstr):
         return False
 
 '''
-Helper function that returns a list of all files, directories, or both, immediate or recursive.
-:param type: 0=both, 1=files, 2=dir
-:param recursive: Top-level immediate or recursive.
+Get the modification datetime from a file.
+:param filepath: Path to file to get modification time from
 '''
-def findFiles(dirpath, type=0, recursive=False):
+def fileModDateTime(filepath):
+    t = os.path.getmtime(filepath)
+    return datetime.fromtimestamp(t)
+
+'''
+Function to extract the "DateTimeOriginal" EXIF value of an image.
+:param filepath: Path to image
+'''
+def imageEXIFDateTime(filepath):
+    strDateTime = imageEXIFTag(filepath, "EXIF DateTimeOriginal")
+    # if strDateTime is None or len(strDateTime) <= 0:
+    #     return None
+    return datetime.strptime(strDateTime, '%Y:%m:%d %H:%M:%S')
+
+'''
+Function to extract the EXIF value of a particular tag.
+:param filepath: Path to image
+:param tag: EXIF tagname (not code) provided by module exifread
+'''
+def imageEXIFTag(filepath, tag):
+    result = None
+    with open(filepath, 'rb') as f:
+        tags = exifread.process_file(f, details=False, stop_tag=tag)
+        if tag in tags.keys():
+            result = tags[tag]
+    return str(result)
+
+'''
+Helper function that returns a list of all files, directories, or both, immediate or recursive.
+:param mode: 0=both, 1=files, 2=dir
+:param recursive: Immediate top-level list or recursive list
+:param ext: File extension to filter by
+'''
+def findFiles(dirpath, mode=0, recursive=False, ext=""):
     stuff = []
+    if len(ext) > 0:
+        ext = ext.strip().lower()
+        if ext[0] != ".":
+            ext = "." + ext
+    # immediate top-level list
     if not recursive:
         for entry in os.listdir(dirpath):
             fullpath = os.path.join(dirpath, entry)
-            if type == 0:
-                stuff.append(fullpath)
-            elif type == 1:
+            if mode == 1 or mode == 0:
+                base, extension = os.path.splitext(fullpath.strip().lower())
                 if os.path.isfile(fullpath):
-                    stuff.append(fullpath)
-            elif type == 2:
+                    if len(ext) > 0:
+                        if extension == ext:
+                            stuff.append(fullpath)
+                    else:
+                        stuff.append(fullpath)
+            if mode == 2 or mode == 0:
                 if os.path.isdir(fullpath):
                     stuff.append(fullpath)
+    # recursive list
     else:
         for root, dirs, files in os.walk(dirpath):
-            if type == 0:
+            if mode == 1 or mode == 0:
                 for file in files:
                     fullpath = os.path.join(root, file)
-                    stuff.append(fullpath)
-                for dir in dirs:
-                    fullpath = os.path.join(root, dir)
-                    stuff.append(fullpath)
-            elif type == 1:
-                for file in files:
-                    fullpath = os.path.join(root, file)
-                    stuff.append(fullpath)
-            elif type == 2:
+                    base, extension = os.path.splitext(fullpath.strip().lower())
+                    if len(ext) > 0:
+                        if extension == ext:
+                            stuff.append(fullpath)
+                    else:
+                        stuff.append(fullpath)
+            if mode == 2 or mode == 0:
                 for dir in dirs:
                     fullpath = os.path.join(root, dir)
                     stuff.append(fullpath)
