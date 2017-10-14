@@ -44,19 +44,21 @@ class SkyDataViewer(QMainWindow):
         # available settings, set to defaults
         self.Settings = {
             "Filename": "settings.json",
+            "DataDirectory": "",
             "WindowWidth": 1024,
             "WindowHeight": 768,
-            "DataDirectory": "",
             "HorizSplitLeft": -1,
             "HorizSplitRight": -1,
             "VertSplitTop": -1,
             "VertSplitBottom": -1,
         }
 
-        # load settings
+        # load and validate settings
         if os.path.exists(self.Settings["Filename"]):
             with open(self.Settings["Filename"], 'r') as file:
                 self.Settings = json.load(file)
+        if len(self.Settings["DataDirectory"]) > 0 and not os.path.exists(self.Settings["DataDirectory"]):
+            self.Settings["DataDirectory"] = ""
 
         # init
         QToolTip.setFont(QFont('SansSerif', 8))
@@ -67,8 +69,7 @@ class SkyDataViewer(QMainWindow):
         self.initMenu()
 
         # startup
-        if self.Settings["Filename"] is not None and len(self.Settings["Filename"]) > 0:
-            self.loadData()
+        self.loadData()
 
     def initMenu(self):
         # menu actions
@@ -212,7 +213,7 @@ class SkyDataViewer(QMainWindow):
             self.loadData()
 
     def loadData(self):
-        if self.Settings["DataDirectory"] is None or len(self.Settings["DataDirectory"]) <= 0:
+        if len(self.Settings["DataDirectory"]) <= 0 or not os.path.exists(self.Settings["DataDirectory"]):
             return
 
         self.lblDataDir.setText(self.Settings["DataDirectory"])
@@ -232,7 +233,7 @@ class SkyDataViewer(QMainWindow):
         # btn.clicked.connect(QApplication.instance().quit)
         event.accept()
 
-        # cache settings to file
+        # cache settings
         self.Settings["WindowWidth"] = self.width()
         self.Settings["WindowHeight"] = self.height()
         left, right = self.splitHoriz.sizes()
@@ -241,6 +242,8 @@ class SkyDataViewer(QMainWindow):
         top, bottom = self.splitVert.sizes()
         self.Settings["VertSplitTop"] = top
         self.Settings["VertSplitBottom"] = bottom
+
+        # dump settings to file
         with open(self.Settings["Filename"], 'w') as file:
             json.dump(self.Settings, file, indent=4)
 
