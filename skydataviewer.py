@@ -27,12 +27,11 @@
 # ====================================================================
 import sys
 import os
-import random
 import json
 from PyQt5.QtCore import QCoreApplication, Qt, QDir
 from PyQt5.QtGui import QIcon, QFont, QPainter
 from PyQt5.QtWidgets import *
-from PyQt5.QtWidgets import qApp
+#from PyQt5.QtWidgets import qApp
 import utility
 from viewfisheye import ViewFisheye
 
@@ -61,6 +60,8 @@ class SkyDataViewer(QMainWindow):
             self.Settings["DataDirectory"] = ""
 
         # init
+        self.hdrCaptures = [] # some number of these per day
+        self.asdMeasures = [] # 81 of these per capture time
         QToolTip.setFont(QFont('SansSerif', 8))
 
         # init GUI
@@ -94,6 +95,7 @@ class SkyDataViewer(QMainWindow):
         self.btnDataDir.setToolTip('Set data directory...')
         self.btnDataDir.clicked.connect(self.browseForFolder)
         self.lblDataDir = QLabel()
+        self.lblDataDir.setTextInteractionFlags(Qt.TextSelectableByMouse)
         boxDataDir = QHBoxLayout()
         boxDataDir.setSpacing(10)
         boxDataDir.setContentsMargins(0, 0, 0, 0)
@@ -103,16 +105,19 @@ class SkyDataViewer(QMainWindow):
         pnlDataDir.setLayout(boxDataDir)
 
         # date time panel
-        self.timeSlider = QSlider(Qt.Horizontal, self)
-        self.timeSlider.setFocusPolicy(Qt.NoFocus)
-        self.timeSlider.setTickPosition(QSlider.TicksAbove)
-        # timeSlider.setRange(1, 4)
-        # timeSlider.setSingleStep(1)
+        self.cbxDate = QComboBox()
+        self.cbxDate.currentIndexChanged.connect(self.dateSelected)
+        self.sldTime = QSlider(Qt.Horizontal, self)
+        self.sldTime.setTickPosition(QSlider.TicksAbove)
+        self.sldTime.setRange(0, 0)
+        self.sldTime.setTickInterval(1)
+        self.sldTime.setPageStep(1)
+        self.sldTime.valueChanged.connect(self.timeSelected)
         boxDateTime = QHBoxLayout()
         boxDateTime.setSpacing(10)
         boxDateTime.setContentsMargins(0, 0, 0, 0)
-        boxDateTime.addWidget(QComboBox())
-        boxDateTime.addWidget(self.timeSlider, 1)
+        boxDateTime.addWidget(self.cbxDate)
+        boxDateTime.addWidget(self.sldTime, 1)
         pnlDatetime = QWidget()
         pnlDatetime.setLayout(boxDateTime)
 
@@ -138,10 +143,10 @@ class SkyDataViewer(QMainWindow):
 
         # render pane
         self.wgtRender = ViewFisheye()
-        #self.wgtRender.setPhoto("res/sky.jpg")
 
         # info view
         self.wgtInfo = QTextEdit()
+        self.wgtInfo.setFocusPolicy(Qt.ClickFocus)
 
         # horizontal splitter
         self.splitHoriz = QSplitter(Qt.Horizontal)
@@ -161,6 +166,7 @@ class SkyDataViewer(QMainWindow):
 
         # energy graph
         self.wgtGraph = QTextEdit()
+        self.wgtGraph.setFocusPolicy(Qt.ClickFocus)
 
         # vertical splitter
         self.splitVert = QSplitter(Qt.Vertical)
@@ -176,7 +182,6 @@ class SkyDataViewer(QMainWindow):
         grid.addWidget(pnlDataDir, 0, 0)
         grid.addWidget(pnlDatetime, 1, 0)
         grid.addWidget(self.splitVert, 2, 0)
-        #     grid.addWidget(edtReview, 3, 1, 5, 1)
         pnlMain = QWidget()
         pnlMain.setLayout(grid)
         self.setCentralWidget(pnlMain)
@@ -188,22 +193,34 @@ class SkyDataViewer(QMainWindow):
         self.setWindowIcon(QIcon('res/icon.png'))
         self.statusBar().showMessage('Ready')
 
-    def drawRenderFrame(self, event):
-        painter = QPainter()
-        painter.begin(self)
-        painter.setPen(Qt.red)
-        size = self.size()
-        for i in range(1000):
-            x = random.randint(1, size.width() - 1)
-            y = random.randint(1, size.height() - 1)
-            painter.drawPoint(x, y)
-        painter.end()
+    def resetAllUI(self):
+        self.lblDataDir.clear()
+        self.cbxDate.clear()
+        self.sldTime.setRange(0, 0)
+        self.wgtRender.clear()
+        self.wgtRender.repaint()
 
-    def center(self):
-        frame = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
-        frame.moveCenter(centerPoint)
-        self.move(frame.topLeft())
+    def resetDayUI(self):
+        self.sldTime.setRange(0, 0)
+        self.wgtRender.clear()
+        self.wgtRender.repaint()
+
+    def loadData(self):
+        if len(self.Settings["DataDirectory"]) <= 0 or not os.path.exists(self.Settings["DataDirectory"]):
+            return
+
+        # GUI
+        self.resetAllUI()
+        self.lblDataDir.setText(self.Settings["DataDirectory"])
+
+        # find capture dates and times
+        captureDateDirs = utility.findFiles(self.Settings["DataDirectory"], mode=2)
+        captureDateDirs[:] = [dir for dir in captureDateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
+        captureDates = [os.path.basename(dir) for dir in captureDateDirs]
+        if len(captureDates) > 0:
+            self.cbxDate.addItems(captureDates)
+            #self.cbxDate.setCurrentIndex(-1) # trigger manual date selection
+            #self.cbxDate.setCurrentIndex(0)  # trigger manual date selection
 
     def browseForFolder(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', self.Settings["DataDirectory"])
@@ -212,16 +229,65 @@ class SkyDataViewer(QMainWindow):
             self.Settings["DataDirectory"] = directory
             self.loadData()
 
-    def loadData(self):
-        if len(self.Settings["DataDirectory"]) <= 0 or not os.path.exists(self.Settings["DataDirectory"]):
+    def dateSelected(self, index):
+        if index < 0 or index >= self.cbxDate.count():
             return
 
-        self.lblDataDir.setText(self.Settings["DataDirectory"])
-        captureDateDirs = utility.findFiles(self.Settings["DataDirectory"], type=2)
-        captureDateDirs[:] = [dir for dir in captureDateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
+        # GUI
+        self.resetDayUI()
 
-        for dir in captureDateDirs:
-            print(dir)
+        # find HDR photos
+        pathDate = os.path.join(self.Settings["DataDirectory"], self.cbxDate.itemText(index))
+        pathHDR = os.path.join(pathDate, "HDR")
+        if not os.path.exists(pathHDR):
+            return
+        photos = utility.findFiles(pathHDR, mode=1, ext="jpg")
+        if len(photos) <= 0:
+            return
+
+        # filter HDR photos down to those we are interested in
+        captures = []
+        captureIntervals = []
+        captureIntervals.append(utility.imageEXIFDateTime(photos[0])) # start with the first photo timestamp
+        threshold = 5 # look for next timestamp at least 5 mins later (next capture interval)
+        pPrev = photos[0]
+        for p in photos:
+            last = captureIntervals[-1]
+            next = utility.imageEXIFDateTime(p)
+            if (next - last).total_seconds() / 60.0 >= threshold:
+                captureIntervals.append(next)
+                captures.append(pPrev)
+            pPrev = p
+        captures.append(photos[-1])
+        self.hdrCaptures = captures[1:]
+        if len(self.hdrCaptures) <= 0:
+            return
+
+        # load GUI
+        self.sldTime.setRange(0, len(self.hdrCaptures)-1)
+        self.wgtRender.setPhoto(self.hdrCaptures[0])
+        self.wgtRender.repaint()
+
+        # for p in captures:
+        #     print(p, utility.fileModDateTime(p))
+
+    def timeSelected(self, index):
+        self.wgtRender.setPhoto(self.hdrCaptures[index])
+        self.wgtRender.repaint()
+
+    # def contextMenuEvent(self, event):
+    #     menuCtx = QMenu(self)
+    #     actExit = QAction(QIcon(), '&Exit', self)
+    #     menuCtx.addAction(actExit)
+    #     action = menuCtx.exec_(self.mapToGlobal(event.pos()))
+    #     if action == actExit:
+    #         self.close()
+
+    def center(self):
+        frame = self.frameGeometry()
+        centerPoint = QDesktopWidget().availableGeometry().center()
+        frame.moveCenter(centerPoint)
+        self.move(frame.topLeft())
 
     def closeEvent(self, event):
         # answer = QMessageBox.question(self, 'Quit Confirmation', 'Are you sure?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No )
@@ -246,14 +312,6 @@ class SkyDataViewer(QMainWindow):
         # dump settings to file
         with open(self.Settings["Filename"], 'w') as file:
             json.dump(self.Settings, file, indent=4)
-
-    def contextMenuEvent(self, event):
-        menuCtx = QMenu(self)
-        actExit = QAction(QIcon(), '&Exit', self)
-        menuCtx.addAction(actExit)
-        action = menuCtx.exec_(self.mapToGlobal(event.pos()))
-        if action == actExit:
-            self.close()
 
 
 if __name__ == '__main__':
