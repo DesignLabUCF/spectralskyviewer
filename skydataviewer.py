@@ -119,37 +119,36 @@ class SkyDataViewer(QMainWindow):
         # toolbar.addAction(actExit)
 
     def initWidgets(self):
-        # data directory panel
+        # data panel
         self.btnDataDir = QPushButton('Data', self)
         self.btnDataDir.setIcon(self.btnDataDir.style().standardIcon(QStyle.SP_DirIcon))
         self.btnDataDir.setToolTip('Load data directory...')
         self.btnDataDir.clicked.connect(self.browseForData)
-        self.lblDataDir = QLabel()
-        self.lblDataDir.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
-        boxDataDir = QHBoxLayout()
-        boxDataDir.setSpacing(10)
-        boxDataDir.setContentsMargins(0, 0, 0, 0)
-        boxDataDir.addWidget(self.btnDataDir)
-        boxDataDir.addWidget(self.lblDataDir, 1)
-        pnlDataDir = QWidget()
-        pnlDataDir.setLayout(boxDataDir)
-
-        # date time panel
+        self.lblData = QLabel()
+        self.lblData.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
         self.cbxDate = QComboBox()
+        self.cbxDate.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.cbxDate.currentIndexChanged.connect(self.dateSelected)
+        self.lblTime = QLabel("00:00:00")
+        self.lblTime.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
         self.sldTime = QSlider(Qt.Horizontal, self)
         self.sldTime.setTickPosition(QSlider.TicksAbove)
         self.sldTime.setRange(0, 0)
         self.sldTime.setTickInterval(1)
         self.sldTime.setPageStep(1)
         self.sldTime.valueChanged.connect(self.timeSelected)
-        boxDateTime = QHBoxLayout()
-        boxDateTime.setSpacing(10)
-        boxDateTime.setContentsMargins(0, 0, 0, 0)
-        boxDateTime.addWidget(self.cbxDate)
-        boxDateTime.addWidget(self.sldTime, 1)
-        pnlDatetime = QWidget()
-        pnlDatetime.setLayout(boxDateTime)
+        gridData = QGridLayout()
+        #gridData.setVerticalSpacing(5)
+        #gridData.setHorizontalSpacing(5)
+        gridData.setSpacing(5)
+        gridData.setContentsMargins(0,0,0,0)
+        gridData.addWidget(self.btnDataDir, 0, 0)
+        gridData.addWidget(self.lblData, 0, 1, 1, 2)
+        gridData.addWidget(self.cbxDate, 1, 0)
+        gridData.addWidget(self.lblTime, 1, 1)
+        gridData.addWidget(self.sldTime, 1, 2)
+        pnlData = QWidget()
+        pnlData.setLayout(gridData)
 
         # toolbox
         self.btn2DRender = QPushButton(self)
@@ -214,14 +213,13 @@ class SkyDataViewer(QMainWindow):
                                  self.Settings["VertSplitBottom"] if self.Settings["VertSplitBottom"] >= 0 else self.Settings["WindowHeight"] * 0.25])
 
         # attach high level panels and vertical splitter to layout of window
-        grid = QGridLayout()
-        grid.setSpacing(10)
-        grid.setContentsMargins(10, 10, 10, 0)
-        grid.addWidget(pnlDataDir, 0, 0)
-        grid.addWidget(pnlDatetime, 1, 0)
-        grid.addWidget(self.splitVert, 2, 0)
+        gridMain = QGridLayout()
+        gridMain.setSpacing(5)
+        gridMain.setContentsMargins(10, 10, 10, 10)
+        gridMain.addWidget(pnlData, 0, 0)
+        gridMain.addWidget(self.splitVert, 1, 0)
         pnlMain = QWidget()
-        pnlMain.setLayout(grid)
+        pnlMain.setLayout(gridMain)
         self.setCentralWidget(pnlMain)
 
         # window
@@ -232,14 +230,16 @@ class SkyDataViewer(QMainWindow):
         self.statusBar().showMessage('Ready')
 
     def resetAllUI(self):
-        self.lblDataDir.clear()
+        self.lblData.clear()
+        self.lblTime.setText("00:00:00")
         self.cbxDate.clear()
         self.sldTime.setRange(0, 0)
         self.wgtRender.clear()
         self.wgtRender.repaint()
 
     def resetDayUI(self):
-        self.lblDataDir.setText(self.Settings["DataDirectory"])
+        self.lblData.setText(self.Settings["DataDirectory"])
+        self.lblTime.setText("00:00:00")
         self.sldTime.setRange(0, 0)
         self.wgtRender.clear()
         self.wgtRender.repaint()
@@ -250,7 +250,7 @@ class SkyDataViewer(QMainWindow):
 
         # GUI
         self.resetAllUI()
-        self.lblDataDir.setText(self.Settings["DataDirectory"])
+        self.lblData.setText(self.Settings["DataDirectory"])
 
         # find capture dates and times
         captureDateDirs = utility.findFiles(self.Settings["DataDirectory"], mode=2)
@@ -307,7 +307,8 @@ class SkyDataViewer(QMainWindow):
         self.sldTime.valueChanged.emit(0)
 
     def timeSelected(self, index):
-        self.lblDataDir.setText(self.hdrCaptures[index])
+        self.lblData.setText(self.hdrCaptures[index])
+        self.lblTime.setText(str(utility.imageEXIFDateTime(self.hdrCaptures[index]).time()))
         self.wgtRender.setPhoto(self.hdrCaptures[index])
         if os.path.exists(os.path.splitext(self.hdrCaptures[index])[0]+'.cr2'):
             self.wgtRender.setRAWAvailable(True)
@@ -328,9 +329,10 @@ class SkyDataViewer(QMainWindow):
     def toggleStatusBar(self, state):
         if state:
             self.statusBar().show()
+            #self.centralWidget().layout().setContentsMargins(10,10,10,0)
         else:
             self.statusBar().hide()
-
+            #self.centralWidget().layout().setContentsMargins(10,10,10,10)
 
     def center(self):
         frame = self.frameGeometry()
