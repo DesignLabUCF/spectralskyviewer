@@ -50,6 +50,8 @@ class SkyDataViewer(QMainWindow):
             "HorizSplitRight": -1,
             "VertSplitTop": -1,
             "VertSplitBottom": -1,
+            "ShowHUD": True,
+            "ShowStatusBar": True,
         }
 
         # load and validate settings
@@ -66,23 +68,51 @@ class SkyDataViewer(QMainWindow):
 
         # init GUI
         # uic.loadUi('design.ui', self)
-        self.initWidgets()
         self.initMenu()
+        self.initWidgets()
 
         # startup
         self.loadData()
 
     def initMenu(self):
-        # menu actions
+        # file menu actions
         actExit = QAction(QIcon(), 'E&xit', self)
         actExit.setShortcut('Ctrl+Q')
-        actExit.setStatusTip('Exit application')
+        actExit.setStatusTip('Exit the application')
         actExit.triggered.connect(self.close)
+        actLoad = QAction(QIcon(), '&Load', self)
+        actLoad.setShortcut('Ctrl+L')
+        actLoad.setStatusTip('Load the data directory...')
+        actLoad.triggered.connect(self.browseForData)
+
+        # view menu actions
+        self.actHUD = QAction(QIcon(), 'Show &HUD', self)
+        self.actHUD.setCheckable(True)
+        self.actHUD.setChecked(self.Settings["ShowHUD"])
+        self.actHUD.setStatusTip('Toggle display of HUD')
+        self.actHUD.triggered.connect(self.toggleHUD)
+        self.actStatusBar = QAction(QIcon(), 'Show Status &Bar', self)
+        self.actStatusBar.setCheckable(True)
+        self.actStatusBar.setChecked(self.Settings["ShowStatusBar"])
+        self.actStatusBar.setStatusTip('Toggle display of status bar')
+        self.actStatusBar.triggered.connect(self.toggleStatusBar)
+
+        # help menu actions
+        actAbout = QAction(QIcon(), '&About', self)
+        actAbout.setStatusTip('Information about this application')
+        #actAbout.triggered.connect(self.close)
 
         # menubar
         menubar = self.menuBar()
         menuFile = menubar.addMenu('&File')
+        menuFile.addAction(actLoad)
+        menuFile.addSeparator()
         menuFile.addAction(actExit)
+        menuView = menubar.addMenu('&View')
+        menuView.addAction(self.actHUD)
+        menuView.addAction(self.actStatusBar)
+        menuHelp = menubar.addMenu('&Help')
+        menuHelp.addAction(actAbout)
 
         # # toolbar
         # toolbar = self.addToolBar('Toolbar')
@@ -92,10 +122,10 @@ class SkyDataViewer(QMainWindow):
         # data directory panel
         self.btnDataDir = QPushButton('Data', self)
         self.btnDataDir.setIcon(self.btnDataDir.style().standardIcon(QStyle.SP_DirIcon))
-        self.btnDataDir.setToolTip('Set data directory...')
-        self.btnDataDir.clicked.connect(self.browseForFolder)
+        self.btnDataDir.setToolTip('Load data directory...')
+        self.btnDataDir.clicked.connect(self.browseForData)
         self.lblDataDir = QLabel()
-        self.lblDataDir.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.lblDataDir.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
         boxDataDir = QHBoxLayout()
         boxDataDir.setSpacing(10)
         boxDataDir.setContentsMargins(0, 0, 0, 0)
@@ -143,15 +173,23 @@ class SkyDataViewer(QMainWindow):
 
         # render pane
         self.wgtRender = ViewFisheye()
+        self.wgtRender.showHUD(self.actHUD.isChecked())
 
         # info view
-        self.wgtInfo = QTextEdit()
-        self.wgtInfo.setFocusPolicy(Qt.ClickFocus)
+        self.lblHDRFile = QLabel()
+        self.lblHDRFile.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+        boxInfo = QVBoxLayout()
+        boxInfo.setSpacing(0)
+        boxInfo.setContentsMargins(0, 0, 0, 0)
+        boxInfo.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        boxInfo.addWidget(self.lblHDRFile)
+        pnlInfo = QWidget()
+        pnlInfo.setLayout(boxInfo)
 
         # horizontal splitter
         self.splitHoriz = QSplitter(Qt.Horizontal)
         self.splitHoriz.addWidget(self.wgtRender)
-        self.splitHoriz.addWidget(self.wgtInfo)
+        self.splitHoriz.addWidget(pnlInfo)
         self.splitHoriz.setSizes([self.Settings["HorizSplitLeft"] if self.Settings["HorizSplitLeft"] >= 0 else self.Settings["WindowWidth"] * 0.75,
                                   self.Settings["HorizSplitRight"] if self.Settings["HorizSplitRight"] >= 0 else self.Settings["WindowWidth"] * 0.25])
 
@@ -201,6 +239,7 @@ class SkyDataViewer(QMainWindow):
         self.wgtRender.repaint()
 
     def resetDayUI(self):
+        self.lblDataDir.setText(self.Settings["DataDirectory"])
         self.sldTime.setRange(0, 0)
         self.wgtRender.clear()
         self.wgtRender.repaint()
@@ -222,7 +261,7 @@ class SkyDataViewer(QMainWindow):
             #self.cbxDate.setCurrentIndex(-1) # trigger manual date selection
             #self.cbxDate.setCurrentIndex(0)  # trigger manual date selection
 
-    def browseForFolder(self):
+    def browseForData(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', self.Settings["DataDirectory"])
         directory = QDir.toNativeSeparators(directory)
         if directory is not None and len(directory) > 0 and directory != self.Settings["DataDirectory"]:
@@ -265,14 +304,13 @@ class SkyDataViewer(QMainWindow):
 
         # load GUI
         self.sldTime.setRange(0, len(self.hdrCaptures)-1)
-        self.wgtRender.setPhoto(self.hdrCaptures[0])
-        self.wgtRender.repaint()
-
-        # for p in captures:
-        #     print(p, utility.fileModDateTime(p))
+        self.sldTime.valueChanged.emit(0)
 
     def timeSelected(self, index):
+        self.lblDataDir.setText(self.hdrCaptures[index])
         self.wgtRender.setPhoto(self.hdrCaptures[index])
+        if os.path.exists(os.path.splitext(self.hdrCaptures[index])[0]+'.cr2'):
+            self.wgtRender.setRAWAvailable(True)
         self.wgtRender.repaint()
 
     # def contextMenuEvent(self, event):
@@ -282,6 +320,17 @@ class SkyDataViewer(QMainWindow):
     #     action = menuCtx.exec_(self.mapToGlobal(event.pos()))
     #     if action == actExit:
     #         self.close()
+
+    def toggleHUD(self, state):
+        self.wgtRender.showHUD(state)
+        self.wgtRender.repaint()
+
+    def toggleStatusBar(self, state):
+        if state:
+            self.statusBar().show()
+        else:
+            self.statusBar().hide()
+
 
     def center(self):
         frame = self.frameGeometry()
@@ -295,7 +344,6 @@ class SkyDataViewer(QMainWindow):
         #     event.accept()
         # else:
         #     event.ignore()
-
         # btn.clicked.connect(QApplication.instance().quit)
         event.accept()
 
@@ -308,6 +356,8 @@ class SkyDataViewer(QMainWindow):
         top, bottom = self.splitVert.sizes()
         self.Settings["VertSplitTop"] = top
         self.Settings["VertSplitBottom"] = bottom
+        self.Settings["ShowHUD"] = self.actHUD.isChecked()
+        self.Settings["ShowStatusBar"] = self.actStatusBar.isChecked()
 
         # dump settings to file
         with open(self.Settings["Filename"], 'w') as file:

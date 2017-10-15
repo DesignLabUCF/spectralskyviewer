@@ -26,29 +26,49 @@
 # @summary: A widget for displaying the fisheye view of the HDR data
 # ====================================================================
 import os
+from datetime import datetime
 from PyQt5.QtCore import Qt, QRect
-from PyQt5.QtGui import QFont, QPainter, QColor, QPen, QBrush, QImage
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QIcon
+from PyQt5.QtWidgets import QWidget, QStyle
+import utility
 
 
 class ViewFisheye(QWidget):
     def __init__(self):
         super().__init__()
+        self.myPhoto = QImage()
+        self.myPhotoPath = ""
+        self.myPhotoTimestamp = datetime.now()
+        self.srcRect = QRect()
+        self.hudEnabled = True
+        self.rawAvailable = False
+        # preloaded graphics
         self.pen = QPen(Qt.black, 1, Qt.SolidLine)
         self.brush = QBrush(Qt.darkGray, Qt.Dense1Pattern)
-        self.myPhoto = QImage()
-        self.srcRect = QRect()
-
-    def clear(self):
-        self.myPhoto = QImage()
-        self.srcRect = QRect()
+        self.font = QFont('Courier New', 8)
+        self.iconWarning = self.style().standardIcon(QStyle.SP_MessageBoxWarning).pixmap(16)
 
     def setPhoto(self, path):
         if os.path.exists(path):
+            self.myPhotoPath = path
+            self.myPhotoTimestamp = utility.imageEXIFDateTime(path)
             self.myPhoto = QImage(path)
             self.srcRect = QRect(0, 0, self.myPhoto.width(), self.myPhoto.height())
         else:
             self.clear()
+
+    def clear(self):
+        self.myPhoto = QImage()
+        self.myPhotoPath = ""
+        self.myPhotoTimestamp = datetime.now()
+        self.srcRect = QRect()
+        self.rawAvailable = False
+
+    def showHUD(self, b):
+        self.hudEnabled = b
+
+    def setRAWAvailable(self, b):
+        self.rawAvailable = b
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -81,6 +101,20 @@ class ViewFisheye(QWidget):
             # center and draw it
             destRect.moveTo(self.width()/2-destRect.width()/2, self.height()/2-destRect.height()/2)
             painter.drawImage(destRect, self.myPhoto, self.srcRect)
+
+            # HUD
+            if self.hudEnabled:
+                painter.setPen(Qt.white)
+                painter.setBackgroundMode(Qt.TransparentMode)
+                painter.setBrush(Qt.NoBrush)
+                painter.setFont(self.font)
+                destRect.setCoords(10, 10, self.width() - 10, 20)
+                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, os.path.basename(self.myPhotoPath))
+                destRect.moveTo(10, 25)
+                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTimestamp.time()))
+
+                if not self.rawAvailable:
+                    painter.drawPixmap(self.width()-10-16, 10, self.iconWarning)
 
         # end draw
         painter.end()
