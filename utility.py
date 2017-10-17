@@ -77,8 +77,8 @@ Function to extract the "DateTimeOriginal" EXIF value of an image.
 '''
 def imageEXIFDateTime(filepath):
     strDateTime = imageEXIFTag(filepath, "EXIF DateTimeOriginal")
-    # if strDateTime is None or len(strDateTime) <= 0:
-    #     return None
+    if strDateTime is None or len(strDateTime) <= 0:
+        return datetime(1,1,1)
     return datetime.strptime(strDateTime, '%Y:%m:%d %H:%M:%S')
 
 '''
@@ -92,7 +92,17 @@ def imageEXIFTag(filepath, tag):
         tags = exifread.process_file(f, details=False, stop_tag=tag)
         if tag in tags.keys():
             result = tags[tag]
-    return str(result)
+    return str(result) if result is not None else None
+
+'''
+Function to extract all important EXIF data from an image.
+:param filepath: Path to image
+'''
+def imageEXIF(filepath):
+    data = {}
+    with open(filepath, 'rb') as f:
+        data = exifread.process_file(f, details=False)
+    return data
 
 '''
 Helper function that returns a list of all files, directories, or both, immediate or recursive.
