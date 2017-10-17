@@ -28,6 +28,7 @@
 import sys
 import os
 import json
+from datetime import datetime
 from PyQt5.QtCore import QCoreApplication, Qt, QDir
 from PyQt5.QtGui import QIcon, QFont, QPainter
 from PyQt5.QtWidgets import *
@@ -40,7 +41,7 @@ class SkyDataViewer(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # available settings, set to defaults
+        # app settings, set to defaults
         self.Settings = {
             "Filename": "settings.json",
             "DataDirectory": "",
@@ -50,6 +51,7 @@ class SkyDataViewer(QMainWindow):
             "HorizSplitRight": -1,
             "VertSplitTop": -1,
             "VertSplitBottom": -1,
+            "ShowInfo": True,
             "ShowHUD": True,
             "ShowStatusBar": True,
         }
@@ -86,6 +88,11 @@ class SkyDataViewer(QMainWindow):
         actLoad.triggered.connect(self.browseForData)
 
         # view menu actions
+        self.actInfo = QAction(QIcon(), 'Show &Info', self)
+        self.actInfo.setCheckable(True)
+        self.actInfo.setChecked(self.Settings["ShowInfo"])
+        self.actInfo.setStatusTip('Toggle display of info panel')
+        self.actInfo.triggered.connect(self.toggleInfoPanel)
         self.actHUD = QAction(QIcon(), 'Show &HUD', self)
         self.actHUD.setCheckable(True)
         self.actHUD.setChecked(self.Settings["ShowHUD"])
@@ -109,6 +116,7 @@ class SkyDataViewer(QMainWindow):
         menuFile.addSeparator()
         menuFile.addAction(actExit)
         menuView = menubar.addMenu('&View')
+        menuView.addAction(self.actInfo)
         menuView.addAction(self.actHUD)
         menuView.addAction(self.actStatusBar)
         menuHelp = menubar.addMenu('&Help')
@@ -171,23 +179,30 @@ class SkyDataViewer(QMainWindow):
         pnlToolbox.setLayout(boxToolbox)
 
         # render pane
-        self.wgtRender = ViewFisheye()
-        self.wgtRender.showHUD(self.actHUD.isChecked())
+        self.wgtFisheye = ViewFisheye()
+        self.wgtFisheye.showHUD(self.actHUD.isChecked())
 
         # info view
-        self.lblHDRFile = QLabel()
-        self.lblHDRFile.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+        self.tblInfo = QTableWidget()
+        self.tblInfo.setShowGrid(False)
+        self.tblInfo.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tblInfo.verticalHeader().hide()
+        #self.tblInfo.horizontalHeader().hide()
+        self.tblInfo.setColumnCount(2)
+        self.tblInfo.setHorizontalHeaderItem(0, QTableWidgetItem("Field"))
+        self.tblInfo.setHorizontalHeaderItem(1, QTableWidgetItem("Value"))
+        self.tblInfo.horizontalHeader().setStretchLastSection(True)
         boxInfo = QVBoxLayout()
         boxInfo.setSpacing(0)
         boxInfo.setContentsMargins(0, 0, 0, 0)
         boxInfo.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        boxInfo.addWidget(self.lblHDRFile)
+        boxInfo.addWidget(self.tblInfo)
         pnlInfo = QWidget()
         pnlInfo.setLayout(boxInfo)
 
         # horizontal splitter
         self.splitHoriz = QSplitter(Qt.Horizontal)
-        self.splitHoriz.addWidget(self.wgtRender)
+        self.splitHoriz.addWidget(self.wgtFisheye)
         self.splitHoriz.addWidget(pnlInfo)
         self.splitHoriz.setSizes([self.Settings["HorizSplitLeft"] if self.Settings["HorizSplitLeft"] >= 0 else self.Settings["WindowWidth"] * 0.75,
                                   self.Settings["HorizSplitRight"] if self.Settings["HorizSplitRight"] >= 0 else self.Settings["WindowWidth"] * 0.25])
@@ -230,19 +245,25 @@ class SkyDataViewer(QMainWindow):
         self.statusBar().showMessage('Ready')
 
     def resetAllUI(self):
+        self.hdrCaptures = []
+        self.asdMeasures = []
         self.lblData.clear()
         self.lblTime.setText("00:00:00")
         self.cbxDate.clear()
         self.sldTime.setRange(0, 0)
-        self.wgtRender.clear()
-        self.wgtRender.repaint()
+        self.wgtFisheye.clear()
+        self.wgtFisheye.repaint()
+        self.tblInfo.clearContents()
 
     def resetDayUI(self):
+        self.hdrCaptures = []
+        self.asdMeasures = []
         self.lblData.setText(self.Settings["DataDirectory"])
         self.lblTime.setText("00:00:00")
         self.sldTime.setRange(0, 0)
-        self.wgtRender.clear()
-        self.wgtRender.repaint()
+        self.wgtFisheye.clear()
+        self.wgtFisheye.repaint()
+        self.tblInfo.clearContents()
 
     def loadData(self):
         if len(self.Settings["DataDirectory"]) <= 0 or not os.path.exists(self.Settings["DataDirectory"]):
@@ -302,17 +323,38 @@ class SkyDataViewer(QMainWindow):
         if len(self.hdrCaptures) <= 0:
             return
 
+        # find ASD data
+
         # load GUI
         self.sldTime.setRange(0, len(self.hdrCaptures)-1)
         self.sldTime.valueChanged.emit(0)
 
     def timeSelected(self, index):
+        if index < 0 or index >= self.sldTime.maximum():
+            return
+
+        # extract EXIF data from image
+        exif = utility.imageEXIF(self.hdrCaptures[index])
+        exif = {k: v for k, v in exif.items() if k.startswith("EXIF")}
+        timestamp = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
+
+        # labels
         self.lblData.setText(self.hdrCaptures[index])
-        self.lblTime.setText(str(utility.imageEXIFDateTime(self.hdrCaptures[index]).time()))
-        self.wgtRender.setPhoto(self.hdrCaptures[index])
-        if os.path.exists(os.path.splitext(self.hdrCaptures[index])[0]+'.cr2'):
-            self.wgtRender.setRAWAvailable(True)
-        self.wgtRender.repaint()
+        self.lblTime.setText(str(timestamp.time()))
+
+        # info panel
+        self.tblInfo.setRowCount(len(exif.keys()))
+        row = 0
+        for key in sorted(exif.keys()):
+            self.tblInfo.setItem(row, 0, QTableWidgetItem(str(key)))
+            self.tblInfo.setItem(row, 1, QTableWidgetItem(str(exif[key])))
+            row += 1
+
+        # render pane
+        self.wgtFisheye.setPhoto(self.hdrCaptures[index], exif=exif)
+        if os.path.exists(os.path.splitext(self.hdrCaptures[index].lower())[0]+'.cr2'):
+            self.wgtFisheye.setRAWAvailable(True)
+        self.wgtFisheye.repaint()
 
     # def contextMenuEvent(self, event):
     #     menuCtx = QMenu(self)
@@ -322,9 +364,16 @@ class SkyDataViewer(QMainWindow):
     #     if action == actExit:
     #         self.close()
 
+    def toggleInfoPanel(self, state):
+        if state:
+            self.splitHoriz.setSizes([self.width() * 0.75, self.width() * 0.25])
+        else:
+            left, right = self.splitHoriz.sizes()
+            self.splitHoriz.setSizes([left + right, 0])
+
     def toggleHUD(self, state):
-        self.wgtRender.showHUD(state)
-        self.wgtRender.repaint()
+        self.wgtFisheye.showHUD(state)
+        self.wgtFisheye.repaint()
 
     def toggleStatusBar(self, state):
         if state:
@@ -358,6 +407,7 @@ class SkyDataViewer(QMainWindow):
         top, bottom = self.splitVert.sizes()
         self.Settings["VertSplitTop"] = top
         self.Settings["VertSplitBottom"] = bottom
+        self.Settings["ShowInfo"] = self.actInfo.isChecked()
         self.Settings["ShowHUD"] = self.actHUD.isChecked()
         self.Settings["ShowStatusBar"] = self.actStatusBar.isChecked()
 
