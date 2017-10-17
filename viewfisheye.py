@@ -36,31 +36,36 @@ import utility
 class ViewFisheye(QWidget):
     def __init__(self):
         super().__init__()
+        # members
         self.myPhoto = QImage()
         self.myPhotoPath = ""
-        self.myPhotoTimestamp = datetime.now()
+        self.myPhotoTime = datetime(1,1,1)
         self.srcRect = QRect()
         self.hudEnabled = True
         self.rawAvailable = False
+        self.mouseCoords = [0,0]
         # preloaded graphics
         self.pen = QPen(Qt.black, 1, Qt.SolidLine)
         self.brush = QBrush(Qt.darkGray, Qt.Dense1Pattern)
         self.font = QFont('Courier New', 8)
         self.iconWarning = self.style().standardIcon(QStyle.SP_MessageBoxWarning).pixmap(16)
+        # init
+        self.setMouseTracking(True)
 
-    def setPhoto(self, path):
+    def setPhoto(self, path, exif=None):
         if os.path.exists(path):
             self.myPhotoPath = path
-            self.myPhotoTimestamp = utility.imageEXIFDateTime(path)
             self.myPhoto = QImage(path)
             self.srcRect = QRect(0, 0, self.myPhoto.width(), self.myPhoto.height())
+            if exif is not None:
+                self.myPhotoTime = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
         else:
             self.clear()
 
     def clear(self):
         self.myPhoto = QImage()
         self.myPhotoPath = ""
-        self.myPhotoTimestamp = datetime.now()
+        self.myPhotoTime = datetime(1,1,1)
         self.srcRect = QRect()
         self.rawAvailable = False
 
@@ -69,6 +74,11 @@ class ViewFisheye(QWidget):
 
     def setRAWAvailable(self, b):
         self.rawAvailable = b
+
+    def mouseMoveEvent(self, event):
+        self.mouseCoords = [event.x(), event.y()]
+        self.repaint()
+        #print(self.mouseCoords)
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -86,21 +96,21 @@ class ViewFisheye(QWidget):
 
         # draw photo
         if not self.myPhoto.isNull():
-            destRect = QRect()
+            destRectPhoto = QRect()
 
             # use the appropriate scaling factor that requires the most scaling ( - 2 to fit in border )
             wRatio = self.width()/self.myPhoto.width()
             hRatio = self.height()/self.myPhoto.height()
             if wRatio <= hRatio:
-                destRect.setWidth(self.srcRect.width() * wRatio - 2)
-                destRect.setHeight(self.srcRect.height() * wRatio - 2)
+                destRectPhoto.setWidth(self.srcRect.width() * wRatio - 2)
+                destRectPhoto.setHeight(self.srcRect.height() * wRatio - 2)
             else:
-                destRect.setWidth(self.srcRect.width() * hRatio - 2)
-                destRect.setHeight(self.srcRect.height() * hRatio - 2)
+                destRectPhoto.setWidth(self.srcRect.width() * hRatio - 2)
+                destRectPhoto.setHeight(self.srcRect.height() * hRatio - 2)
 
             # center and draw it
-            destRect.moveTo(self.width()/2-destRect.width()/2, self.height()/2-destRect.height()/2)
-            painter.drawImage(destRect, self.myPhoto, self.srcRect)
+                destRectPhoto.moveTo(self.width()/2-destRectPhoto.width()/2, self.height()/2-destRectPhoto.height()/2)
+            painter.drawImage(destRectPhoto, self.myPhoto, self.srcRect)
 
             # HUD
             if self.hudEnabled:
@@ -108,13 +118,28 @@ class ViewFisheye(QWidget):
                 painter.setBackgroundMode(Qt.TransparentMode)
                 painter.setBrush(Qt.NoBrush)
                 painter.setFont(self.font)
-                destRect.setCoords(10, 10, self.width() - 10, 20)
-                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, os.path.basename(self.myPhotoPath))
-                destRect.moveTo(10, 25)
-                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTimestamp.time()))
+                destRect = QRect()
 
+                # filename
+                destRect.setCoords(10, 10, self.width()/2, 50)
+                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, os.path.basename(self.myPhotoPath))
+                # timestamp
+                destRect.moveTo(10, 25)
+                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTime))
+                # dimenstions
+                destRect.moveTo(10, 40)
+                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.srcRect.width()) + " x " + str(self.srcRect.height()))
+                # mouse coords
+                if self.mouseCoords[0] < destRectPhoto.x() or self.mouseCoords[1] < destRectPhoto.y() or self.mouseCoords[0] > destRectPhoto.x() + destRectPhoto.width() or self.mouseCoords[1] > destRectPhoto.y() + destRectPhoto.height():
+                    self.mouseCoords = [-1, -1]
+                else:
+                    self.mouseCoords[0] -= destRectPhoto.x() #+ round(destRectPhoto.width()/2)
+                    self.mouseCoords[1] -= destRectPhoto.y() #+ round(destRectPhoto.height()/2)
+                destRect.setCoords(10, 10, self.width()-10, self.height()-10)
+                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, str(self.mouseCoords[0]) + ", " + str(self.mouseCoords[1]))
+                # raw notice
                 if not self.rawAvailable:
-                    painter.drawPixmap(self.width()-10-16, 10, self.iconWarning)
+                    painter.drawPixmap(self.width()-16-16, 16, self.iconWarning)
 
         # end draw
         painter.end()
