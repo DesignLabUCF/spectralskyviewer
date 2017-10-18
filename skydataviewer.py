@@ -57,10 +57,10 @@ class SkyDataViewer(QMainWindow):
         }
 
         # load and validate settings
-        if os.path.exists(self.Settings["Filename"]):
+        if (os.path.exists(self.Settings["Filename"])):
             with open(self.Settings["Filename"], 'r') as file:
                 self.Settings = json.load(file)
-        if len(self.Settings["DataDirectory"]) > 0 and not os.path.exists(self.Settings["DataDirectory"]):
+        if (len(self.Settings["DataDirectory"]) > 0 and not os.path.exists(self.Settings["DataDirectory"])):
             self.Settings["DataDirectory"] = ""
 
         # init
@@ -266,7 +266,7 @@ class SkyDataViewer(QMainWindow):
         self.tblInfo.clearContents()
 
     def loadData(self):
-        if len(self.Settings["DataDirectory"]) <= 0 or not os.path.exists(self.Settings["DataDirectory"]):
+        if (len(self.Settings["DataDirectory"]) <= 0 or not os.path.exists(self.Settings["DataDirectory"])):
             return
 
         # GUI
@@ -277,7 +277,8 @@ class SkyDataViewer(QMainWindow):
         captureDateDirs = utility.findFiles(self.Settings["DataDirectory"], mode=2)
         captureDateDirs[:] = [dir for dir in captureDateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
         captureDates = [os.path.basename(dir) for dir in captureDateDirs]
-        if len(captureDates) > 0:
+        if (len(captureDates) > 0):
+            self.cbxDate.addItem("-dates-")
             self.cbxDate.addItems(captureDates)
             #self.cbxDate.setCurrentIndex(-1) # trigger manual date selection
             #self.cbxDate.setCurrentIndex(0)  # trigger manual date selection
@@ -285,12 +286,12 @@ class SkyDataViewer(QMainWindow):
     def browseForData(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', self.Settings["DataDirectory"])
         directory = QDir.toNativeSeparators(directory)
-        if directory is not None and len(directory) > 0 and directory != self.Settings["DataDirectory"]:
+        if (directory is not None and len(directory) > 0 and directory != self.Settings["DataDirectory"]):
             self.Settings["DataDirectory"] = directory
             self.loadData()
 
     def dateSelected(self, index):
-        if index < 0 or index >= self.cbxDate.count():
+        if (index < 0 or index >= self.cbxDate.count()):
             return
 
         # GUI
@@ -302,7 +303,7 @@ class SkyDataViewer(QMainWindow):
         if not os.path.exists(pathHDR):
             return
         photos = utility.findFiles(pathHDR, mode=1, ext="jpg")
-        if len(photos) <= 0:
+        if (len(photos) <= 0):
             return
 
         # filter HDR photos down to those we are interested in
@@ -314,13 +315,13 @@ class SkyDataViewer(QMainWindow):
         for p in photos:
             last = captureIntervals[-1]
             next = utility.imageEXIFDateTime(p)
-            if (next - last).total_seconds() / 60.0 >= threshold:
+            if ((next - last).total_seconds() / 60.0 >= threshold):
                 captureIntervals.append(next)
                 captures.append(pPrev)
             pPrev = p
         captures.append(photos[-1])
         self.hdrCaptures = captures[1:]
-        if len(self.hdrCaptures) <= 0:
+        if (len(self.hdrCaptures) <= 0):
             return
 
         # find ASD data
@@ -330,7 +331,7 @@ class SkyDataViewer(QMainWindow):
         self.sldTime.valueChanged.emit(0)
 
     def timeSelected(self, index):
-        if index < 0 or index >= self.sldTime.maximum():
+        if (index < 0 or index >= self.sldTime.maximum()):
             return
 
         # extract EXIF data from image
@@ -352,7 +353,7 @@ class SkyDataViewer(QMainWindow):
 
         # render pane
         self.wgtFisheye.setPhoto(self.hdrCaptures[index], exif=exif)
-        if os.path.exists(os.path.splitext(self.hdrCaptures[index].lower())[0]+'.cr2'):
+        if (os.path.exists(os.path.splitext(self.hdrCaptures[index].lower())[0]+'.cr2')):
             self.wgtFisheye.setRAWAvailable(True)
         self.wgtFisheye.repaint()
 
@@ -365,7 +366,7 @@ class SkyDataViewer(QMainWindow):
     #         self.close()
 
     def toggleInfoPanel(self, state):
-        if state:
+        if (state):
             self.splitHoriz.setSizes([self.width() * 0.75, self.width() * 0.25])
         else:
             left, right = self.splitHoriz.sizes()
@@ -376,7 +377,7 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.repaint()
 
     def toggleStatusBar(self, state):
-        if state:
+        if (state):
             self.statusBar().show()
             #self.centralWidget().layout().setContentsMargins(10,10,10,0)
         else:

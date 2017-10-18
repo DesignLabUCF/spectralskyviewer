@@ -53,11 +53,11 @@ class ViewFisheye(QWidget):
         self.setMouseTracking(True)
 
     def setPhoto(self, path, exif=None):
-        if os.path.exists(path):
+        if (os.path.exists(path)):
             self.myPhotoPath = path
             self.myPhoto = QImage(path)
             self.srcRect = QRect(0, 0, self.myPhoto.width(), self.myPhoto.height())
-            if exif is not None:
+            if (exif is not None):
                 self.myPhotoTime = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
         else:
             self.clear()
@@ -95,13 +95,13 @@ class ViewFisheye(QWidget):
         painter.drawRect(0, 0, self.width()-1, self.height()-1)
 
         # draw photo
-        if not self.myPhoto.isNull():
+        if (not self.myPhoto.isNull()):
             destRectPhoto = QRect()
 
             # use the appropriate scaling factor that requires the most scaling ( - 2 to fit in border )
             wRatio = self.width()/self.myPhoto.width()
             hRatio = self.height()/self.myPhoto.height()
-            if wRatio <= hRatio:
+            if (wRatio <= hRatio):
                 destRectPhoto.setWidth(self.srcRect.width() * wRatio - 2)
                 destRectPhoto.setHeight(self.srcRect.height() * wRatio - 2)
             else:
@@ -109,11 +109,11 @@ class ViewFisheye(QWidget):
                 destRectPhoto.setHeight(self.srcRect.height() * hRatio - 2)
 
             # center and draw it
-                destRectPhoto.moveTo(self.width()/2-destRectPhoto.width()/2, self.height()/2-destRectPhoto.height()/2)
+            destRectPhoto.moveTo(self.width()/2-destRectPhoto.width()/2, self.height()/2-destRectPhoto.height()/2)
             painter.drawImage(destRectPhoto, self.myPhoto, self.srcRect)
 
             # HUD
-            if self.hudEnabled:
+            if (self.hudEnabled):
                 painter.setPen(Qt.white)
                 painter.setBackgroundMode(Qt.TransparentMode)
                 painter.setBrush(Qt.NoBrush)
@@ -130,15 +130,19 @@ class ViewFisheye(QWidget):
                 destRect.moveTo(10, 40)
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.srcRect.width()) + " x " + str(self.srcRect.height()))
                 # mouse coords
-                if self.mouseCoords[0] < destRectPhoto.x() or self.mouseCoords[1] < destRectPhoto.y() or self.mouseCoords[0] > destRectPhoto.x() + destRectPhoto.width() or self.mouseCoords[1] > destRectPhoto.y() + destRectPhoto.height():
+                if (self.mouseCoords[0] < destRectPhoto.x() or
+                    self.mouseCoords[1] < destRectPhoto.y() or
+                    self.mouseCoords[0] > destRectPhoto.x() + destRectPhoto.width() or
+                    self.mouseCoords[1] > destRectPhoto.y() + destRectPhoto.height()):
                     self.mouseCoords = [-1, -1]
                 else:
                     self.mouseCoords[0] -= destRectPhoto.x() #+ round(destRectPhoto.width()/2)
                     self.mouseCoords[1] -= destRectPhoto.y() #+ round(destRectPhoto.height()/2)
                 destRect.setCoords(10, 10, self.width()-10, self.height()-10)
-                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, str(self.mouseCoords[0]) + ", " + str(self.mouseCoords[1]))
+                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight,
+                                 str(self.mouseCoords[0]) + ", " + str(self.mouseCoords[1]))
                 # raw notice
-                if not self.rawAvailable:
+                if (not self.rawAvailable):
                     painter.drawPixmap(self.width()-16-16, 16, self.iconWarning)
 
         # end draw
