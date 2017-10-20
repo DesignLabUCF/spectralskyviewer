@@ -302,7 +302,7 @@ class SkyDataViewer(QMainWindow):
         pathHDR = os.path.join(pathDate, "HDR")
         if not os.path.exists(pathHDR):
             return
-        photos = utility.findFiles(pathHDR, mode=1, ext="jpg")
+        photos = utility.findFiles(pathHDR, mode=1, ext=["jpg"])
         if (len(photos) <= 0):
             return
 

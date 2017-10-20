@@ -108,14 +108,15 @@ def imageEXIF(filepath):
 Helper function that returns a list of all files, directories, or both, immediate or recursive.
 :param mode: 0=both, 1=files, 2=dir
 :param recursive: Immediate top-level list or recursive list
-:param ext: File extension to filter by
+:param ext: List of file extensions to filter by
 '''
-def findFiles(dirpath, mode=0, recursive=False, ext=""):
+def findFiles(dirpath, mode=0, recursive=False, ext=[]):
     stuff = []
     if len(ext) > 0:
-        ext = ext.strip().lower()
-        if ext[0] != ".":
-            ext = "." + ext
+        for i in range(0, len(ext)):
+            ext[i] = ext[i].strip().lower()
+            if ext[i][0] != ".":
+                ext[i] = "." + ext[i]
     # immediate top-level list
     if not recursive:
         for entry in os.listdir(dirpath):
@@ -124,8 +125,9 @@ def findFiles(dirpath, mode=0, recursive=False, ext=""):
                 base, extension = os.path.splitext(fullpath.strip().lower())
                 if os.path.isfile(fullpath):
                     if len(ext) > 0:
-                        if extension == ext:
-                            stuff.append(fullpath)
+                        for e in ext:
+                            if extension == e:
+                                stuff.append(fullpath)
                     else:
                         stuff.append(fullpath)
             if mode == 2 or mode == 0:
@@ -139,8 +141,9 @@ def findFiles(dirpath, mode=0, recursive=False, ext=""):
                     fullpath = os.path.join(root, file)
                     base, extension = os.path.splitext(fullpath.strip().lower())
                     if len(ext) > 0:
-                        if extension == ext:
-                            stuff.append(fullpath)
+                        for e in ext:
+                            if extension == e:
+                                stuff.append(fullpath)
                     else:
                         stuff.append(fullpath)
             if mode == 2 or mode == 0:
