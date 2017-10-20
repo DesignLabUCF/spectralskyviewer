@@ -55,6 +55,23 @@ class SkyDataViewer(QMainWindow):
             "ShowHUD": True,
             "ShowStatusBar": True,
         }
+        # different possible exposure times of the HDR data (in seconds)
+        self.Exposures = [
+            0.000125,
+            0.001000,
+            0.008000,
+            0.066000,
+            0.033000,
+            0.250000,
+            1.000000,
+            2.000000,
+            4.000000,
+        ]
+
+        # member variables
+        self.hdrCaptureDirs = []  # some number of these per day
+        self.asdMeasures = []     # 81 of these per capture time
+        self.exposure = 0
 
         # load and validate settings
         if (os.path.exists(self.Settings["Filename"])):
@@ -64,11 +81,7 @@ class SkyDataViewer(QMainWindow):
             self.Settings["DataDirectory"] = ""
 
         # init
-        self.hdrCaptures = [] # some number of these per day
-        self.asdMeasures = [] # 81 of these per capture time
         QToolTip.setFont(QFont('SansSerif', 8))
-
-        # init GUI
         # uic.loadUi('design.ui', self)
         self.initMenu()
         self.initWidgets()
@@ -139,6 +152,9 @@ class SkyDataViewer(QMainWindow):
         self.cbxDate.currentIndexChanged.connect(self.dateSelected)
         self.lblTime = QLabel("00:00:00")
         self.lblTime.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+        self.cbxExposure = QComboBox()
+        self.cbxExposure.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.cbxExposure.currentIndexChanged.connect(self.exposureSelected)
         self.sldTime = QSlider(Qt.Horizontal, self)
         self.sldTime.setTickPosition(QSlider.TicksAbove)
         self.sldTime.setRange(0, 0)
@@ -151,10 +167,11 @@ class SkyDataViewer(QMainWindow):
         gridData.setSpacing(5)
         gridData.setContentsMargins(0,0,0,0)
         gridData.addWidget(self.btnDataDir, 0, 0)
-        gridData.addWidget(self.lblData, 0, 1, 1, 2)
+        gridData.addWidget(self.lblData, 0, 1, 1, 3)
         gridData.addWidget(self.cbxDate, 1, 0)
         gridData.addWidget(self.lblTime, 1, 1)
-        gridData.addWidget(self.sldTime, 1, 2)
+        gridData.addWidget(self.cbxExposure, 1, 2)
+        gridData.addWidget(self.sldTime, 1, 3)
         pnlData = QWidget()
         pnlData.setLayout(gridData)
 
@@ -245,43 +262,24 @@ class SkyDataViewer(QMainWindow):
         self.statusBar().showMessage('Ready')
 
     def resetAllUI(self):
-        self.hdrCaptures = []
         self.asdMeasures = []
         self.lblData.clear()
         self.lblTime.setText("00:00:00")
         self.cbxDate.clear()
+        self.cbxExposure.clear()
         self.sldTime.setRange(0, 0)
-        self.wgtFisheye.clear()
+        self.wgtFisheye.setPhoto(None)
         self.wgtFisheye.repaint()
         self.tblInfo.clearContents()
 
     def resetDayUI(self):
-        self.hdrCaptures = []
         self.asdMeasures = []
         self.lblData.setText(self.Settings["DataDirectory"])
         self.lblTime.setText("00:00:00")
         self.sldTime.setRange(0, 0)
-        self.wgtFisheye.clear()
+        self.wgtFisheye.setPhoto(None)
         self.wgtFisheye.repaint()
         self.tblInfo.clearContents()
-
-    def loadData(self):
-        if (len(self.Settings["DataDirectory"]) <= 0 or not os.path.exists(self.Settings["DataDirectory"])):
-            return
-
-        # GUI
-        self.resetAllUI()
-        self.lblData.setText(self.Settings["DataDirectory"])
-
-        # find capture dates and times
-        captureDateDirs = utility.findFiles(self.Settings["DataDirectory"], mode=2)
-        captureDateDirs[:] = [dir for dir in captureDateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
-        captureDates = [os.path.basename(dir) for dir in captureDateDirs]
-        if (len(captureDates) > 0):
-            self.cbxDate.addItem("-dates-")
-            self.cbxDate.addItems(captureDates)
-            #self.cbxDate.setCurrentIndex(-1) # trigger manual date selection
-            #self.cbxDate.setCurrentIndex(0)  # trigger manual date selection
 
     def browseForData(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', self.Settings["DataDirectory"])
@@ -290,6 +288,24 @@ class SkyDataViewer(QMainWindow):
             self.Settings["DataDirectory"] = directory
             self.loadData()
 
+    def loadData(self):
+        if (len(self.Settings["DataDirectory"]) <= 0 or not os.path.exists(self.Settings["DataDirectory"])):
+            return
+
+        # GUI
+        self.resetAllUI()
+        self.lblData.setText(self.Settings["DataDirectory"])
+        self.cbxExposure.addItems([str(x) for x in self.Exposures])
+        self.exposure = 0
+
+        # find capture dates
+        captureDateDirs = utility.findFiles(self.Settings["DataDirectory"], mode=2)
+        captureDateDirs[:] = [dir for dir in captureDateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
+        captureDates = [os.path.basename(dir) for dir in captureDateDirs]
+        if (len(captureDates) > 0):
+            self.cbxDate.addItem("-dates-") # this will trigger a date selection of index 0
+            self.cbxDate.addItems(captureDates)
+
     def dateSelected(self, index):
         if (index < 0 or index >= self.cbxDate.count()):
             return
@@ -297,50 +313,55 @@ class SkyDataViewer(QMainWindow):
         # GUI
         self.resetDayUI()
 
-        # find HDR photos
+        # find HDR data path
         pathDate = os.path.join(self.Settings["DataDirectory"], self.cbxDate.itemText(index))
+        if not os.path.exists(pathDate):
+            return
         pathHDR = os.path.join(pathDate, "HDR")
         if not os.path.exists(pathHDR):
-            return
-        photos = utility.findFiles(pathHDR, mode=1, ext=["jpg"])
-        if (len(photos) <= 0):
+            QMessageBox.critical(self, "Error", "No HDR folder of photos found.", QMessageBox.Ok)
             return
 
-        # filter HDR photos down to those we are interested in
-        captures = []
-        captureIntervals = []
-        captureIntervals.append(utility.imageEXIFDateTime(photos[0])) # start with the first photo timestamp
-        threshold = 5 # look for next timestamp at least 5 mins later (next capture interval)
-        pPrev = photos[0]
-        for p in photos:
-            last = captureIntervals[-1]
-            next = utility.imageEXIFDateTime(p)
-            if ((next - last).total_seconds() / 60.0 >= threshold):
-                captureIntervals.append(next)
-                captures.append(pPrev)
-            pPrev = p
-        captures.append(photos[-1])
-        self.hdrCaptures = captures[1:]
-        if (len(self.hdrCaptures) <= 0):
+        # find all capture time dirs
+        self.hdrCaptureDirs = utility.findFiles(pathHDR, mode=2)
+        self.hdrCaptureDirs[:] = [dir for dir in self.hdrCaptureDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
+        if (len(self.hdrCaptureDirs) <= 0):
+            QMessageBox.critical(self, "Error", "No HDR capture folders found.\nFormat is time of capture (e.g. 08.57.23).", QMessageBox.Ok)
             return
 
         # find ASD data
 
         # load GUI
-        self.sldTime.setRange(0, len(self.hdrCaptures)-1)
+        self.sldTime.setRange(0, len(self.hdrCaptureDirs)-1)
         self.sldTime.valueChanged.emit(0)
 
     def timeSelected(self, index):
         if (index < 0 or index >= self.sldTime.maximum()):
             return
 
-        # extract EXIF data from image
-        exif = utility.imageEXIF(self.hdrCaptures[index])
+        # gather all exposure photos taken at time selected
+        photos = utility.findFiles(self.hdrCaptureDirs[index], mode=1, ext=["jpg"])
+        if (len(photos) <= 0):
+            #QMessageBox.critical(self, "Error", "No photos found in:\n" + self.hdrCaptureDirs[index], QMessageBox.Ok)
+            return
+
+        # We are assuming the photos are sorted (increasing) by exposure time!!!
+        # A safer method would be to gather all EXIF DateTimeOriginal fields and sort manually
+
+        # is there a photo for the currently selected exposure?
+        if (self.exposure >= len(photos)):
+            #QMessageBox.critical(self, "Error", "No photo found with exposure: " + self.Exposures[self.exposure], QMessageBox.Ok)
+            self.wgtFisheye.setPhoto(None)
+            self.wgtFisheye.repaint()
+            return
+
+        # extract EXIF data from photo
+        exif = utility.imageEXIF(photos[self.exposure])
         exif = {k: v for k, v in exif.items() if k.startswith("EXIF")}
         timestamp = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
 
-        # labels
-        self.lblData.setText(self.hdrCaptures[index])
+        # datetime panel
+        self.lblData.setText(photos[self.exposure])
         self.lblTime.setText(str(timestamp.time()))
 
         # info panel
@@ -352,10 +373,17 @@ class SkyDataViewer(QMainWindow):
             row += 1
 
         # render pane
-        self.wgtFisheye.setPhoto(self.hdrCaptures[index], exif=exif)
-        if (os.path.exists(os.path.splitext(self.hdrCaptures[index].lower())[0]+'.cr2')):
+        self.wgtFisheye.setPhoto(photos[self.exposure], exif=exif)
+        if (os.path.exists(os.path.splitext(photos[self.exposure].lower())[0]+'.cr2')):
             self.wgtFisheye.setRAWAvailable(True)
         self.wgtFisheye.repaint()
+
+    def exposureSelected(self, index):
+        if (index < 0 or index >= self.cbxExposure.count()):
+            return
+
+        self.exposure = index
+        self.sldTime.valueChanged.emit(self.sldTime.value())
 
     # def contextMenuEvent(self, event):
     #     menuCtx = QMenu(self)

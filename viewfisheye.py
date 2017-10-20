@@ -53,21 +53,20 @@ class ViewFisheye(QWidget):
         self.setMouseTracking(True)
 
     def setPhoto(self, path, exif=None):
-        if (os.path.exists(path)):
+        if (path is not None and os.path.exists(path)):
             self.myPhotoPath = path
             self.myPhoto = QImage(path)
             self.srcRect = QRect(0, 0, self.myPhoto.width(), self.myPhoto.height())
             if (exif is not None):
                 self.myPhotoTime = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
+            else:
+                self.myPhotoTime = utility.imageEXIFDateTime(path)
         else:
-            self.clear()
-
-    def clear(self):
-        self.myPhoto = QImage()
-        self.myPhotoPath = ""
-        self.myPhotoTime = datetime(1,1,1)
-        self.srcRect = QRect()
-        self.rawAvailable = False
+            self.myPhoto = QImage()
+            self.myPhotoPath = ""
+            self.myPhotoTime = datetime(1, 1, 1)
+            self.srcRect = QRect()
+            self.rawAvailable = False
 
     def showHUD(self, b):
         self.hudEnabled = b
