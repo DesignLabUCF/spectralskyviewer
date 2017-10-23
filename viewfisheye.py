@@ -23,19 +23,22 @@
 # ====================================================================
 # @author: Joe Del Rocco
 # @since: 10/13/2017
-# @summary: A widget for displaying the fisheye view of the HDR data
+# @summary: A widget for displaying the original fisheye view of the HDR data
 # ====================================================================
 import os
+import math
 from datetime import datetime
 from PyQt5.QtCore import Qt, QRect
-from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QIcon
+from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage
 from PyQt5.QtWidgets import QWidget, QStyle
 import utility
+import angle_utilities
 
 
 class ViewFisheye(QWidget):
     def __init__(self):
         super().__init__()
+
         # members
         self.myPhoto = QImage()
         self.myPhotoPath = ""
@@ -43,12 +46,15 @@ class ViewFisheye(QWidget):
         self.srcRect = QRect()
         self.hudEnabled = True
         self.rawAvailable = False
-        self.mouseCoords = [0,0]
+        self.coordsMouse = [0, 0]
+
         # preloaded graphics
-        self.pen = QPen(Qt.black, 1, Qt.SolidLine)
-        self.brush = QBrush(Qt.darkGray, Qt.Dense1Pattern)
+        self.painter = QPainter()
+        self.brushBG = QBrush(Qt.black, Qt.SolidPattern)
+        self.penText = QPen(Qt.white, 1, Qt.SolidLine)
         self.font = QFont('Courier New', 8)
         self.iconWarning = self.style().standardIcon(QStyle.SP_MessageBoxWarning).pixmap(16)
+
         # init
         self.setMouseTracking(True)
 
@@ -75,9 +81,12 @@ class ViewFisheye(QWidget):
         self.rawAvailable = b
 
     def mouseMoveEvent(self, event):
-        self.mouseCoords = [event.x(), event.y()]
+        self.coordsMouse = [event.x(), event.y()]
         self.repaint()
-        #print(self.mouseCoords)
+
+    def leaveEvent(self, event):
+        self.coordsMouse = [-1, -1]
+        self.repaint()
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -87,10 +96,13 @@ class ViewFisheye(QWidget):
         painter.begin(self)
 
         # background
+        # painter.setBackground(Qt.gray)
+        # self.brush.setColor(Qt.darkGray)
+        # self.brush.setStyle(Qt.Dense1Pattern)
         painter.setBackgroundMode(Qt.OpaqueMode)
-        painter.setBackground(Qt.gray)
-        painter.setPen(self.pen)
-        painter.setBrush(self.brush)
+        painter.setBackground(Qt.black)
+        painter.setBrush(self.brushBG)
+        painter.setPen(Qt.NoPen)
         painter.drawRect(0, 0, self.width()-1, self.height()-1)
 
         # draw photo
@@ -113,33 +125,98 @@ class ViewFisheye(QWidget):
 
             # HUD
             if (self.hudEnabled):
-                painter.setPen(Qt.white)
                 painter.setBackgroundMode(Qt.TransparentMode)
+                #painter.setBackground(Qt.black)
                 painter.setBrush(Qt.NoBrush)
+                painter.setPen(self.penText)
                 painter.setFont(self.font)
                 destRect = QRect()
 
-                # filename
+                # draw filename
                 destRect.setCoords(10, 10, self.width()/2, 50)
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, os.path.basename(self.myPhotoPath))
-                # timestamp
+                # draw timestamp
                 destRect.moveTo(10, 25)
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTime))
-                # dimenstions
+                # draw dimensions
                 destRect.moveTo(10, 40)
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.srcRect.width()) + " x " + str(self.srcRect.height()))
-                # mouse coords
-                if (self.mouseCoords[0] < destRectPhoto.x() or
-                    self.mouseCoords[1] < destRectPhoto.y() or
-                    self.mouseCoords[0] > destRectPhoto.x() + destRectPhoto.width() or
-                    self.mouseCoords[1] > destRectPhoto.y() + destRectPhoto.height()):
-                    self.mouseCoords = [-1, -1]
-                else:
-                    self.mouseCoords[0] -= destRectPhoto.x() #+ round(destRectPhoto.width()/2)
-                    self.mouseCoords[1] -= destRectPhoto.y() #+ round(destRectPhoto.height()/2)
-                destRect.setCoords(10, 10, self.width()-10, self.height()-10)
+
+                # coordinates we are interested in
+                #self.coordsMouse   # x,y of this widget
+                coordsXY = [-1, -1] # x,y over photo as scaled on this widget
+                coordsUV = [-1, -1] # u,v lookup in actual photo on disk
+                coordsUC = [-1, -1] # unit circle coords from center of photo to edge of fisheye radius
+                coordsFC = [-1, -1] # "fractional" coords of fisheye photo w/ 0,0 top left and 1,1 bottom right
+                coordsTP = [-1, -1] # theta,phi polar coordinates
+                radius = destRectPhoto.height()/2
+
+                # compute all relevant coordinates only when mouse is over fisheye portion of photo
+                if (self.coordsMouse[0] >= destRectPhoto.x() and
+                    self.coordsMouse[1] >= destRectPhoto.y() and
+                    self.coordsMouse[0] < destRectPhoto.x() + destRectPhoto.width() and
+                    self.coordsMouse[1] < destRectPhoto.y() + destRectPhoto.height()):
+                    coordsXY[0] = self.coordsMouse[0] - destRectPhoto.x()
+                    coordsXY[1] = self.coordsMouse[1] - destRectPhoto.y()
+                    coordsUC[0] = (coordsXY[0] - destRectPhoto.width()/2) / radius
+                    coordsUC[1] = (coordsXY[1] - destRectPhoto.height()/2) / radius
+                    coordsUV[0] = int(coordsXY[0] / destRectPhoto.width() * self.myPhoto.width())
+                    coordsUV[1] = int(coordsXY[1] / destRectPhoto.height() * self.myPhoto.height())
+                    coordsFC[0] = (coordsUC[0] + 1) / 2
+                    coordsFC[1] = (coordsUC[1] + 1) / 2
+                    coordsTP = angle_utilities.GetAngleFromUV(coordsFC[0], coordsFC[1])
+
+                # draw x,y coords
+                destRect.setCoords(10, 10, self.width()-10, self.height()- 124)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight,
-                                 str(self.mouseCoords[0]) + ", " + str(self.mouseCoords[1]))
+                                 str(coordsXY[0]) + ", " + str(coordsXY[1]) + " xy")
+
+                # draw u,v coords
+                destRect.setCoords(10, 10, self.width() - 10, self.height() - 114)
+                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight,
+                                 str(coordsUV[0]).format("{:0>4d}") + ", " + str(coordsUV[1]).format("{:0>4d}") + " uv")
+
+                # draw unit circle coords
+                text = "-1, -1 uc"
+                if (coordsXY[0] >= 0 and coordsXY[1] >= 0):
+                    text = "{:.2f}".format(coordsUC[0]) + ", " + "{:.2f}".format(coordsUC[1]) + " uc"
+                destRect.setCoords(10, 10, self.width() - 10, self.height() - 104)
+                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, text)
+
+                # draw fractional coords
+                text = "-1, -1 fr"
+                if (coordsXY[0] >= 0 and coordsXY[1] >= 0):
+                    text = "{:.2f}".format(coordsFC[0]) + ", " + "{:.2f}".format(coordsFC[1]) + " fr"
+                destRect.setCoords(10, 10, self.width() - 10, self.height() - 94)
+                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, text)
+
+                # draw t,p coords
+                text = "-1, -1 θφ"
+                if (coordsXY[0] >= 0 and coordsXY[1] >= 0):
+                    text = "{:.2f}".format(coordsTP[0]) + ", " + "{:.2f}".format(coordsTP[1]) + " θφ"
+                destRect.setCoords(10, 10, self.width() - 10, self.height() - 84)
+                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, text)
+
+                # draw cursor visual indicators (outlines)
+                circleX = self.width() - 10 - 64 - 10 - 64
+                circleY = self.height() - 10 - 64
+                pixelX = self.width() - 64 - 10
+                pixelY = self.height() - 64 - 10
+                painter.drawEllipse(circleX, circleY, 64, 64)
+                painter.drawRect(pixelX, pixelY, 64, 64)
+
+                # only fill if cursor is within fisheye radius
+                distance = math.sqrt((coordsUC[0] * coordsUC[0]) + (coordsUC[1] * coordsUC[1]))
+                if (distance <= 1.0):
+                    color = self.myPhoto.pixelColor(coordsUV[0], coordsUV[1])
+                    painter.setBackgroundMode(Qt.OpaqueMode)
+                    painter.setBackground(color)
+                    painter.setBrush(QBrush(color, Qt.SolidPattern))
+                    cx = circleX + (coordsFC[0] * 64)
+                    cy = circleY + (coordsFC[1] * 64)
+                    painter.drawEllipse(cx - 5, cy - 5, 10, 10)
+                    painter.drawRect(pixelX, pixelY, 64, 64)
+
                 # raw notice
                 if (not self.rawAvailable):
                     painter.drawPixmap(self.width()-16-16, 16, self.iconWarning)
