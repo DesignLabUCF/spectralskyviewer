@@ -30,7 +30,7 @@ import os
 import json
 from datetime import datetime
 from PyQt5.QtCore import QCoreApplication, Qt, QDir
-from PyQt5.QtGui import QIcon, QFont, QPainter
+from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import *
 #from PyQt5.QtWidgets import qApp
 import utility
@@ -150,8 +150,9 @@ class SkyDataViewer(QMainWindow):
         self.cbxDate = QComboBox()
         self.cbxDate.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.cbxDate.currentIndexChanged.connect(self.dateSelected)
-        self.lblTime = QLabel("00:00:00")
-        self.lblTime.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+        self.cbxTime = QComboBox()
+        self.cbxTime.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.cbxTime.currentIndexChanged.connect(self.timeSelected)
         self.cbxExposure = QComboBox()
         self.cbxExposure.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.cbxExposure.currentIndexChanged.connect(self.exposureSelected)
@@ -169,7 +170,7 @@ class SkyDataViewer(QMainWindow):
         gridData.addWidget(self.btnDataDir, 0, 0)
         gridData.addWidget(self.lblData, 0, 1, 1, 3)
         gridData.addWidget(self.cbxDate, 1, 0)
-        gridData.addWidget(self.lblTime, 1, 1)
+        gridData.addWidget(self.cbxTime, 1, 1)
         gridData.addWidget(self.cbxExposure, 1, 2)
         gridData.addWidget(self.sldTime, 1, 3)
         pnlData = QWidget()
@@ -264,9 +265,14 @@ class SkyDataViewer(QMainWindow):
     def resetAllUI(self):
         self.asdMeasures = []
         self.lblData.clear()
-        self.lblTime.setText("00:00:00")
         self.cbxDate.clear()
+        self.cbxDate.addItem("-date-")
+        self.cbxTime.clear()
+        self.cbxTime.addItem("-time-")
         self.cbxExposure.clear()
+        self.cbxExposure.addItem("-exposure-")
+        self.cbxExposure.addItems([str(x) for x in self.Exposures])
+        self.exposure = -1
         self.sldTime.setRange(0, 0)
         self.wgtFisheye.setPhoto(None)
         self.wgtFisheye.repaint()
@@ -275,7 +281,8 @@ class SkyDataViewer(QMainWindow):
     def resetDayUI(self):
         self.asdMeasures = []
         self.lblData.setText(self.Settings["DataDirectory"])
-        self.lblTime.setText("00:00:00")
+        self.cbxTime.clear()
+        self.cbxTime.addItem("-time-")
         self.sldTime.setRange(0, 0)
         self.wgtFisheye.setPhoto(None)
         self.wgtFisheye.repaint()
@@ -294,16 +301,12 @@ class SkyDataViewer(QMainWindow):
 
         # GUI
         self.resetAllUI()
-        self.lblData.setText(self.Settings["DataDirectory"])
-        self.cbxExposure.addItems([str(x) for x in self.Exposures])
-        self.exposure = 0
 
         # find capture dates
         captureDateDirs = utility.findFiles(self.Settings["DataDirectory"], mode=2)
         captureDateDirs[:] = [dir for dir in captureDateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
         captureDates = [os.path.basename(dir) for dir in captureDateDirs]
         if (len(captureDates) > 0):
-            self.cbxDate.addItem("-dates-") # this will trigger a date selection of index 0
             self.cbxDate.addItems(captureDates)
 
     def dateSelected(self, index):
@@ -332,12 +335,31 @@ class SkyDataViewer(QMainWindow):
         # find ASD data
 
         # load GUI
+        self.cbxTime.addItems([os.path.basename(x) for x in self.hdrCaptureDirs])
+        self.cbxTime.setCurrentIndex(1) # because combobox first element is not a valid value
         self.sldTime.setRange(0, len(self.hdrCaptureDirs)-1)
         self.sldTime.valueChanged.emit(0)
+        if (self.exposure < 0):
+            self.cbxExposure.setCurrentIndex(1) # because combobox first element is not a valid value
+            self.exposure = 0
 
     def timeSelected(self, index):
         if (index < 0 or index >= self.sldTime.maximum()):
             return
+
+        # get sender of event
+        widget = self.sender()
+        if (widget == self.cbxTime):
+            index -= 1  # because combobox first element is not a valid value
+
+        # handle unselected time or exposure
+        if (index < 0 or self.exposure < 0):
+            self.wgtFisheye.setPhoto(None)
+            self.wgtFisheye.repaint()
+            return
+
+        # At this point we are assuming the photos are sorted (increasing) by exposure time!!!
+        # A safer method would be to gather all EXIF DateTimeOriginal fields and sort manually
 
         # gather all exposure photos taken at time selected
         photos = utility.findFiles(self.hdrCaptureDirs[index], mode=1, ext=["jpg"])
@@ -345,12 +367,8 @@ class SkyDataViewer(QMainWindow):
             #QMessageBox.critical(self, "Error", "No photos found in:\n" + self.hdrCaptureDirs[index], QMessageBox.Ok)
             return
 
-        # We are assuming the photos are sorted (increasing) by exposure time!!!
-        # A safer method would be to gather all EXIF DateTimeOriginal fields and sort manually
-
         # is there a photo for the currently selected exposure?
         if (self.exposure >= len(photos)):
-            #QMessageBox.critical(self, "Error", "No photo found with exposure: " + self.Exposures[self.exposure], QMessageBox.Ok)
             self.wgtFisheye.setPhoto(None)
             self.wgtFisheye.repaint()
             return
@@ -362,15 +380,19 @@ class SkyDataViewer(QMainWindow):
 
         # datetime panel
         self.lblData.setText(photos[self.exposure])
-        self.lblTime.setText(str(timestamp.time()))
+        if (widget == self.cbxTime):
+            self.sldTime.setSliderPosition(index)
+        elif (widget == self.sldTime):
+            self.cbxTime.setCurrentIndex(index+1) # because combobox first element is not a valid value
 
         # info panel
         self.tblInfo.setRowCount(len(exif.keys()))
         row = 0
         for key in sorted(exif.keys()):
-            self.tblInfo.setItem(row, 0, QTableWidgetItem(str(key)))
+            self.tblInfo.setItem(row, 0, QTableWidgetItem(str(key)[5:]))
             self.tblInfo.setItem(row, 1, QTableWidgetItem(str(exif[key])))
             row += 1
+        self.tblInfo.resizeColumnToContents(0)
 
         # render pane
         self.wgtFisheye.setPhoto(photos[self.exposure], exif=exif)
@@ -379,8 +401,7 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.repaint()
 
     def exposureSelected(self, index):
-        if (index < 0 or index >= self.cbxExposure.count()):
-            return
+        index -= 1 # -1 because combobox first element is not a valid value
 
         self.exposure = index
         self.sldTime.valueChanged.emit(self.sldTime.value())
