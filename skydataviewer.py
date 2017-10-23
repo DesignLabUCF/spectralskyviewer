@@ -51,8 +51,9 @@ class SkyDataViewer(QMainWindow):
             "HorizSplitRight": -1,
             "VertSplitTop": -1,
             "VertSplitBottom": -1,
-            "ShowInfo": True,
+            "ShowGrid": False,
             "ShowHUD": True,
+            "ShowInfo": True,
             "ShowStatusBar": True,
         }
         # different possible exposure times of the HDR data (in seconds)
@@ -101,16 +102,21 @@ class SkyDataViewer(QMainWindow):
         actLoad.triggered.connect(self.browseForData)
 
         # view menu actions
-        self.actInfo = QAction(QIcon(), 'Show &Info', self)
-        self.actInfo.setCheckable(True)
-        self.actInfo.setChecked(self.Settings["ShowInfo"])
-        self.actInfo.setStatusTip('Toggle display of info panel')
-        self.actInfo.triggered.connect(self.toggleInfoPanel)
+        self.actGrid = QAction(QIcon(), 'Show &Grid', self)
+        self.actGrid.setCheckable(True)
+        self.actGrid.setChecked(self.Settings["ShowGrid"])
+        self.actGrid.setStatusTip('Toggle display of grid')
+        self.actGrid.triggered.connect(self.toggleGrid)
         self.actHUD = QAction(QIcon(), 'Show &HUD', self)
         self.actHUD.setCheckable(True)
         self.actHUD.setChecked(self.Settings["ShowHUD"])
         self.actHUD.setStatusTip('Toggle display of HUD')
         self.actHUD.triggered.connect(self.toggleHUD)
+        self.actInfo = QAction(QIcon(), 'Show &Info', self)
+        self.actInfo.setCheckable(True)
+        self.actInfo.setChecked(self.Settings["ShowInfo"])
+        self.actInfo.setStatusTip('Toggle display of info panel')
+        self.actInfo.triggered.connect(self.toggleInfoPanel)
         self.actStatusBar = QAction(QIcon(), 'Show Status &Bar', self)
         self.actStatusBar.setCheckable(True)
         self.actStatusBar.setChecked(self.Settings["ShowStatusBar"])
@@ -129,8 +135,9 @@ class SkyDataViewer(QMainWindow):
         menuFile.addSeparator()
         menuFile.addAction(actExit)
         menuView = menubar.addMenu('&View')
-        menuView.addAction(self.actInfo)
+        menuView.addAction(self.actGrid)
         menuView.addAction(self.actHUD)
+        menuView.addAction(self.actInfo)
         menuView.addAction(self.actStatusBar)
         menuHelp = menubar.addMenu('&Help')
         menuHelp.addAction(actAbout)
@@ -275,6 +282,8 @@ class SkyDataViewer(QMainWindow):
         self.exposure = -1
         self.sldTime.setRange(0, 0)
         self.wgtFisheye.setPhoto(None)
+        self.wgtFisheye.showGrid(self.Settings["ShowGrid"])
+        self.wgtFisheye.showHUD(self.Settings["ShowHUD"])
         self.wgtFisheye.repaint()
         self.tblInfo.clearContents()
 
@@ -414,16 +423,20 @@ class SkyDataViewer(QMainWindow):
     #     if action == actExit:
     #         self.close()
 
+    def toggleGrid(self, state):
+        self.wgtFisheye.showGrid(state)
+        self.wgtFisheye.repaint()
+
+    def toggleHUD(self, state):
+        self.wgtFisheye.showHUD(state)
+        self.wgtFisheye.repaint()
+
     def toggleInfoPanel(self, state):
         if (state):
             self.splitHoriz.setSizes([self.width() * 0.75, self.width() * 0.25])
         else:
             left, right = self.splitHoriz.sizes()
             self.splitHoriz.setSizes([left + right, 0])
-
-    def toggleHUD(self, state):
-        self.wgtFisheye.showHUD(state)
-        self.wgtFisheye.repaint()
 
     def toggleStatusBar(self, state):
         if (state):
@@ -457,8 +470,9 @@ class SkyDataViewer(QMainWindow):
         top, bottom = self.splitVert.sizes()
         self.Settings["VertSplitTop"] = top
         self.Settings["VertSplitBottom"] = bottom
-        self.Settings["ShowInfo"] = self.actInfo.isChecked()
+        self.Settings["ShowGrid"] = self.actGrid.isChecked()
         self.Settings["ShowHUD"] = self.actHUD.isChecked()
+        self.Settings["ShowInfo"] = self.actInfo.isChecked()
         self.Settings["ShowStatusBar"] = self.actStatusBar.isChecked()
 
         # dump settings to file

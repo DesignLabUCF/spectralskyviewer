@@ -44,7 +44,8 @@ class ViewFisheye(QWidget):
         self.myPhotoPath = ""
         self.myPhotoTime = datetime(1,1,1)
         self.srcRect = QRect()
-        self.hudEnabled = True
+        self.enableHUD = True
+        self.enableGrid = False
         self.rawAvailable = False
         self.coordsMouse = [0, 0]
 
@@ -75,7 +76,10 @@ class ViewFisheye(QWidget):
             self.rawAvailable = False
 
     def showHUD(self, b):
-        self.hudEnabled = b
+        self.enableHUD = b
+
+    def showGrid(self, b):
+        self.enableGrid = b
 
     def setRAWAvailable(self, b):
         self.rawAvailable = b
@@ -124,13 +128,14 @@ class ViewFisheye(QWidget):
             painter.drawImage(destRectPhoto, self.myPhoto, self.srcRect)
 
             # HUD
-            if (self.hudEnabled):
+            if (self.enableHUD):
                 painter.setBackgroundMode(Qt.TransparentMode)
                 #painter.setBackground(Qt.black)
                 painter.setBrush(Qt.NoBrush)
                 painter.setPen(self.penText)
                 painter.setFont(self.font)
                 destRect = QRect()
+                radius = destRectPhoto.height() / 2
 
                 # draw filename
                 destRect.setCoords(10, 10, self.width()/2, 50)
@@ -142,6 +147,22 @@ class ViewFisheye(QWidget):
                 destRect.moveTo(10, 40)
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.srcRect.width()) + " x " + str(self.srcRect.height()))
 
+                # draw grid
+                if (self.enableGrid):
+                    cx = destRectPhoto.x() + destRectPhoto.width() / 2
+                    cy = destRectPhoto.y() + destRectPhoto.height() / 2
+                    painter.drawLine(cx - radius, cy, cx + radius, cy)
+                    painter.drawLine(cx, cy - radius, cx, cy + radius)
+                    painter.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
+                    destRect.setCoords(cx - radius + 5, cy + 5, self.width()-1, self.height()-1)
+                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
+                    destRect.setCoords(cx + radius - 15, cy + 5, self.width()-1, self.height()-1)
+                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
+                    destRect.setCoords(cx + 5, cy - radius + 5, self.width()-1, self.height()-1)
+                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
+                    destRect.setCoords(cx + 5, cy + radius - 20, self.width()-1, self.height()-1)
+                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
+
                 # coordinates we are interested in
                 #self.coordsMouse   # x,y of this widget
                 coordsXY = [-1, -1] # x,y over photo as scaled on this widget
@@ -149,7 +170,6 @@ class ViewFisheye(QWidget):
                 coordsUC = [-1, -1] # unit circle coords from center of photo to edge of fisheye radius
                 coordsFC = [-1, -1] # "fractional" coords of fisheye photo w/ 0,0 top left and 1,1 bottom right
                 coordsTP = [-1, -1] # theta,phi polar coordinates
-                radius = destRectPhoto.height()/2
 
                 # compute all relevant coordinates only when mouse is over fisheye portion of photo
                 if (self.coordsMouse[0] >= destRectPhoto.x() and
@@ -204,7 +224,6 @@ class ViewFisheye(QWidget):
                 pixelY = self.height() - 64 - 10
                 painter.drawEllipse(circleX, circleY, 64, 64)
                 painter.drawRect(pixelX, pixelY, 64, 64)
-
                 # only fill if cursor is within fisheye radius
                 distance = math.sqrt((coordsUC[0] * coordsUC[0]) + (coordsUC[1] * coordsUC[1]))
                 if (distance <= 1.0):
