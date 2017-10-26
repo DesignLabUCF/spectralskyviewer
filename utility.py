@@ -32,6 +32,7 @@ import os
 import shutil
 import subprocess
 import shlex
+import re
 import logging
 import exifread
 from datetime import datetime
@@ -50,6 +51,16 @@ Normalize a number between 0-1.
 '''
 def normalize(n, minval, maxval):
     return float(n-minval)/float(maxval-minval)
+
+'''
+Use this for natural (human) sorting. Pass this as a key to a function that takes keys, such as sort.
+:param s: The element that will be sorted
+:param _nsre: Regular expression to find the digit portion of the element.
+:author: https://stackoverflow.com/a/16090640/1002098
+'''
+RegexDigits = re.compile('([0-9]+)')
+def naturalSortKey(s, _nsre=RegexDigits):
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
 
 '''
 Verify that a string is a valid date or datetime
