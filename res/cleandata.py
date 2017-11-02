@@ -255,6 +255,7 @@ def HDROrganizePhotos(args):
     for p in photos:
         last = captureIntervals[-1]
         next = utility.imageEXIFDateTime(p)
+
         # we've encountered next capture interval
         if ((next - last).total_seconds() / 60.0 >= threshold):
             captureIntervals.append(next)
@@ -262,6 +263,7 @@ def HDROrganizePhotos(args):
             print(captureFolder)
             if (not args.readonly):
                 os.mkdir(captureFolder)
+
         # put photo in folder
         destPath = os.path.join(captureFolder, os.path.basename(p))
         print("Move " + os.path.basename(p) + " to " + destPath)
@@ -303,7 +305,7 @@ def ASDRenameDirs(args):
 '''
 Function that renames ASD files to capture pattern index and polar coordinates.
 :param args: ArgumentParser arguments parsed at program startup
-:note: Warning! This function assumes each asd file in a capture directory is a different capture pattern location,
+:note: Warning! This function assumes each asd file in a capture directory is from a different capture pattern location,
 and that the ordering is the same as the capture pattern. There is no way to confirm this in the file itself by looking
 at the data, so we have to make this assumption.
 '''
@@ -332,9 +334,12 @@ def ASDRenameFiles(args):
             print("No asd files found in this directory.")
             return
 
-        # THIS ASSUMES THE FILES IN THIS DIRECTORY ARE THE CAPTURE PATTERN LOCATIONS!
+        # THIS ASSUMES EACH FILE IN THIS DIRECTORY IS FROM A DIFFERENT SAMPLING PATTERN LOCATION,
+        # AND THE ORDERING IS THE SAME AS THE CAPTURE PATTERN DEFINED ABOVE!
+        # THIS IS A MAJOR ASSUMPTION! IT IS BELIEVED TO BE CORRECT IN THE DATA I HAVE AT THE TIME OF WRITING THIS CODE,
+        # BUT PLEASE CONFIRM THIS BEFORE RUNNING THIS CODE ON YOUR OWN DATA!
 
-        # FIRST, make sure the list is NATURAL sorted (for humans, like in Windows Explorer)
+        # First, make sure the list is NATURAL sorted (for humans, like in Windows Explorer)
         # We have to do this because someone may not have padded the filename digits.
         # If the files are not natural sorted, THEY WILL BE RENAMED TO THE WRONG CAPTURE PATTERN LOCATIONS!
         asdFiles.sort(key=utility.naturalSortKey)
@@ -342,7 +347,7 @@ def ASDRenameFiles(args):
         # for the number of files in the sampling pattern
         for idx in range(0, len(SkydomeSamplingPattern)):
             if (idx >= len(asdFiles)):
-                print("ASD file count (" + str(idx) + ") doesn't match sample pattern locations (" + str(len(SkydomeSamplingPattern)))
+                print("ASD file #" + str(idx+1) + " is beyond the capture pattern location count (" + str(len(SkydomeSamplingPattern)) + ")")
                 break
 
             # rename to format: ##_TTT.TT_PP.PPPP_.asd
@@ -352,22 +357,23 @@ def ASDRenameFiles(args):
             if (not args.readonly):
                 os.rename(asdFiles[idx], os.path.join(dir, newName))
             if (os.path.exists(os.path.join(dir, oldName) + ".rad")):
-                oldName = oldName + ".rad"
-                newName = newName + ".rad"
-                print("Rename: " + oldName + " to " + newName)
+                old = oldName + ".rad"
+                new = newName + ".rad"
+                print("Rename: " + old + " to " + new)
                 if (not args.readonly):
-                    os.rename(os.path.join(dir, oldName), os.path.join(dir, newName))
-            if (os.path.exists(os.path.join(dir, oldName) + ".txt")):
-                oldName = oldName + ".txt"
-                newName = newName + ".txt"
-                print("Rename: " + oldName + " to " + newName)
+                    os.rename(os.path.join(dir, old), os.path.join(dir, new))
+            if (os.path.exists(os.path.join(dir, oldName) + ".rad.txt")):
+                old = oldName + ".rad.txt"
+                new = newName + ".rad.txt"
+                print("Rename: " + old + " to " + new)
                 if (not args.readonly):
-                    os.rename(os.path.join(dir, oldName), os.path.join(dir, newName))
+                    os.rename(os.path.join(dir, old), os.path.join(dir, new))
 
 '''
 Function that reorganizes ASD files into capture directories (timestamps) based on a capture interval.
-The interval between captures has a default (below), but can also be specified to this script.
-:param args: ArgumentParser arguments parsed at program startup
+:note: Warning! This function assumes each asd file is from a different capture pattern location,
+and that the ordering is the same as the capture pattern. There is no way to confirm this in the file itself by looking
+at the data, so we have to make this assumption.
 '''
 def ASDOrganizeFiles(args):
     print("Organizing ASD files into timestamp directories in:\n" + args.directory)
@@ -381,46 +387,69 @@ def ASDOrganizeFiles(args):
         print("No asd files found in this directory.")
         return
 
-    # # we want to separate files into directories for each capture
-    # # for the number of files in the sampling pattern
-    # for idx in range(0, len(SkydomeSamplingPattern)):
-    #     if (idx >= len(asdFiles)):
-    #         print("ASD file count (" + str(idx) + ") doesn't match sample pattern locations (" + str(len(SkydomeSamplingPattern)))
-    #         break
-    #
-    #     fileModDate = ...
-    #     captureFolder = os.path.join(args.directory, str(fileModDate.time()).replace(':', '.'))
-    #     print(captureFolder)
-    #     if (not args.readonly):
-    #         os.mkdir(captureFolder)
+    # THIS ASSUMES EACH FILE IN THIS DIRECTORY IS FROM A DIFFERENT SAMPLING PATTERN LOCATION,
+    # AND THE ORDERING IS THE SAME AS THE CAPTURE PATTERN DEFINED ABOVE!
+    # THIS IS A MAJOR ASSUMPTION! IT IS BELIEVED TO BE CORRECT IN THE DATA I HAVE AT THE TIME OF WRITING THIS CODE,
+    # BUT PLEASE CONFIRM THIS BEFORE RUNNING THIS CODE ON YOUR OWN DATA!
 
-    # # we want to separate files into directories for each capture
-    # captures = []
-    # captureIntervals = [utility.imageEXIFDateTime(photos[0])] # start with first photo timestamp
-    # threshold = 4       # look for next timestamp after this amount of time (next capture interval)
-    # if (args.interval): # user can specify it
-    #     threshold = args.interval
-    # captureFolder = os.path.join(args.directory, str(captureIntervals[-1].time()).replace(':', '.'))
-    # print(captureFolder)
-    # if (not args.readonly):
-    #     os.mkdir(captureFolder)
-    #
-    # # for each file
-    # for p in photos:
-    #     last = captureIntervals[-1]
-    #     next = utility.imageEXIFDateTime(p)
-    #     # we've encountered next capture interval
-    #     if ((next - last).total_seconds() / 60.0 >= threshold):
-    #         captureIntervals.append(next)
-    #         captureFolder = os.path.join(args.directory, str(next.time()).replace(':', '.'))
-    #         print(captureFolder)
-    #         if (not args.readonly):
-    #             os.mkdir(captureFolder)
-    #     # put photo in folder
-    #     destPath = os.path.join(captureFolder, os.path.basename(p))
-    #     print("Move " + os.path.basename(p) + " to " + destPath)
-    #     if (not args.readonly):
-    #         shutil.move(p, destPath)
+    # we want to organize all asd files into folders - one folder for each capture interval
+    captures = []
+    captureIntervals = [datetime.fromtimestamp(os.path.getmtime(asdFiles[0]))]  # start with first timestamp
+    threshold = 4  # look for next timestamp after this amount of time (next capture interval)
+    if (args.interval):  # user can specify capture interval
+        threshold = args.interval
+    captureFolder = os.path.join(args.directory, str(captureIntervals[-1].time()).replace(':', '.'))
+    print(captureFolder)
+    if (not args.readonly):
+        os.mkdir(captureFolder)
+
+    # this stuff is for error checking - to make sure we are on track
+    filesPerCapture = 0
+    dirsToMake = []
+    filesToMove = []
+
+    # for each asd file
+    for asdfile in asdFiles:
+        last = captureIntervals[-1]
+        next = datetime.fromtimestamp(os.path.getmtime(asdfile))
+
+        # we've encountered next capture interval
+        if ((next - last).total_seconds() / 60.0 >= threshold):
+            if (filesPerCapture < len(SkydomeSamplingPattern)): # warning, last folder was not complete
+                print("ASD file count (" + str(filesPerCapture) + ") for last capture folder was less than capture pattern location count (" + str(len(SkydomeSamplingPattern)) + ")")
+            captureIntervals.append(next)
+            captureFolder = os.path.join(args.directory, str(next.time()).replace(':', '.'))
+            print(captureFolder)
+            dirsToMake.append(captureFolder)
+            filesPerCapture = 0  # reset file count as we are considering a new capture folder
+
+        # check to see if we've tried to move more files than there are in a capture pattern
+        filesPerCapture += 1
+        if (filesPerCapture > len(SkydomeSamplingPattern)):
+            print("ASD file #" + str(filesPerCapture) + " is beyond the capture pattern location count (" + str(len(SkydomeSamplingPattern)) + ")")
+            return
+
+        # put file into folder
+        destPath = os.path.join(captureFolder, os.path.basename(asdfile))
+        print("Move " + os.path.basename(asdfile) + " to " + destPath)
+        filesToMove.append([asdfile, destPath])
+        if (os.path.exists(asdfile + ".rad")):
+            old = asdfile + ".rad"
+            new = destPath + ".rad"
+            print("Move " + os.path.basename(old) + " to " + new)
+            filesToMove.append([old, new])
+        if (os.path.exists(asdfile + ".rad.txt")):
+            old = asdfile + ".rad.txt"
+            new = destPath + ".rad.txt"
+            print("Move " + os.path.basename(old) + " to " + new)
+            filesToMove.append([old, new])
+
+    # if we've gotten this far, then we haven't errored out, and it's safe to actually do this work
+    if (not args.readonly):
+        for dir in dirsToMake:
+            os.mkdir(dir)
+        for f in filesToMove:
+            shutil.move(f[0], f[1])
 
 #---------------------------------------------------------------------
 
