@@ -32,7 +32,8 @@ from PyQt5.QtCore import Qt, QRect
 from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage
 from PyQt5.QtWidgets import QWidget, QStyle
 import utility
-import angle_utilities
+import utility_angles
+import utility_data
 
 
 class ViewFisheye(QWidget):
@@ -158,6 +159,7 @@ class ViewFisheye(QWidget):
             self.myPhoto = QImage(path)
             self.myPhotoSrcRect = QRect(0, 0, self.myPhoto.width(), self.myPhoto.height())
             self.myPhotoDestRect = QRect(0, 0, self.width(), self.height())
+            self.rawAvailable = utility_data.isHDRRawAvailable(path)
             if (exif is not None):
                 self.myPhotoTime = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
             else:
@@ -226,8 +228,8 @@ class ViewFisheye(QWidget):
         radiusSample2 = radiusSample * 2
         u, v = 0, 0
         for i in range(0, len(self.samplingPattern)):
-            u, v = angle_utilities.FisheyeAngleWarp(self.samplingPattern[i][0], self.samplingPattern[i][1])
-            u, v = angle_utilities.GetUVFromAngle(u, v)
+            u, v = utility_angles.FisheyeAngleWarp(self.samplingPattern[i][0], self.samplingPattern[i][1])
+            u, v = utility_angles.GetUVFromAngle(u, v)
             u = (self.gridCenter[0] - self.gridRadius) + (u * diameter)
             v = (self.gridCenter[1] - self.gridRadius) + (v * diameter)
             self.gridSamples[i].setRect(u - radiusSample, v - radiusSample, radiusSample2, radiusSample2)
@@ -315,7 +317,7 @@ class ViewFisheye(QWidget):
                     coordsXY[1] = int(coordsxy[1] / self.myPhotoDestRect.height() * self.myPhoto.height())
                     coordsUV[0] = (coordsUC[0] + 1) / 2
                     coordsUV[1] = (coordsUC[1] + 1) / 2
-                    coordsTP = angle_utilities.GetAngleFromUV(coordsUV[0], coordsUV[1])
+                    coordsTP = utility_angles.GetAngleFromUV(coordsUV[0], coordsUV[1])
                     distance = math.sqrt((coordsUC[0] * coordsUC[0]) + (coordsUC[1] * coordsUC[1]))
 
                 # formatted text strings for coordinates

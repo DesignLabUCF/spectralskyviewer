@@ -34,7 +34,8 @@ from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import *
 #from PyQt5.QtWidgets import qApp
 import utility
-from viewfisheye import ViewFisheye
+import utility_data
+from view_fisheye import ViewFisheye
 
 
 class SkyDataViewer(QMainWindow):
@@ -43,7 +44,7 @@ class SkyDataViewer(QMainWindow):
 
         # app settings, set to defaults
         self.Settings = {
-            "Filename": "settings.json",
+            "Filename": "res\\settings.json",
             "DataDirectory": "",
             "WindowWidth": 1024,
             "WindowHeight": 768,
@@ -405,8 +406,6 @@ class SkyDataViewer(QMainWindow):
 
         # render pane
         self.wgtFisheye.setPhoto(photos[self.exposure], exif=exif)
-        if (os.path.exists(os.path.splitext(photos[self.exposure].lower())[0]+'.cr2')):
-            self.wgtFisheye.setRAWAvailable(True)
         self.wgtFisheye.repaint()
 
     def exposureSelected(self, index):
