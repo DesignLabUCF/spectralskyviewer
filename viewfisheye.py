@@ -39,7 +39,7 @@ class ViewFisheye(QWidget):
     def __init__(self):
         super().__init__()
 
-        # skydome sampling pattern: 81 samples (theta, phi)
+        # members - skydome sampling pattern: 81 samples (theta, phi)
         self.samplingPattern = [
             [000.00, 12.1151],
             [011.25, 12.1151],
@@ -130,13 +130,19 @@ class ViewFisheye(QWidget):
         self.myPhoto = QImage()
         self.myPhotoPath = ""
         self.myPhotoTime = datetime(1,1,1)
-        self.srcRect = QRect()
+        self.myPhotoSrcRect = QRect()
+        self.myPhotoDestRect = QRect()
         self.enableHUD = True
         self.enableGrid = False
         self.rawAvailable = False
         self.coordsMouse = [0, 0]
+        self.gridCenter = [0, 0]
+        self.gridRadius = 0
+        self.gridSamples = []
+        for i in range(0, len(self.samplingPattern)):
+            self.gridSamples.append(QRect(0,0,0,0)) # these need to be recomputed after valid photo dest rect
 
-        # preloaded graphics
+        # members - preloaded graphics
         self.painter = QPainter()
         self.brushBG = QBrush(Qt.black, Qt.SolidPattern)
         self.penText = QPen(Qt.white, 1, Qt.SolidLine)
@@ -150,7 +156,8 @@ class ViewFisheye(QWidget):
         if (path is not None and os.path.exists(path)):
             self.myPhotoPath = path
             self.myPhoto = QImage(path)
-            self.srcRect = QRect(0, 0, self.myPhoto.width(), self.myPhoto.height())
+            self.myPhotoSrcRect = QRect(0, 0, self.myPhoto.width(), self.myPhoto.height())
+            self.myPhotoDestRect = QRect(0, 0, self.width(), self.height())
             if (exif is not None):
                 self.myPhotoTime = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
             else:
@@ -159,8 +166,10 @@ class ViewFisheye(QWidget):
             self.myPhoto = QImage()
             self.myPhotoPath = ""
             self.myPhotoTime = datetime(1, 1, 1)
-            self.srcRect = QRect()
+            self.myPhotoSrcRect = QRect()
+            self.myPhotoDestRect = QRect()
             self.rawAvailable = False
+        self.computeBounds()
 
     def showHUD(self, b):
         self.enableHUD = b
@@ -179,8 +188,49 @@ class ViewFisheye(QWidget):
         self.coordsMouse = [-1, -1]
         self.repaint()
 
-    #def resizeEvent(self, event):
+    def resizeEvent(self, event):
+        self.computeBounds()
 
+    def computeBounds(self):
+        if (self.myPhoto.isNull()):
+            self.myPhotoDestRect = QRect(0, 0, self.width(), self.height())
+            self.gridCenter = [self.width()/2, self.height()/2]
+            self.gridRadius = 0
+            for i in range(0, len(self.samplingPattern)):
+                self.gridSamples[i].setRect(self.gridCenter[0], self.gridCenter[1], 0, 0)
+            return
+
+        # scale the photo dest rect
+        # scale by the scaling factor that requires the most scaling ( - 2 to fit in border )
+        wRatio = self.width() / self.myPhoto.width()
+        hRatio = self.height() / self.myPhoto.height()
+        if (wRatio <= hRatio):
+            self.myPhotoDestRect.setWidth(self.myPhotoSrcRect.width() * wRatio - 2)
+            self.myPhotoDestRect.setHeight(self.myPhotoSrcRect.height() * wRatio - 2)
+        else:
+            self.myPhotoDestRect.setWidth(self.myPhotoSrcRect.width() * hRatio - 2)
+            self.myPhotoDestRect.setHeight(self.myPhotoSrcRect.height() * hRatio - 2)
+
+        # center the photo dest rect
+        self.myPhotoDestRect.moveTo(self.width() / 2 - self.myPhotoDestRect.width() / 2,
+                                    self.height() / 2 - self.myPhotoDestRect.height() / 2)
+
+        # compute grid center
+        self.gridCenter[0] = self.myPhotoDestRect.x() + self.myPhotoDestRect.width() / 2
+        self.gridCenter[1] = self.myPhotoDestRect.y() + self.myPhotoDestRect.height() / 2
+        self.gridRadius = self.myPhotoDestRect.height() / 2
+
+        # computer sampling pattern locations
+        diameter = self.gridRadius * 2
+        radiusSample = self.gridRadius / 50
+        radiusSample2 = radiusSample * 2
+        u, v = 0, 0
+        for i in range(0, len(self.samplingPattern)):
+            u, v = angle_utilities.FisheyeAngleWarp(self.samplingPattern[i][0], self.samplingPattern[i][1])
+            u, v = angle_utilities.GetUVFromAngle(u, v)
+            u = (self.gridCenter[0] - self.gridRadius) + (u * diameter)
+            v = (self.gridCenter[1] - self.gridRadius) + (v * diameter)
+            self.gridSamples[i].setRect(u - radiusSample, v - radiusSample, radiusSample2, radiusSample2)
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -201,21 +251,7 @@ class ViewFisheye(QWidget):
 
         # draw photo
         if (not self.myPhoto.isNull()):
-            destRectPhoto = QRect()
-
-            # use the appropriate scaling factor that requires the most scaling ( - 2 to fit in border )
-            wRatio = self.width()/self.myPhoto.width()
-            hRatio = self.height()/self.myPhoto.height()
-            if (wRatio <= hRatio):
-                destRectPhoto.setWidth(self.srcRect.width() * wRatio - 2)
-                destRectPhoto.setHeight(self.srcRect.height() * wRatio - 2)
-            else:
-                destRectPhoto.setWidth(self.srcRect.width() * hRatio - 2)
-                destRectPhoto.setHeight(self.srcRect.height() * hRatio - 2)
-
-            # center and draw it
-            destRectPhoto.moveTo(self.width()/2-destRectPhoto.width()/2, self.height()/2-destRectPhoto.height()/2)
-            painter.drawImage(destRectPhoto, self.myPhoto, self.srcRect)
+            painter.drawImage(self.myPhotoDestRect, self.myPhoto, self.myPhotoSrcRect)
 
             # HUD
             if (self.enableHUD):
@@ -225,7 +261,7 @@ class ViewFisheye(QWidget):
                 painter.setPen(self.penText)
                 painter.setFont(self.font)
                 destRect = QRect()
-                radius = destRectPhoto.height() / 2
+                radius = self.myPhotoDestRect.height() / 2
 
                 # draw filename
                 destRect.setCoords(10, 10, self.width()/2, 50)
@@ -235,37 +271,27 @@ class ViewFisheye(QWidget):
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTime))
                 # draw dimensions
                 destRect.moveTo(10, 40)
-                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.srcRect.width()) + " x " + str(self.srcRect.height()))
+                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoSrcRect.width()) + " x " + str(self.myPhotoSrcRect.height()))
 
                 # draw grid
                 if (self.enableGrid):
-                    cx = destRectPhoto.x() + destRectPhoto.width() / 2
-                    cy = destRectPhoto.y() + destRectPhoto.height() / 2
                     # radius
-                    painter.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
+                    painter.drawEllipse(self.gridCenter[0] - radius, self.gridCenter[1] - radius, radius * 2, radius * 2)
                     # crosshairs
-                    painter.drawLine(cx - radius, cy, cx + radius, cy)
-                    painter.drawLine(cx, cy - radius, cx, cy + radius)
+                    painter.drawLine(self.gridCenter[0] - radius, self.gridCenter[1], self.gridCenter[0] + radius, self.gridCenter[1])
+                    painter.drawLine(self.gridCenter[0], self.gridCenter[1] - radius, self.gridCenter[0], self.gridCenter[1] + radius)
                     # labels
-                    destRect.setCoords(cx - radius + 5, cy + 5, self.width()-1, self.height()-1)
+                    destRect.setCoords(self.gridCenter[0] - radius + 5, self.gridCenter[1] + 5, self.width()-1, self.height()-1)
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
-                    destRect.setCoords(cx + radius - 15, cy + 5, self.width()-1, self.height()-1)
+                    destRect.setCoords(self.gridCenter[0] + radius - 15, self.gridCenter[1] + 5, self.width()-1, self.height()-1)
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
-                    destRect.setCoords(cx + 5, cy - radius + 5, self.width()-1, self.height()-1)
+                    destRect.setCoords(self.gridCenter[0] + 5, self.gridCenter[1] - radius + 5, self.width()-1, self.height()-1)
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
-                    destRect.setCoords(cx + 5, cy + radius - 20, self.width()-1, self.height()-1)
+                    destRect.setCoords(self.gridCenter[0] + 5, self.gridCenter[1] + radius - 20, self.width()-1, self.height()-1)
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
                     # sampling pattern
-                    diameter = radius * 2
-                    radiusSample = radius / 50
-                    radiusSample2 = radiusSample * 2
-                    u,v = 0,0
-                    for s in self.samplingPattern:
-                        u,v = angle_utilities.FisheyeAngleWarp(s[0], s[1])
-                        u,v = angle_utilities.GetUVFromAngle(u, v)
-                        u = (cx - radius) + (u * diameter)
-                        v = (cy - radius) + (v * diameter)
-                        painter.drawEllipse(u - radiusSample, v - radiusSample, radiusSample2, radiusSample2)
+                    for r in self.gridSamples:
+                        painter.drawEllipse(r)
 
                 # coordinates we are interested in
                 #self.coordsMouse   # x,y of this widget
@@ -277,16 +303,16 @@ class ViewFisheye(QWidget):
                 distance = math.inf # distance from center of fisheye to mouse in unit circle
 
                 # compute all relevant coordinates only when mouse is over fisheye portion of photo
-                if (self.coordsMouse[0] >= destRectPhoto.x() and
-                    self.coordsMouse[1] >= destRectPhoto.y() and
-                    self.coordsMouse[0] < destRectPhoto.x() + destRectPhoto.width() and
-                    self.coordsMouse[1] < destRectPhoto.y() + destRectPhoto.height()):
-                    coordsxy[0] = self.coordsMouse[0] - destRectPhoto.x()
-                    coordsxy[1] = self.coordsMouse[1] - destRectPhoto.y()
-                    coordsUC[0] = (coordsxy[0] - destRectPhoto.width()/2) / radius
-                    coordsUC[1] = (coordsxy[1] - destRectPhoto.height()/2) / radius
-                    coordsXY[0] = int(coordsxy[0] / destRectPhoto.width() * self.myPhoto.width())
-                    coordsXY[1] = int(coordsxy[1] / destRectPhoto.height() * self.myPhoto.height())
+                if (self.coordsMouse[0] >= self.myPhotoDestRect.x() and
+                    self.coordsMouse[1] >= self.myPhotoDestRect.y() and
+                    self.coordsMouse[0] < self.myPhotoDestRect.x() + self.myPhotoDestRect.width() and
+                    self.coordsMouse[1] < self.myPhotoDestRect.y() + self.myPhotoDestRect.height()):
+                    coordsxy[0] = self.coordsMouse[0] - self.myPhotoDestRect.x()
+                    coordsxy[1] = self.coordsMouse[1] - self.myPhotoDestRect.y()
+                    coordsUC[0] = (coordsxy[0] - self.myPhotoDestRect.width()/2) / radius
+                    coordsUC[1] = (coordsxy[1] - self.myPhotoDestRect.height()/2) / radius
+                    coordsXY[0] = int(coordsxy[0] / self.myPhotoDestRect.width() * self.myPhoto.width())
+                    coordsXY[1] = int(coordsxy[1] / self.myPhotoDestRect.height() * self.myPhoto.height())
                     coordsUV[0] = (coordsUC[0] + 1) / 2
                     coordsUV[1] = (coordsUC[1] + 1) / 2
                     coordsTP = angle_utilities.GetAngleFromUV(coordsUV[0], coordsUV[1])
