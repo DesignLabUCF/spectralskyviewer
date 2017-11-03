@@ -29,10 +29,11 @@ import sys
 import os
 import shutil
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 # we need utility
 sys.path.insert(0, '../')
 import utility
+import utility_data
 
 
 # skydome sampling pattern: 81 samples (theta, phi)
@@ -121,11 +122,47 @@ SkydomeSamplingPattern = [
 ]
 
 
+'''
+Simple function to list all subdirectories of a directory.
+:param args: ArgumentParser arguments parsed at program startup
+'''
 def ListSubDirectories(args):
     print("Listing subdirectories of:\n" + args.directory)
     dirs = utility.findFiles(args.directory, mode=2)
     for dir in dirs:
         print(dir)
+
+'''
+Function that offsets capture directories (times of day) by a specific amount.
+This is used to correct/account for time shift errors in the photo EXIF data (like daylight savings).
+:param args: ArgumentParser arguments parsed at program startup
+:note: This can be used on both HDR or ASD data because it is simply offsetting the capture time directory.
+'''
+def OffsetCaptureTimes(args):
+    print("Offsetting all capture time directories in:\n" + args.directory)
+    # ensure directory exists
+    if (not os.path.exists(args.directory)):
+        return
+
+    # grab all capture timestamp directories
+    timeDirs = utility.findFiles(args.directory, mode=2)
+    if (len(timeDirs) <= 0):
+        print("No directories found at all.")
+        return
+    timeDirs[:] = [dir for dir in timeDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
+    if (len(timeDirs) <= 0):
+        print("No capture time directories found.")
+        return
+
+    # for each timestamp directory
+    for dir in timeDirs:
+        oldname = os.path.basename(dir)
+        oldtime = datetime.strptime(oldname, "%H.%M.%S")
+        newtime = oldtime + timedelta(hours=args.timeoffset)
+        newname = str(newtime.time()).replace(':', '.') # folder names can't have colons
+        print("Rename: " + oldname + " to " + newname)
+        if (not args.readonly):
+            os.rename(dir, os.path.join(os.path.dirname(dir), newname))
 
 #-HDR-----------------------------------------------------------------
 
@@ -147,7 +184,7 @@ def HDRRenameDirs(args):
         return
     timeDirs[:] = [dir for dir in timeDirs if utility.verifyDateTime(os.path.basename(dir), "%H-%M-%S")]
     if (len(timeDirs) <= 0):
-        print("No capture timestamp directories found.")
+        print("No capture time directories found.")
         return
 
     # for each timestamp directory
@@ -242,7 +279,7 @@ def HDROrganizePhotos(args):
 
     # we want to separate photos into directories for each capture
     captures = []
-    captureIntervals = [utility.imageEXIFDateTime(photos[0])] # start with first photo timestamp
+    captureIntervals = [utility_data.imageEXIFDateTime(photos[0])] # start with first photo timestamp
     threshold = 4       # look for next timestamp after this amount of time (next capture interval)
     if (args.interval): # user can specify capture interval
         threshold = args.interval
@@ -254,7 +291,7 @@ def HDROrganizePhotos(args):
     # for each loose photo
     for p in photos:
         last = captureIntervals[-1]
-        next = utility.imageEXIFDateTime(p)
+        next = utility_data.imageEXIFDateTime(p)
 
         # we've encountered next capture interval
         if ((next - last).total_seconds() / 60.0 >= threshold):
@@ -322,7 +359,7 @@ def ASDRenameFiles(args):
         return
     timeDirs[:] = [dir for dir in timeDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
     if (len(timeDirs) <= 0):
-        print("No capture timestamp directories found.")
+        print("No capture time directories found.")
         return
 
     # for each timestamp directory
@@ -460,6 +497,7 @@ def main():
     parser.add_argument('directory', help='a directory to operate on')
     parser.add_argument('-r', '--readonly', dest='readonly', action='store_true', help='read only mode (no writes)', default=False)
     parser.add_argument('-l', '--listdirs', dest='listdirs', action='store_true', help='list sub dirs of directory', default=False)
+    parser.add_argument('-t', '--timeoffset', dest='timeoffset', type=int, help='offset capture dirs by this number of hours +/-')
     parser.add_argument('-hdr', '--hdr', dest='hdr', action='store_true', help='HDR mode - working w/ HDR photos')
     parser.add_argument('-asd', '--asd', dest='asd', action='store_true', help='ASD mode - working w/ ASD files')
     parser.add_argument('-d', '--renamedirs', dest='renamedirs', action='store_true', help='cleanup dir names', default=False)
@@ -478,6 +516,8 @@ def main():
     # do it
     if (args.listdirs):
         ListSubDirectories(args)
+    elif (args.timeoffset):
+        OffsetCaptureTimes(args)
     elif (args.hdr):
         if (args.renamedirs):
             HDRRenameDirs(args)
