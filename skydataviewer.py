@@ -277,7 +277,8 @@ class SkyDataViewer(QMainWindow):
         self.setWindowIcon(QIcon('res/icon.png'))
         self.statusBar().showMessage('Ready')
 
-    def resetAllUI(self):
+    def resetAll(self):
+        self.hdrCaptureDirs = []
         self.asdMeasures = []
         self.lblData.clear()
         self.cbxDate.clear()
@@ -296,7 +297,8 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.repaint()
         self.tblInfo.clearContents()
 
-    def resetDayUI(self):
+    def resetDay(self):
+        self.hdrCaptureDirs = []
         self.asdMeasures = []
         self.lblData.setText(self.Settings["DataDirectory"])
         self.cbxTime.clear()
@@ -318,7 +320,7 @@ class SkyDataViewer(QMainWindow):
             return
 
         # GUI
-        self.resetAllUI()
+        self.resetAll()
 
         # find capture dates
         captureDateDirs = utility.findFiles(self.Settings["DataDirectory"], mode=2)
@@ -332,7 +334,7 @@ class SkyDataViewer(QMainWindow):
             return
 
         # GUI
-        self.resetDayUI()
+        self.resetDay()
 
         # find HDR data path
         pathDate = os.path.join(self.Settings["DataDirectory"], self.cbxDate.itemText(index))
@@ -374,8 +376,8 @@ class SkyDataViewer(QMainWindow):
         if (widget == self.cbxTime):
             index -= 1  # because combobox first element is not a valid value
 
-        # handle unselected time or exposure
-        if (index < 0 or self.exposure < 0):
+        # handle unselected time, exposure, or rare events triggered when we have no data loaded yet
+        if (index < 0 or self.exposure < 0 or len(self.hdrCaptureDirs) <= 0):
             self.wgtFisheye.setPhoto(None)
             self.wgtFisheye.repaint()
             return
@@ -423,7 +425,9 @@ class SkyDataViewer(QMainWindow):
         index -= 1 # -1 because combobox first element is not a valid value
 
         self.exposure = index
-        self.sldTime.valueChanged.emit(self.sldTime.value())
+
+        if (self.hdrCaptureDirs is not None and len(self.hdrCaptureDirs) > 0):
+            self.sldTime.valueChanged.emit(self.sldTime.value())
 
     # def contextMenuEvent(self, event):
     #     menuCtx = QMenu(self)
