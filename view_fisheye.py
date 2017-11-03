@@ -28,8 +28,8 @@
 import os
 import math
 from datetime import datetime
-from PyQt5.QtCore import Qt, QRect
-from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage
+from PyQt5.QtCore import Qt, QRect, QPointF
+from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPainterPath
 from PyQt5.QtWidgets import QWidget, QStyle
 import utility
 import utility_angles
@@ -124,8 +124,8 @@ class ViewFisheye(QWidget):
             [000.00, 71.9187],
             [000.00, 90.0000],
         ]
-        # converted to radians
-        self.samplingPattern[:] = [[math.radians(s[0]), math.radians(s[1])] for s in self.samplingPattern]
+        # convert to radians
+        #self.samplingPattern[:] = [[math.radians(s[0]), math.radians(s[1])] for s in self.samplingPattern]
 
         # members
         self.myPhoto = QImage()
@@ -135,8 +135,10 @@ class ViewFisheye(QWidget):
         self.myPhotoDestRect = QRect()
         self.enableHUD = True
         self.enableGrid = False
+        self.enableSunPath = False
         self.rawAvailable = False
         self.coordsMouse = [0, 0]
+        self.sunPathPoints = []  # theta (azimuth), phi (90-zenith), datetime
         self.gridCenter = [0, 0]
         self.gridRadius = 0
         self.gridSamples = []
@@ -145,8 +147,10 @@ class ViewFisheye(QWidget):
 
         # members - preloaded graphics
         self.painter = QPainter()
+        self.pathSun = QPainterPath()
         self.brushBG = QBrush(Qt.black, Qt.SolidPattern)
         self.penText = QPen(Qt.white, 1, Qt.SolidLine)
+        self.penSun = QPen(Qt.yellow, 1, Qt.SolidLine)
         self.font = QFont('Courier New', 8)
         self.iconWarning = self.style().standardIcon(QStyle.SP_MessageBoxWarning).pixmap(16)
 
@@ -154,6 +158,7 @@ class ViewFisheye(QWidget):
         self.setMouseTracking(True)
 
     def setPhoto(self, path, exif=None):
+        # if photo is valid
         if (path is not None and os.path.exists(path)):
             self.myPhotoPath = path
             self.myPhoto = QImage(path)
@@ -163,7 +168,8 @@ class ViewFisheye(QWidget):
             if (exif is not None):
                 self.myPhotoTime = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
             else:
-                self.myPhotoTime = utility.imageEXIFDateTime(path)
+                self.myPhotoTime = utility_data.imageEXIFDateTime(path)
+        # photo is null or missing
         else:
             self.myPhoto = QImage()
             self.myPhotoPath = ""
@@ -173,25 +179,8 @@ class ViewFisheye(QWidget):
             self.rawAvailable = False
         self.computeBounds()
 
-    def showHUD(self, b):
-        self.enableHUD = b
-
-    def showGrid(self, b):
-        self.enableGrid = b
-
-    def setRAWAvailable(self, b):
-        self.rawAvailable = b
-
-    def mouseMoveEvent(self, event):
-        self.coordsMouse = [event.x(), event.y()]
-        self.repaint()
-
-    def leaveEvent(self, event):
-        self.coordsMouse = [-1, -1]
-        self.repaint()
-
-    def resizeEvent(self, event):
-        self.computeBounds()
+    def setSunPath(self, sunpath):
+        self.sunPathPoints = sunpath
 
     def computeBounds(self):
         if (self.myPhoto.isNull()):
@@ -228,11 +217,48 @@ class ViewFisheye(QWidget):
         radiusSample2 = radiusSample * 2
         u, v = 0, 0
         for i in range(0, len(self.samplingPattern)):
-            u, v = utility_angles.FisheyeAngleWarp(self.samplingPattern[i][0], self.samplingPattern[i][1])
-            u, v = utility_angles.GetUVFromAngle(u, v)
+            u, v = utility_angles.FisheyeAngleWarp(self.samplingPattern[i][0], self.samplingPattern[i][1], inRadians=False)
+            u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
             u = (self.gridCenter[0] - self.gridRadius) + (u * diameter)
             v = (self.gridCenter[1] - self.gridRadius) + (v * diameter)
             self.gridSamples[i].setRect(u - radiusSample, v - radiusSample, radiusSample2, radiusSample2)
+
+        # compute sun path
+        self.pathSun = QPainterPath()
+        if (len(self.sunPathPoints) > 0):
+            t, p, dt = self.sunPathPoints[0]
+            t, p = utility_angles.FisheyeAngleWarp(t, p, inRadians=False)
+            u, v = utility_angles.GetUVFromAngle(t, p, inRadians=False)
+            x = (self.gridCenter[0] - self.gridRadius) + (u * diameter)
+            y = (self.gridCenter[1] - self.gridRadius) + (v * diameter)
+            self.pathSun.moveTo(x, y)
+            for i in range(1, len(self.sunPathPoints)):
+                t, p, dt = self.sunPathPoints[i]
+                t, p = utility_angles.FisheyeAngleWarp(t, p, inRadians=False)
+                u, v = utility_angles.GetUVFromAngle(t, p, inRadians=False)
+                x = (self.gridCenter[0] - self.gridRadius) + (u * diameter)
+                y = (self.gridCenter[1] - self.gridRadius) + (v * diameter)
+                self.pathSun.lineTo(x, y)
+
+    def showHUD(self, b):
+        self.enableHUD = b
+
+    def showGrid(self, b):
+        self.enableGrid = b
+
+    def showSunPath(self, b):
+        self.enableSunPath = b
+
+    def mouseMoveEvent(self, event):
+        self.coordsMouse = [event.x(), event.y()]
+        self.repaint()
+
+    def leaveEvent(self, event):
+        self.coordsMouse = [-1, -1]
+        self.repaint()
+
+    def resizeEvent(self, event):
+        self.computeBounds()
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -260,40 +286,51 @@ class ViewFisheye(QWidget):
                 painter.setBackgroundMode(Qt.TransparentMode)
                 #painter.setBackground(Qt.black)
                 painter.setBrush(Qt.NoBrush)
-                painter.setPen(self.penText)
                 painter.setFont(self.font)
                 destRect = QRect()
-                radius = self.myPhotoDestRect.height() / 2
+                diameter = self.gridRadius * 2
+
+                # draw sun path
+                if (self.enableSunPath):
+                    painter.setPen(self.penSun)
+                    painter.drawPath(self.pathSun)
+                    for i in range(0, self.pathSun.elementCount()):
+                        e = self.pathSun.elementAt(i)
+                        destRect.setCoords(e.x, e.y + 5, self.width() - 1, self.height() - 1)
+                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.sunPathPoints[i][2].hour))
+
+                # draw grid
+                if (self.enableGrid):
+                    painter.setPen(self.penText)
+                    # radius
+                    painter.drawEllipse(self.gridCenter[0] - self.gridRadius, self.gridCenter[1] - self.gridRadius, diameter, diameter)
+                    # crosshairs
+                    painter.drawLine(self.gridCenter[0] - self.gridRadius, self.gridCenter[1], self.gridCenter[0] + self.gridRadius, self.gridCenter[1])
+                    painter.drawLine(self.gridCenter[0], self.gridCenter[1] - self.gridRadius, self.gridCenter[0], self.gridCenter[1] + self.gridRadius)
+                    # labels
+                    destRect.setCoords(self.gridCenter[0] - self.gridRadius + 5, self.gridCenter[1] + 5, self.width()-1, self.height()-1)
+                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
+                    destRect.setCoords(self.gridCenter[0] + self.gridRadius - 15, self.gridCenter[1] + 5, self.width()-1, self.height()-1)
+                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
+                    destRect.setCoords(self.gridCenter[0] + 5, self.gridCenter[1] - self.gridRadius + 5, self.width()-1, self.height()-1)
+                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
+                    destRect.setCoords(self.gridCenter[0] + 5, self.gridCenter[1] + self.gridRadius - 20, self.width()-1, self.height()-1)
+                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
+                    # sampling pattern
+                    for r in self.gridSamples:
+                        painter.drawEllipse(r)
 
                 # draw filename
-                destRect.setCoords(10, 10, self.width()/2, 50)
+                painter.setPen(self.penText)
+                destRect.setCoords(10, 10, self.width() / 2, 50)
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, os.path.basename(self.myPhotoPath))
                 # draw timestamp
                 destRect.moveTo(10, 25)
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTime))
                 # draw dimensions
                 destRect.moveTo(10, 40)
-                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoSrcRect.width()) + " x " + str(self.myPhotoSrcRect.height()))
-
-                # draw grid
-                if (self.enableGrid):
-                    # radius
-                    painter.drawEllipse(self.gridCenter[0] - radius, self.gridCenter[1] - radius, radius * 2, radius * 2)
-                    # crosshairs
-                    painter.drawLine(self.gridCenter[0] - radius, self.gridCenter[1], self.gridCenter[0] + radius, self.gridCenter[1])
-                    painter.drawLine(self.gridCenter[0], self.gridCenter[1] - radius, self.gridCenter[0], self.gridCenter[1] + radius)
-                    # labels
-                    destRect.setCoords(self.gridCenter[0] - radius + 5, self.gridCenter[1] + 5, self.width()-1, self.height()-1)
-                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
-                    destRect.setCoords(self.gridCenter[0] + radius - 15, self.gridCenter[1] + 5, self.width()-1, self.height()-1)
-                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
-                    destRect.setCoords(self.gridCenter[0] + 5, self.gridCenter[1] - radius + 5, self.width()-1, self.height()-1)
-                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
-                    destRect.setCoords(self.gridCenter[0] + 5, self.gridCenter[1] + radius - 20, self.width()-1, self.height()-1)
-                    painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
-                    # sampling pattern
-                    for r in self.gridSamples:
-                        painter.drawEllipse(r)
+                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft,
+                                 str(self.myPhotoSrcRect.width()) + " x " + str(self.myPhotoSrcRect.height()))
 
                 # coordinates we are interested in
                 #self.coordsMouse   # x,y of this widget
@@ -311,8 +348,8 @@ class ViewFisheye(QWidget):
                     self.coordsMouse[1] < self.myPhotoDestRect.y() + self.myPhotoDestRect.height()):
                     coordsxy[0] = self.coordsMouse[0] - self.myPhotoDestRect.x()
                     coordsxy[1] = self.coordsMouse[1] - self.myPhotoDestRect.y()
-                    coordsUC[0] = (coordsxy[0] - self.myPhotoDestRect.width()/2) / radius
-                    coordsUC[1] = (coordsxy[1] - self.myPhotoDestRect.height()/2) / radius
+                    coordsUC[0] = (coordsxy[0] - self.myPhotoDestRect.width()/2) / self.gridRadius
+                    coordsUC[1] = (coordsxy[1] - self.myPhotoDestRect.height()/2) / self.gridRadius
                     coordsXY[0] = int(coordsxy[0] / self.myPhotoDestRect.width() * self.myPhoto.width())
                     coordsXY[1] = int(coordsxy[1] / self.myPhotoDestRect.height() * self.myPhoto.height())
                     coordsUV[0] = (coordsUC[0] + 1) / 2

@@ -53,6 +53,7 @@ class SkyDataViewer(QMainWindow):
             "VertSplitTop": -1,
             "VertSplitBottom": -1,
             "ShowGrid": False,
+            "ShowSunPath": False,
             "ShowHUD": True,
             "ShowInfo": True,
             "ShowStatusBar": True,
@@ -108,6 +109,11 @@ class SkyDataViewer(QMainWindow):
         self.actGrid.setChecked(self.Settings["ShowGrid"])
         self.actGrid.setStatusTip('Toggle display of grid')
         self.actGrid.triggered.connect(self.toggleGrid)
+        self.actSunPath = QAction(QIcon(), 'Show &Sun Path', self)
+        self.actSunPath.setCheckable(True)
+        self.actSunPath.setChecked(self.Settings["ShowSunPath"])
+        self.actSunPath.setStatusTip('Toggle display of sun path')
+        self.actSunPath.triggered.connect(self.toggleSunPath)
         self.actHUD = QAction(QIcon(), 'Show &HUD', self)
         self.actHUD.setCheckable(True)
         self.actHUD.setChecked(self.Settings["ShowHUD"])
@@ -137,6 +143,7 @@ class SkyDataViewer(QMainWindow):
         menuFile.addAction(actExit)
         menuView = menubar.addMenu('&View')
         menuView.addAction(self.actGrid)
+        menuView.addAction(self.actSunPath)
         menuView.addAction(self.actHUD)
         menuView.addAction(self.actInfo)
         menuView.addAction(self.actStatusBar)
@@ -284,6 +291,7 @@ class SkyDataViewer(QMainWindow):
         self.sldTime.setRange(0, 0)
         self.wgtFisheye.setPhoto(None)
         self.wgtFisheye.showGrid(self.Settings["ShowGrid"])
+        self.wgtFisheye.showSunPath(self.Settings["ShowSunPath"])
         self.wgtFisheye.showHUD(self.Settings["ShowHUD"])
         self.wgtFisheye.repaint()
         self.tblInfo.clearContents()
@@ -332,7 +340,7 @@ class SkyDataViewer(QMainWindow):
             return
         pathHDR = os.path.join(pathDate, "HDR")
         if not os.path.exists(pathHDR):
-            QMessageBox.critical(self, "Error", "No HDR folder of photos found.", QMessageBox.Ok)
+            QMessageBox.critical(self, "Error", "No HDR dir of photos found.", QMessageBox.Ok)
             return
 
         # find all capture time dirs
@@ -344,6 +352,10 @@ class SkyDataViewer(QMainWindow):
 
         # find ASD data
 
+        # load sun path for this capture date
+        sunpath = utility_data.loadSunPath(pathDate)
+        self.wgtFisheye.setSunPath(sunpath)
+
         # load GUI
         self.cbxTime.addItems([os.path.basename(x) for x in self.hdrCaptureDirs])
         self.cbxTime.setCurrentIndex(1) # because combobox first element is not a valid value
@@ -354,7 +366,7 @@ class SkyDataViewer(QMainWindow):
             self.exposure = 0
 
     def timeSelected(self, index):
-        if (index < 0 or index >= self.sldTime.maximum()):
+        if (index < 0 or index >= self.cbxTime.count()):
             return
 
         # get sender of event
@@ -384,9 +396,8 @@ class SkyDataViewer(QMainWindow):
             return
 
         # extract EXIF data from photo
-        exif = utility.imageEXIF(photos[self.exposure])
-        exif = {k: v for k, v in exif.items() if k.startswith("EXIF")}
-        timestamp = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
+        exif = utility_data.imageEXIF(photos[self.exposure])
+        exif = {k: v for k, v in exif.items() if k.startswith("EXIF")} # filter down to EXIF tags only
 
         # datetime panel
         self.lblData.setText(photos[self.exposure])
@@ -424,6 +435,10 @@ class SkyDataViewer(QMainWindow):
 
     def toggleGrid(self, state):
         self.wgtFisheye.showGrid(state)
+        self.wgtFisheye.repaint()
+
+    def toggleSunPath(self, state):
+        self.wgtFisheye.showSunPath(state)
         self.wgtFisheye.repaint()
 
     def toggleHUD(self, state):
@@ -470,6 +485,7 @@ class SkyDataViewer(QMainWindow):
         self.Settings["VertSplitTop"] = top
         self.Settings["VertSplitBottom"] = bottom
         self.Settings["ShowGrid"] = self.actGrid.isChecked()
+        self.Settings["ShowSunPath"] = self.actSunPath.isChecked()
         self.Settings["ShowHUD"] = self.actHUD.isChecked()
         self.Settings["ShowInfo"] = self.actInfo.isChecked()
         self.Settings["ShowStatusBar"] = self.actStatusBar.isChecked()
