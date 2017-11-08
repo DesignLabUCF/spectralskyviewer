@@ -52,11 +52,12 @@ class SkyDataViewer(QMainWindow):
             "HorizSplitRight": -1,
             "VertSplitTop": -1,
             "VertSplitBottom": -1,
-            "ShowUVGrid": False,
+            "ShowMask": True,
+            "ShowHUD": True,
             "ShowCompass": False,
             "ShowSunPath": False,
             "ShowSamples": False,
-            "ShowHUD": True,
+            "ShowUVGrid": False,
             "ShowEXIF": True,
             "ShowStatusBar": True,
         }
@@ -106,11 +107,27 @@ class SkyDataViewer(QMainWindow):
         actLoad.triggered.connect(self.browseForData)
 
         # view menu actions
-        self.actUVGrid = QAction(QIcon(), 'Show &UVGrid', self)
-        self.actUVGrid.setCheckable(True)
-        self.actUVGrid.setChecked(self.Settings["ShowUVGrid"])
-        self.actUVGrid.setStatusTip('Toggle display of UV grid')
-        self.actUVGrid.triggered.connect(self.toggleUVGrid)
+        self.actEXIF = QAction(QIcon(), 'Show E&XIF', self)
+        self.actEXIF = QAction(QIcon(), 'Show E&XIF', self)
+        self.actEXIF.setCheckable(True)
+        self.actEXIF.setChecked(self.Settings["ShowEXIF"])
+        self.actEXIF.setStatusTip('Toggle display of EXIF panel')
+        self.actEXIF.triggered.connect(self.toggleEXIFPanel)
+        self.actStatusBar = QAction(QIcon(), 'Show Status &Bar', self)
+        self.actStatusBar.setCheckable(True)
+        self.actStatusBar.setChecked(self.Settings["ShowStatusBar"])
+        self.actStatusBar.setStatusTip('Toggle display of status bar')
+        self.actStatusBar.triggered.connect(self.toggleStatusBar)
+        self.actMask = QAction(QIcon(), 'Show &Mask', self)
+        self.actMask.setCheckable(True)
+        self.actMask.setChecked(self.Settings["ShowMask"])
+        self.actMask.setStatusTip('Toggle display of fisheye mask')
+        self.actMask.triggered.connect(self.toggleMask)
+        self.actHUD = QAction(QIcon(), 'Show &HUD', self)
+        self.actHUD.setCheckable(True)
+        self.actHUD.setChecked(self.Settings["ShowHUD"])
+        self.actHUD.setStatusTip('Toggle display of HUD')
+        self.actHUD.triggered.connect(self.toggleHUD)
         self.actCompass = QAction(QIcon(), 'Show &Compass', self)
         self.actCompass.setCheckable(True)
         self.actCompass.setChecked(self.Settings["ShowCompass"])
@@ -126,21 +143,11 @@ class SkyDataViewer(QMainWindow):
         self.actSamples.setChecked(self.Settings["ShowSamples"])
         self.actSamples.setStatusTip('Toggle display of sampling pattern')
         self.actSamples.triggered.connect(self.toggleSamples)
-        self.actHUD = QAction(QIcon(), 'Show &HUD', self)
-        self.actHUD.setCheckable(True)
-        self.actHUD.setChecked(self.Settings["ShowHUD"])
-        self.actHUD.setStatusTip('Toggle display of HUD')
-        self.actHUD.triggered.connect(self.toggleHUD)
-        self.actEXIF = QAction(QIcon(), 'Show E&XIF', self)
-        self.actEXIF.setCheckable(True)
-        self.actEXIF.setChecked(self.Settings["ShowEXIF"])
-        self.actEXIF.setStatusTip('Toggle display of EXIF panel')
-        self.actEXIF.triggered.connect(self.toggleEXIFPanel)
-        self.actStatusBar = QAction(QIcon(), 'Show Status &Bar', self)
-        self.actStatusBar.setCheckable(True)
-        self.actStatusBar.setChecked(self.Settings["ShowStatusBar"])
-        self.actStatusBar.setStatusTip('Toggle display of status bar')
-        self.actStatusBar.triggered.connect(self.toggleStatusBar)
+        self.actUVGrid = QAction(QIcon(), 'Show &UVGrid', self)
+        self.actUVGrid.setCheckable(True)
+        self.actUVGrid.setChecked(self.Settings["ShowUVGrid"])
+        self.actUVGrid.setStatusTip('Toggle display of UV grid')
+        self.actUVGrid.triggered.connect(self.toggleUVGrid)
 
         # help menu actions
         actAbout = QAction(QIcon(), '&About', self)
@@ -154,13 +161,16 @@ class SkyDataViewer(QMainWindow):
         menuFile.addSeparator()
         menuFile.addAction(actExit)
         menuView = menubar.addMenu('&View')
-        menuView.addAction(self.actCompass)
-        menuView.addAction(self.actUVGrid)
-        menuView.addAction(self.actSunPath)
-        menuView.addAction(self.actSamples)
-        menuView.addAction(self.actHUD)
         menuView.addAction(self.actEXIF)
         menuView.addAction(self.actStatusBar)
+        menuView.addSeparator()
+        menuView.addAction(self.actMask)
+        menuView.addAction(self.actHUD)
+        menuView.addSeparator()
+        menuView.addAction(self.actCompass)
+        menuView.addAction(self.actSunPath)
+        menuView.addAction(self.actSamples)
+        menuView.addAction(self.actUVGrid)
         menuHelp = menubar.addMenu('&Help')
         menuHelp.addAction(actAbout)
 
@@ -232,7 +242,7 @@ class SkyDataViewer(QMainWindow):
         pnlToolbox.setLayout(boxToolbox)
 
         # render pane
-        self.wgtFisheye = ViewFisheye()
+        self.wgtFisheye = ViewFisheye(self)
         self.wgtFisheye.showHUD(self.actHUD.isChecked())
 
         # info view
@@ -311,11 +321,12 @@ class SkyDataViewer(QMainWindow):
         self.exposure = -1
         self.sldTime.setRange(0, 0)
         self.wgtFisheye.setPhoto(None)
-        self.wgtFisheye.showUVGrid(self.Settings["ShowUVGrid"])
+        self.wgtFisheye.showMask(self.Settings["ShowMask"])
+        self.wgtFisheye.showHUD(self.Settings["ShowHUD"])
         self.wgtFisheye.showCompass(self.Settings["ShowCompass"])
         self.wgtFisheye.showSunPath(self.Settings["ShowSunPath"])
         self.wgtFisheye.showSamples(self.Settings["ShowSamples"])
-        self.wgtFisheye.showHUD(self.Settings["ShowHUD"])
+        self.wgtFisheye.showUVGrid(self.Settings["ShowUVGrid"])
         self.wgtFisheye.repaint()
         self.tblInfo.clearContents()
 
@@ -456,25 +467,17 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.resetRotation()
         self.wgtFisheye.repaint()
 
-    def toggleUVGrid(self, state):
-        self.wgtFisheye.showUVGrid(state)
-        self.wgtFisheye.repaint()
-
-    def toggleCompass(self, state):
-        self.wgtFisheye.showCompass(state)
-        self.wgtFisheye.repaint()
-
-    def toggleSunPath(self, state):
-        self.wgtFisheye.showSunPath(state)
-        self.wgtFisheye.repaint()
-
-    def toggleSamples(self, state):
-        self.wgtFisheye.showSamples(state)
-        self.wgtFisheye.repaint()
-
-    def toggleHUD(self, state):
-        self.wgtFisheye.showHUD(state)
-        self.wgtFisheye.repaint()
+    def triggerContextMenu(self, widget, event):
+        if (widget == self.wgtFisheye):
+            menuCtx = QMenu(self)
+            menuCtx.addAction(self.actMask)
+            menuCtx.addAction(self.actHUD)
+            menuCtx.addSeparator()
+            menuCtx.addAction(self.actCompass)
+            menuCtx.addAction(self.actSunPath)
+            menuCtx.addAction(self.actSamples)
+            menuCtx.addAction(self.actUVGrid)
+            menuCtx.exec_(widget.mapToGlobal(event.pos()))
 
     def toggleEXIFPanel(self, state):
         if (state):
@@ -490,6 +493,34 @@ class SkyDataViewer(QMainWindow):
         else:
             self.statusBar().hide()
             #self.centralWidget().layout().setContentsMargins(10,10,10,10)
+
+    def toggleMask(self, state):
+        self.wgtFisheye.showMask(state)
+        self.wgtFisheye.repaint()
+
+    def toggleHUD(self, state):
+        self.wgtFisheye.showHUD(state)
+        self.wgtFisheye.repaint()
+        self.actUVGrid.setEnabled(state)
+        self.actCompass.setEnabled(state)
+        self.actSunPath.setEnabled(state)
+        self.actSamples.setEnabled(state)
+
+    def toggleUVGrid(self, state):
+        self.wgtFisheye.showUVGrid(state)
+        self.wgtFisheye.repaint()
+
+    def toggleCompass(self, state):
+        self.wgtFisheye.showCompass(state)
+        self.wgtFisheye.repaint()
+
+    def toggleSunPath(self, state):
+        self.wgtFisheye.showSunPath(state)
+        self.wgtFisheye.repaint()
+
+    def toggleSamples(self, state):
+        self.wgtFisheye.showSamples(state)
+        self.wgtFisheye.repaint()
 
     def center(self):
         frame = self.frameGeometry()
@@ -515,13 +546,14 @@ class SkyDataViewer(QMainWindow):
         top, bottom = self.splitVert.sizes()
         self.Settings["VertSplitTop"] = top
         self.Settings["VertSplitBottom"] = bottom
-        self.Settings["ShowUVGrid"] = self.actUVGrid.isChecked()
+        self.Settings["ShowEXIF"] = self.actEXIF.isChecked()
+        self.Settings["ShowStatusBar"] = self.actStatusBar.isChecked()
+        self.Settings["ShowMask"] = self.actMask.isChecked()
+        self.Settings["ShowHUD"] = self.actHUD.isChecked()
         self.Settings["ShowCompass"] = self.actCompass.isChecked()
         self.Settings["ShowSunPath"] = self.actSunPath.isChecked()
         self.Settings["ShowSamples"] = self.actSamples.isChecked()
-        self.Settings["ShowHUD"] = self.actHUD.isChecked()
-        self.Settings["ShowEXIF"] = self.actEXIF.isChecked()
-        self.Settings["ShowStatusBar"] = self.actStatusBar.isChecked()
+        self.Settings["ShowUVGrid"] = self.actUVGrid.isChecked()
 
         # dump settings to file
         with open(self.Settings["Filename"], 'w') as file:

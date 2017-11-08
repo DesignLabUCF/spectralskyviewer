@@ -29,15 +29,15 @@ import os
 import math
 from datetime import datetime
 from PyQt5.QtCore import Qt, QRect, QPoint, QPointF
-from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPainterPath, QTransform
-from PyQt5.QtWidgets import QWidget, QStyle
+from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QIcon
+from PyQt5.QtWidgets import QWidget, QStyle, QAction, QMenu
 import utility
 import utility_angles
 import utility_data
 
 
 class ViewFisheye(QWidget):
-    def __init__(self):
+    def __init__(self, parent):
         super().__init__()
 
         # members - skydome sampling pattern: 81 samples (theta, phi)
@@ -128,6 +128,7 @@ class ViewFisheye(QWidget):
         #self.samplingPattern[:] = [[math.radians(s[0]), math.radians(s[1])] for s in self.samplingPattern]
 
         # members
+        self.parent = parent
         self.myPhoto = QImage()
         self.myPhotoPath = ""
         self.myPhotoTime = datetime(1,1,1)
@@ -135,6 +136,7 @@ class ViewFisheye(QWidget):
         self.myPhotoDestRect = QRect()
         self.myPhotoRadius = 0
         self.myPhotoRotation = 0
+        self.enableMask = True
         self.enableHUD = True
         self.enableUVGrid = False
         self.enableCompass = False
@@ -151,6 +153,7 @@ class ViewFisheye(QWidget):
 
         # members - preloaded graphics
         self.painter = QPainter()
+        self.mask = QImage()
         self.pathSun = QPainterPath()
         self.brushBG = QBrush(Qt.black, Qt.SolidPattern)
         self.penText = QPen(Qt.white, 1, Qt.SolidLine)
@@ -192,6 +195,9 @@ class ViewFisheye(QWidget):
 
     def resetRotation(self, angles=0):
         self.myPhotoRotation = angles
+
+    def showMask(self, b):
+        self.enableMask = b
 
     def showHUD(self, b):
         self.enableHUD = b
@@ -235,13 +241,8 @@ class ViewFisheye(QWidget):
     def resizeEvent(self, event):
         self.computeBounds()
 
-    # def contextMenuEvent(self, event):
-    #     menuCtx = QMenu(self)
-    #     actExit = QAction(QIcon(), '&Exit', self)
-    #     menuCtx.addAction(actExit)
-    #     action = menuCtx.exec_(self.mapToGlobal(event.pos()))
-    #     if action == actExit:
-    #         self.close()
+    def contextMenuEvent(self, event):
+        self.parent.triggerContextMenu(self, event)
 
     def computeBounds(self):
         if (self.myPhoto.isNull()):
@@ -320,6 +321,9 @@ class ViewFisheye(QWidget):
                 y = (self.viewCenter[1] - self.myPhotoRadius) + (v * diameter)
                 self.pathSun.lineTo(x, y)
 
+        # compute new mask
+        self.mask = QPixmap(self.width(), self.height()).toImage()
+
     def paintEvent(self, event):
         super().paintEvent(event)
 
@@ -328,24 +332,45 @@ class ViewFisheye(QWidget):
         painter.begin(self)
 
         # background
-        #self.brushBG.setColor(Qt.darkGray)
-        #self.brushBG.setStyle(Qt.Dense1Pattern)
-        #painter.setBackground(Qt.gray)
+        if (not self.enableMask):
+            self.brushBG.setColor(Qt.darkGray)
+            self.brushBG.setStyle(Qt.Dense1Pattern)
+            painter.setBackground(Qt.gray)
+
+        else:
+            self.brushBG.setColor(Qt.black)
+            self.brushBG.setStyle(Qt.SolidPattern)
+            painter.setBackground(Qt.black)
         painter.setBackgroundMode(Qt.OpaqueMode)
-        painter.setBackground(Qt.black)
         painter.setBrush(self.brushBG)
         painter.setPen(Qt.NoPen)
         painter.drawRect(0, 0, self.width(), self.height())
 
         # draw photo
         if (not self.myPhoto.isNull()):
+            # rotate and draw photo as specified by user
             transform = QTransform()
             transform.translate(self.myPhotoDestRect.center().x(), self.myPhotoDestRect.center().y())
             transform.rotate(self.myPhotoRotation)
             transform.translate(-self.myPhotoDestRect.center().x(), -self.myPhotoDestRect.center().y())
             painter.setTransform(transform)
-            painter.drawImage(self.myPhotoDestRect, self.myPhoto, self.myPhotoSrcRect)
+            painter.drawImage(self.myPhotoDestRect, self.myPhoto, self.myPhotoSrcRect) # draw it
             painter.resetTransform()
+
+            destRect = QRect(0, 0, self.fontBounds, self.fontBounds)
+            diameter = self.myPhotoRadius * 2
+
+            # mask
+            if (self.enableMask):
+                maskPainter = QPainter()
+                maskPainter.begin(self.mask)
+                maskPainter.setBrush(QBrush(Qt.magenta, Qt.SolidPattern))
+                maskPainter.drawEllipse(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius, diameter, diameter)
+                maskPainter.end()
+                painter.setCompositionMode(QPainter.CompositionMode_DestinationIn)
+                painter.drawImage(0, 0, self.mask)
+                painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+
 
             # HUD
             if (self.enableHUD):
@@ -353,8 +378,6 @@ class ViewFisheye(QWidget):
                 #painter.setBackground(Qt.black)
                 painter.setBrush(Qt.NoBrush)
                 painter.setFont(self.fontScaled)
-                destRect = QRect(0, 0, self.fontBounds, self.fontBounds)
-                diameter = self.myPhotoRadius * 2
 
                 # draw UV grid
                 if (self.enableUVGrid):
@@ -372,13 +395,13 @@ class ViewFisheye(QWidget):
                     painter.drawLine(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1], self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1])
                     painter.drawLine(self.viewCenter[0], self.viewCenter[1] - self.myPhotoRadius, self.viewCenter[0], self.viewCenter[1] + self.myPhotoRadius)
                     # labels
-                    destRect.moveTo(self.viewCenter[0] - self.myPhotoRadius + 5, self.viewCenter[1] - self.myPhotoRadius + 5)
+                    destRect.moveTo(self.viewCenter[0] - self.myPhotoRadius + self.fontScaled.pointSizeF(), self.viewCenter[1] - self.myPhotoRadius + self.fontScaled.pointSizeF())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
-                    destRect.moveTo(self.viewCenter[0] + self.myPhotoRadius - 10, self.viewCenter[1] - self.myPhotoRadius + 5)
+                    destRect.moveTo(self.viewCenter[0] + self.myPhotoRadius - self.fontScaled.pointSizeF()*2, self.viewCenter[1] - self.myPhotoRadius + self.fontScaled.pointSizeF())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
-                    destRect.moveTo(self.viewCenter[0] - self.myPhotoRadius + 5, self.viewCenter[1] + self.myPhotoRadius - 15)
+                    destRect.moveTo(self.viewCenter[0] - self.myPhotoRadius + self.fontScaled.pointSizeF(), self.viewCenter[1] + self.myPhotoRadius - self.fontScaled.pointSizeF()*3)
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
-                    destRect.moveTo(self.viewCenter[0] + self.myPhotoRadius - 10, self.viewCenter[1] + self.myPhotoRadius - 15)
+                    destRect.moveTo(self.viewCenter[0] + self.myPhotoRadius - self.fontScaled.pointSizeF()*2, self.viewCenter[1] + self.myPhotoRadius - self.fontScaled.pointSizeF()*3)
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
 
                 # draw sun path
@@ -482,7 +505,6 @@ class ViewFisheye(QWidget):
                     textUC = "{:.2f}".format(coordsUC[0]) + ", " + "{:.2f}".format(coordsUC[1]) + " uc"
                     textUV = "{:.2f}".format(coordsUV[0]) + ", " + "{:.2f}".format(coordsUV[1]) + " uv"
                     textTP = "{:.2f}".format(coordsTP[0]) + ", " + "{:.2f}".format(coordsTP[1]) + " θφ"
-
 
                 # draw x,y coords
                 destRect.setCoords(10, 10, self.width()-10, self.height()- 124)
