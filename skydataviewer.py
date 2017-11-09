@@ -306,6 +306,10 @@ class SkyDataViewer(QMainWindow):
         self.setWindowTitle("Sky Data Viewer")
         self.setWindowIcon(QIcon('res/icon.png'))
         self.statusBar().showMessage('Ready')
+        if (self.Settings["ShowStatusBar"]):
+            self.statusBar().show()
+        else:
+            self.statusBar().hide()
 
     def resetAll(self):
         self.hdrCaptureDirs = []
