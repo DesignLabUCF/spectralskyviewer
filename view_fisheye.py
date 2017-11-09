@@ -27,6 +27,7 @@
 # ====================================================================
 import os
 import math
+from enum import Enum
 from datetime import datetime
 from PyQt5.QtCore import Qt, QRect, QPoint, QPointF
 from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QIcon
@@ -37,95 +38,99 @@ import utility_data
 
 
 class ViewFisheye(QWidget):
+    # selection types and modes
+    SelectionType = Enum('SelectType', 'Point Rect')
+    SelectionMode = Enum('SelectMode', 'Select Add Remove')
+
+    # skydome sampling pattern: 81 samples (theta, phi)
+    SamplingPattern = [
+        [000.00, 12.1151],
+        [011.25, 12.1151],
+        [022.50, 12.1151],
+        [033.75, 12.1151],
+        [045.00, 12.1151],
+        [056.25, 12.1151],
+        [067.50, 12.1151],
+        [078.75, 12.1151],
+        [090.00, 12.1151],
+        [101.25, 12.1151],
+        [112.50, 12.1151],
+        [123.75, 12.1151],
+        [135.00, 12.1151],
+        [146.25, 12.1151],
+        [157.50, 12.1151],
+        [168.75, 12.1151],
+        [180.00, 12.1151],
+        [191.25, 12.1151],
+        [202.50, 12.1151],
+        [213.75, 12.1151],
+        [225.00, 12.1151],
+        [236.25, 12.1151],
+        [247.50, 12.1151],
+        [258.75, 12.1151],
+        [270.00, 12.1151],
+        [281.25, 12.1151],
+        [292.50, 12.1151],
+        [303.75, 12.1151],
+        [315.00, 12.1151],
+        [326.25, 12.1151],
+        [337.50, 12.1151],
+        [348.75, 12.1151],
+        [345.00, 33.7490],
+        [330.00, 33.7490],
+        [315.00, 33.7490],
+        [300.00, 33.7490],
+        [285.00, 33.7490],
+        [270.00, 33.7490],
+        [255.00, 33.7490],
+        [240.00, 33.7490],
+        [225.00, 33.7490],
+        [210.00, 33.7490],
+        [195.00, 33.7490],
+        [180.00, 33.7490],
+        [165.00, 33.7490],
+        [150.00, 33.7490],
+        [135.00, 33.7490],
+        [120.00, 33.7490],
+        [105.00, 33.7490],
+        [090.00, 33.7490],
+        [075.00, 33.7490],
+        [060.00, 33.7490],
+        [045.00, 33.7490],
+        [030.00, 33.7490],
+        [015.00, 33.7490],
+        [000.00, 33.7490],
+        [000.00, 53.3665],
+        [022.50, 53.3665],
+        [045.00, 53.3665],
+        [067.50, 53.3665],
+        [090.00, 53.3665],
+        [112.50, 53.3665],
+        [135.00, 53.3665],
+        [157.50, 53.3665],
+        [180.00, 53.3665],
+        [202.50, 53.3665],
+        [225.00, 53.3665],
+        [247.50, 53.3665],
+        [270.00, 53.3665],
+        [292.50, 53.3665],
+        [315.00, 53.3665],
+        [337.50, 53.3665],
+        [315.00, 71.9187],
+        [270.00, 71.9187],
+        [225.00, 71.9187],
+        [180.00, 71.9187],
+        [135.00, 71.9187],
+        [090.00, 71.9187],
+        [045.00, 71.9187],
+        [000.00, 71.9187],
+        [000.00, 90.0000],
+    ]
+    # convert to radians
+    # ViewFisheye.SamplingPattern[:] = [[math.radians(s[0]), math.radians(s[1])] for s in ViewFisheye.SamplingPattern]
+
     def __init__(self, parent):
         super().__init__()
-
-        # members - skydome sampling pattern: 81 samples (theta, phi)
-        self.samplingPattern = [
-            [000.00, 12.1151],
-            [011.25, 12.1151],
-            [022.50, 12.1151],
-            [033.75, 12.1151],
-            [045.00, 12.1151],
-            [056.25, 12.1151],
-            [067.50, 12.1151],
-            [078.75, 12.1151],
-            [090.00, 12.1151],
-            [101.25, 12.1151],
-            [112.50, 12.1151],
-            [123.75, 12.1151],
-            [135.00, 12.1151],
-            [146.25, 12.1151],
-            [157.50, 12.1151],
-            [168.75, 12.1151],
-            [180.00, 12.1151],
-            [191.25, 12.1151],
-            [202.50, 12.1151],
-            [213.75, 12.1151],
-            [225.00, 12.1151],
-            [236.25, 12.1151],
-            [247.50, 12.1151],
-            [258.75, 12.1151],
-            [270.00, 12.1151],
-            [281.25, 12.1151],
-            [292.50, 12.1151],
-            [303.75, 12.1151],
-            [315.00, 12.1151],
-            [326.25, 12.1151],
-            [337.50, 12.1151],
-            [348.75, 12.1151],
-            [345.00, 33.7490],
-            [330.00, 33.7490],
-            [315.00, 33.7490],
-            [300.00, 33.7490],
-            [285.00, 33.7490],
-            [270.00, 33.7490],
-            [255.00, 33.7490],
-            [240.00, 33.7490],
-            [225.00, 33.7490],
-            [210.00, 33.7490],
-            [195.00, 33.7490],
-            [180.00, 33.7490],
-            [165.00, 33.7490],
-            [150.00, 33.7490],
-            [135.00, 33.7490],
-            [120.00, 33.7490],
-            [105.00, 33.7490],
-            [090.00, 33.7490],
-            [075.00, 33.7490],
-            [060.00, 33.7490],
-            [045.00, 33.7490],
-            [030.00, 33.7490],
-            [015.00, 33.7490],
-            [000.00, 33.7490],
-            [000.00, 53.3665],
-            [022.50, 53.3665],
-            [045.00, 53.3665],
-            [067.50, 53.3665],
-            [090.00, 53.3665],
-            [112.50, 53.3665],
-            [135.00, 53.3665],
-            [157.50, 53.3665],
-            [180.00, 53.3665],
-            [202.50, 53.3665],
-            [225.00, 53.3665],
-            [247.50, 53.3665],
-            [270.00, 53.3665],
-            [292.50, 53.3665],
-            [315.00, 53.3665],
-            [337.50, 53.3665],
-            [315.00, 71.9187],
-            [270.00, 71.9187],
-            [225.00, 71.9187],
-            [180.00, 71.9187],
-            [135.00, 71.9187],
-            [090.00, 71.9187],
-            [045.00, 71.9187],
-            [000.00, 71.9187],
-            [000.00, 90.0000],
-        ]
-        # convert to radians
-        #self.samplingPattern[:] = [[math.radians(s[0]), math.radians(s[1])] for s in self.samplingPattern]
 
         # members
         self.parent = parent
@@ -143,12 +148,15 @@ class ViewFisheye(QWidget):
         self.enableSunPath = False
         self.enableSamples = False
         self.rawAvailable = False
+        self.dragSelect = False
+        self.dragSelectRect = QRect(0, 0, 0, 0)
         self.coordsMouse = [0, 0]
         self.viewCenter = [0, 0]
         self.sunPathPoints = []    # [theta (azimuth), phi (90-zenith), datetime]
         self.compassTicks = []     # [x1, y1, x2, y2, x1lbl, y1lbl, angle]
         self.samplesLocations = [] # all sample locations in the sampling pattern
-        for i in range(0, len(self.samplingPattern)):
+        self.samplesSelected = []  # indices of sample locations selected
+        for i in range(0, len(ViewFisheye.SamplingPattern)):
             self.samplesLocations.append(QRect(0, 0, 0, 0))
 
         # members - preloaded graphics
@@ -157,6 +165,8 @@ class ViewFisheye(QWidget):
         self.pathSun = QPainterPath()
         self.brushBG = QBrush(Qt.black, Qt.SolidPattern)
         self.penText = QPen(Qt.white, 1, Qt.SolidLine)
+        self.penSelected = QPen(Qt.magenta, 3, Qt.SolidLine)
+        self.penSelectRect = QPen(Qt.white, 1, Qt.DashLine)
         self.penSun = QPen(Qt.yellow, 1, Qt.SolidLine)
         self.fontFixed = QFont('Courier New', 8)
         self.fontScaled = QFont('Courier New', 8)
@@ -214,9 +224,47 @@ class ViewFisheye(QWidget):
     def showSamples(self, b):
         self.enableSamples = b
 
+    def selectSamples(self, message="none"):
+        self.samplesSelected.clear()
+        if (message == "all"):
+            self.samplesSelected.clear()
+            for i in range(0, len(self.samplesLocations)):
+                self.samplesSelected.append(i)
+        # elif (message == "none"):
+        self.repaint()
+
+    def mousePressEvent(self, event):
+        # nothing to do if no photo loaded
+        if (self.myPhoto.isNull()):
+            return
+
+        # we only care about a left click for point selection
+        # right click is for context menu - handled elsewhere
+        # middle click is for rotation - handled elsewhere
+        if (event.buttons() != Qt.LeftButton):
+            return
+
+        self.computeSelectedSamples(type=ViewFisheye.SelectionType.Point)
+        self.repaint()
+
     def mouseMoveEvent(self, event):
+        # nothing to do if no photo loaded
+        if (self.myPhoto.isNull()):
+            return
+
+        # detect primary mouse button drag for image drag selection
+        if (event.buttons() == Qt.LeftButton):
+            # start selection
+            if (not self.dragSelect):
+                self.dragSelect = True
+                self.dragSelectRect.setX(event.x())
+                self.dragSelectRect.setY(event.y())
+            # update selection bounds
+            self.dragSelectRect.setWidth(event.x() - self.dragSelectRect.x())
+            self.dragSelectRect.setHeight(event.y() - self.dragSelectRect.y())
+
         # detect middle mouse button drag for image rotation
-        if (event.buttons() == Qt.MidButton):
+        elif (event.buttons() == Qt.MidButton):
             old = [self.coordsMouse[0] - self.viewCenter[0], self.coordsMouse[1] - self.viewCenter[1]]
             new = [event.x() - self.viewCenter[0], event.y() - self.viewCenter[1]]
             # clockwise drag increases rotation
@@ -231,8 +279,34 @@ class ViewFisheye(QWidget):
             else:
                 self.myPhotoRotation %= -360
 
+        # lastly, cache mouse coordinates and redraw
         self.coordsMouse = [event.x(), event.y()]
         self.repaint()
+
+    def mouseReleaseEvent(self, event):
+        # nothing to do if no photo loaded
+        if (self.myPhoto.isNull()):
+            return
+
+        # detect primary mouse button release for stopping image drag selection
+        if (event.button() == Qt.LeftButton):
+            # stop selection
+            if (self.dragSelect):
+                # flip coordinates of rect so that width and height are always positive
+                r = self.dragSelectRect
+                x1 = r.x()
+                y1 = r.y()
+                x2 = r.right()
+                y2 = r.bottom()
+                if (r.width() < 0 and r.height() < 0):
+                    self.dragSelectRect.setCoords(x2, y2, x1, y1)
+                elif (r.width() < 0):
+                    self.dragSelectRect.setCoords(x2, y1, x1, y2)
+                elif (r.height() < 0):
+                    self.dragSelectRect.setCoords(x1, y2, x2, y1)
+                self.dragSelect = False
+                self.computeSelectedSamples(type=ViewFisheye.SelectionType.Rect)
+                self.repaint()
 
     def leaveEvent(self, event):
         self.coordsMouse = [-1, -1]
@@ -244,12 +318,48 @@ class ViewFisheye(QWidget):
     def contextMenuEvent(self, event):
         self.parent.triggerContextMenu(self, event)
 
+    def computeSelectedSamples(self, type):
+        px = 0
+        py = 0
+        x1 = 0
+        y1 = 0
+        x2 = 0
+        y2 = 0
+
+        # first clear selection
+        self.samplesSelected = []
+
+        # which single sample did user select by point
+        if (type == ViewFisheye.SelectionType.Point):
+            px = self.coordsMouse[0]
+            py = self.coordsMouse[1]
+            for i in range(0, len(self.samplesLocations)):
+                x1 = self.samplesLocations[i].x()
+                y1 = self.samplesLocations[i].y()
+                x2 = self.samplesLocations[i].x() + self.samplesLocations[i].width()
+                y2 = self.samplesLocations[i].y() + self.samplesLocations[i].width()
+                if (px >= x1 and px <= x2 and py >= y1 and py <= y2):
+                    self.samplesSelected.append(i)
+                    break
+
+        # which samples are in the drag selection rect
+        elif (type == ViewFisheye.SelectionType.Rect):
+            x1 = self.dragSelectRect.x()
+            y1 = self.dragSelectRect.y()
+            x2 = self.dragSelectRect.x() + self.dragSelectRect.width()
+            y2 = self.dragSelectRect.y() + self.dragSelectRect.height()
+            for i in range(0, len(self.samplesLocations)):
+                px = self.samplesLocations[i].center().x()
+                py = self.samplesLocations[i].center().y()
+                if (px >= x1 and px <= x2 and py >= y1 and py <= y2):
+                    self.samplesSelected.append(i)
+
     def computeBounds(self):
         if (self.myPhoto.isNull()):
             self.myPhotoDestRect = QRect(0, 0, self.width(), self.height())
             self.viewCenter = [self.width() / 2, self.height() / 2]
             self.myPhotoRadius = 0
-            for i in range(0, len(self.samplingPattern)):
+            for i in range(0, len(ViewFisheye.SamplingPattern)):
                 self.samplesLocations[i].setRect(self.viewCenter[0], self.viewCenter[1], 0, 0)
             return
 
@@ -281,8 +391,8 @@ class ViewFisheye(QWidget):
         radiusSample = self.myPhotoRadius / 50
         radiusSample2 = radiusSample * 2
         u, v = 0, 0
-        for i in range(0, len(self.samplingPattern)):
-            u, v = utility_angles.FisheyeAngleWarp(self.samplingPattern[i][0], self.samplingPattern[i][1], inRadians=False)
+        for i in range(0, len(ViewFisheye.SamplingPattern)):
+            u, v = utility_angles.FisheyeAngleWarp(ViewFisheye.SamplingPattern[i][0], ViewFisheye.SamplingPattern[i][1], inRadians=False)
             u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
             u = (self.viewCenter[0] - self.myPhotoRadius) + (u * diameter)
             v = (self.viewCenter[1] - self.myPhotoRadius) + (v * diameter)
@@ -357,6 +467,7 @@ class ViewFisheye(QWidget):
             painter.drawImage(self.myPhotoDestRect, self.myPhoto, self.myPhotoSrcRect) # draw it
             painter.resetTransform()
 
+            # useful local vars
             destRect = QRect(0, 0, self.fontBounds, self.fontBounds)
             diameter = self.myPhotoRadius * 2
 
@@ -370,7 +481,6 @@ class ViewFisheye(QWidget):
                 painter.setCompositionMode(QPainter.CompositionMode_DestinationIn)
                 painter.drawImage(0, 0, self.mask)
                 painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
-
 
             # HUD
             if (self.enableHUD):
@@ -435,9 +545,21 @@ class ViewFisheye(QWidget):
 
                 # draw sampling pattern
                 if (self.enableSamples):
+                    # all
                     painter.setPen(self.penText)
                     for r in self.samplesLocations:
                         painter.drawEllipse(r)
+                    # selected
+                    painter.setPen(self.penSelected)
+                    r = QRect()
+                    for i in self.samplesSelected:
+                        r.setCoords(self.samplesLocations[i].x(), self.samplesLocations[i].y(), self.samplesLocations[i].right()+1, self.samplesLocations[i].bottom()+1)
+                        painter.drawEllipse(r)
+
+                # draw selection bounds
+                if (self.dragSelect):
+                    painter.setPen(self.penSelectRect)
+                    painter.drawRect(self.dragSelectRect)
 
                 # draw filename
                 painter.setPen(self.penText)

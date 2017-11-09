@@ -149,6 +149,15 @@ class SkyDataViewer(QMainWindow):
         self.actUVGrid.setStatusTip('Toggle display of UV grid')
         self.actUVGrid.triggered.connect(self.toggleUVGrid)
 
+        # file menu actions
+        self.actClearAll = QAction(QIcon(), '&Clear', self)
+        self.actClearAll.setStatusTip('Clear selected samples')
+        self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
+        self.actSelectAll = QAction(QIcon(), 'Select &All', self)
+        self.actSelectAll.setShortcut('Ctrl+A')
+        self.actSelectAll.setStatusTip('Select all samples')
+        self.actSelectAll.triggered.connect(lambda: self.selectSamples('all'))
+
         # help menu actions
         actAbout = QAction(QIcon(), '&About', self)
         actAbout.setStatusTip('Information about this application')
@@ -171,6 +180,9 @@ class SkyDataViewer(QMainWindow):
         menuView.addAction(self.actSunPath)
         menuView.addAction(self.actSamples)
         menuView.addAction(self.actUVGrid)
+        menuView = menubar.addMenu('&Samples')
+        menuView.addAction(self.actSelectAll)
+        menuView.addAction(self.actClearAll)
         menuHelp = menubar.addMenu('&Help')
         menuHelp.addAction(actAbout)
 
@@ -481,6 +493,9 @@ class SkyDataViewer(QMainWindow):
             menuCtx.addAction(self.actSunPath)
             menuCtx.addAction(self.actSamples)
             menuCtx.addAction(self.actUVGrid)
+            menuCtx.addSeparator()
+            menuCtx.addAction(self.actSelectAll)
+            menuCtx.addAction(self.actClearAll)
             menuCtx.exec_(widget.mapToGlobal(event.pos()))
 
     def toggleEXIFPanel(self, state):
@@ -525,6 +540,9 @@ class SkyDataViewer(QMainWindow):
     def toggleSamples(self, state):
         self.wgtFisheye.showSamples(state)
         self.wgtFisheye.repaint()
+
+    def selectSamples(self, message):
+        self.wgtFisheye.selectSamples(message)
 
     def center(self):
         frame = self.frameGeometry()
