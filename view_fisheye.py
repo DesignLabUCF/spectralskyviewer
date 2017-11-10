@@ -225,13 +225,23 @@ class ViewFisheye(QWidget):
         self.enableSamples = b
 
     def selectSamples(self, message="none"):
+        # nothing to do if no photo loaded
+        if (self.myPhoto.isNull()):
+            return
+
+        # first clear selection
         self.samplesSelected.clear()
+
+        # if (message == "none"):
         if (message == "all"):
             self.samplesSelected.clear()
             for i in range(0, len(self.samplesLocations)):
                 self.samplesSelected.append(i)
-        # elif (message == "none"):
+
         self.repaint()
+
+        # notify viewer
+        self.parent.samplesSelected(self.samplesSelected)
 
     def mousePressEvent(self, event):
         # nothing to do if no photo loaded
@@ -244,8 +254,12 @@ class ViewFisheye(QWidget):
         if (event.buttons() != Qt.LeftButton):
             return
 
+        # select
         self.computeSelectedSamples(type=ViewFisheye.SelectionType.Point)
         self.repaint()
+
+        # notify viewer
+        self.parent.samplesSelected(self.samplesSelected)
 
     def mouseMoveEvent(self, event):
         # nothing to do if no photo loaded
@@ -292,21 +306,19 @@ class ViewFisheye(QWidget):
         if (event.button() == Qt.LeftButton):
             # stop selection
             if (self.dragSelect):
-                # flip coordinates of rect so that width and height are always positive
-                r = self.dragSelectRect
-                x1 = r.x()
-                y1 = r.y()
-                x2 = r.right()
-                y2 = r.bottom()
-                if (r.width() < 0 and r.height() < 0):
-                    self.dragSelectRect.setCoords(x2, y2, x1, y1)
-                elif (r.width() < 0):
-                    self.dragSelectRect.setCoords(x2, y1, x1, y2)
-                elif (r.height() < 0):
-                    self.dragSelectRect.setCoords(x1, y2, x2, y1)
                 self.dragSelect = False
+
+                # unflip coordinates of rect so that width and height are always positive
+                r = self.dragSelectRect
+                r = utility.unflipRect([r.x(), r.y(), r.right(), r.bottom()])
+                self.dragSelectRect.setCoords(r[0], r[1], r[2], r[3])
+
+                # select
                 self.computeSelectedSamples(type=ViewFisheye.SelectionType.Rect)
                 self.repaint()
+
+                # notify viewer
+                self.parent.samplesSelected(self.samplesSelected)
 
     def leaveEvent(self, event):
         self.coordsMouse = [-1, -1]
@@ -316,6 +328,10 @@ class ViewFisheye(QWidget):
         self.computeBounds()
 
     def contextMenuEvent(self, event):
+        # nothing to do if no photo loaded
+        if (self.myPhoto.isNull()):
+            return
+
         self.parent.triggerContextMenu(self, event)
 
     def computeSelectedSamples(self, type):

@@ -48,6 +48,24 @@ def normalize(n, minval, maxval):
     return float(n-minval)/float(maxval-minval)
 
 '''
+Function that takes a RECT and ensures that it is unflipped facing forward (width >= 0, height >= 0).
+If the rect has been flipped so that either the width or height is negative, this function returns it unflipped.
+:param rect: The rect as a list of numbers in order [x1, y1, x2, y2]
+'''
+def unflipRect(rect):
+    newrect = rect
+    # rect is flipped horizontally and vertically
+    if (rect[2] < rect[0] and rect[3] < rect[1]):
+        newrect = [rect[2], rect[3], rect[0], rect[1]]
+    # rect is flipped horizontally
+    elif (rect[2] < rect[0]):
+        newrect = [rect[2], rect[1], rect[0], rect[3]]
+    # rect is flipped vertically
+    elif (rect[3] < rect[1]):
+        newrect = [rect[0], rect[3], rect[2], rect[1]]
+    return newrect
+
+'''
 Use this for natural (human) sorting. Pass this as a key to a function that takes keys, such as sort.
 :param s: The element that will be sorted
 :param _nsre: Regular expression to find the digit portion of the element.

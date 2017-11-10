@@ -33,17 +33,32 @@ from PyQt5.QtCore import QCoreApplication, Qt, QDir
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import *
 #from PyQt5.QtWidgets import qApp
+import numpy as np
+import pyqtgraph as pg
 import utility
 import utility_data
 from view_fisheye import ViewFisheye
 
 
 class SkyDataViewer(QMainWindow):
+    # exposure times of the HDR data (in seconds)
+    Exposures = [
+        0.000125,
+        0.001000,
+        0.008000,
+        0.066000,
+        0.033000,
+        0.250000,
+        1.000000,
+        2.000000,
+        4.000000,
+    ]
+
     def __init__(self):
         super().__init__()
 
         # app settings, set to defaults
-        self.Settings = {
+        self.settings = {
             "Filename": "res\\settings.json",
             "DataDirectory": "",
             "WindowWidth": 1024,
@@ -61,30 +76,19 @@ class SkyDataViewer(QMainWindow):
             "ShowEXIF": True,
             "ShowStatusBar": True,
         }
-        # different possible exposure times of the HDR data (in seconds)
-        self.Exposures = [
-            0.000125,
-            0.001000,
-            0.008000,
-            0.066000,
-            0.033000,
-            0.250000,
-            1.000000,
-            2.000000,
-            4.000000,
-        ]
 
         # member variables
-        self.hdrCaptureDirs = []  # some number of these per day
-        self.asdMeasures = []     # 81 of these per capture time
+        self.capture = datetime.min
+        self.captureTimeHDRDirs = [] # some number of these per day
+        self.captureTimeASDDir = []  # ASD capture time directory of selected HDR capture time
         self.exposure = 0
 
         # load and validate settings
-        if (os.path.exists(self.Settings["Filename"])):
-            with open(self.Settings["Filename"], 'r') as file:
-                self.Settings = json.load(file)
-        if (len(self.Settings["DataDirectory"]) > 0 and not os.path.exists(self.Settings["DataDirectory"])):
-            self.Settings["DataDirectory"] = ""
+        if (os.path.exists(self.settings["Filename"])):
+            with open(self.settings["Filename"], 'r') as file:
+                self.settings = json.load(file)
+        if (len(self.settings["DataDirectory"]) > 0 and not os.path.exists(self.settings["DataDirectory"])):
+            self.settings["DataDirectory"] = ""
 
         # init
         QToolTip.setFont(QFont('SansSerif', 8))
@@ -110,42 +114,42 @@ class SkyDataViewer(QMainWindow):
         self.actEXIF = QAction(QIcon(), 'Show E&XIF', self)
         self.actEXIF = QAction(QIcon(), 'Show E&XIF', self)
         self.actEXIF.setCheckable(True)
-        self.actEXIF.setChecked(self.Settings["ShowEXIF"])
+        self.actEXIF.setChecked(self.settings["ShowEXIF"])
         self.actEXIF.setStatusTip('Toggle display of EXIF panel')
         self.actEXIF.triggered.connect(self.toggleEXIFPanel)
         self.actStatusBar = QAction(QIcon(), 'Show Status &Bar', self)
         self.actStatusBar.setCheckable(True)
-        self.actStatusBar.setChecked(self.Settings["ShowStatusBar"])
+        self.actStatusBar.setChecked(self.settings["ShowStatusBar"])
         self.actStatusBar.setStatusTip('Toggle display of status bar')
         self.actStatusBar.triggered.connect(self.toggleStatusBar)
         self.actMask = QAction(QIcon(), 'Show &Mask', self)
         self.actMask.setCheckable(True)
-        self.actMask.setChecked(self.Settings["ShowMask"])
+        self.actMask.setChecked(self.settings["ShowMask"])
         self.actMask.setStatusTip('Toggle display of fisheye mask')
         self.actMask.triggered.connect(self.toggleMask)
         self.actHUD = QAction(QIcon(), 'Show &HUD', self)
         self.actHUD.setCheckable(True)
-        self.actHUD.setChecked(self.Settings["ShowHUD"])
+        self.actHUD.setChecked(self.settings["ShowHUD"])
         self.actHUD.setStatusTip('Toggle display of HUD')
         self.actHUD.triggered.connect(self.toggleHUD)
         self.actCompass = QAction(QIcon(), 'Show &Compass', self)
         self.actCompass.setCheckable(True)
-        self.actCompass.setChecked(self.Settings["ShowCompass"])
+        self.actCompass.setChecked(self.settings["ShowCompass"])
         self.actCompass.setStatusTip('Toggle display of compass')
         self.actCompass.triggered.connect(self.toggleCompass)
         self.actSunPath = QAction(QIcon(), 'Show Su&n Path', self)
         self.actSunPath.setCheckable(True)
-        self.actSunPath.setChecked(self.Settings["ShowSunPath"])
+        self.actSunPath.setChecked(self.settings["ShowSunPath"])
         self.actSunPath.setStatusTip('Toggle display of sun path')
         self.actSunPath.triggered.connect(self.toggleSunPath)
         self.actSamples = QAction(QIcon(), 'Show &Samples', self)
         self.actSamples.setCheckable(True)
-        self.actSamples.setChecked(self.Settings["ShowSamples"])
+        self.actSamples.setChecked(self.settings["ShowSamples"])
         self.actSamples.setStatusTip('Toggle display of sampling pattern')
         self.actSamples.triggered.connect(self.toggleSamples)
         self.actUVGrid = QAction(QIcon(), 'Show &UVGrid', self)
         self.actUVGrid.setCheckable(True)
-        self.actUVGrid.setChecked(self.Settings["ShowUVGrid"])
+        self.actUVGrid.setChecked(self.settings["ShowUVGrid"])
         self.actUVGrid.setStatusTip('Toggle display of UV grid')
         self.actUVGrid.triggered.connect(self.toggleUVGrid)
 
@@ -198,6 +202,7 @@ class SkyDataViewer(QMainWindow):
         self.btnDataDir.clicked.connect(self.browseForData)
         self.lblData = QLabel()
         self.lblData.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+        #self.lblData.setSizePolicy(QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum, QSizePolicy.Label))
         self.cbxDate = QComboBox()
         self.cbxDate.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.cbxDate.currentIndexChanged.connect(self.dateSelected)
@@ -258,29 +263,29 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.showHUD(self.actHUD.isChecked())
 
         # info view
-        self.tblInfo = QTableWidget()
-        self.tblInfo.setShowGrid(False)
-        self.tblInfo.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tblInfo.verticalHeader().hide()
-        #self.tblInfo.horizontalHeader().hide()
-        self.tblInfo.setColumnCount(2)
-        self.tblInfo.setHorizontalHeaderItem(0, QTableWidgetItem("Field"))
-        self.tblInfo.setHorizontalHeaderItem(1, QTableWidgetItem("Value"))
-        self.tblInfo.horizontalHeader().setStretchLastSection(True)
-        boxInfo = QVBoxLayout()
-        boxInfo.setSpacing(0)
-        boxInfo.setContentsMargins(0, 0, 0, 0)
-        boxInfo.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        boxInfo.addWidget(self.tblInfo)
-        pnlInfo = QWidget()
-        pnlInfo.setLayout(boxInfo)
+        self.tblEXIF = QTableWidget()
+        self.tblEXIF.setShowGrid(False)
+        self.tblEXIF.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tblEXIF.verticalHeader().hide()
+        #self.tblEXIF.horizontalHeader().hide()
+        self.tblEXIF.setColumnCount(2)
+        self.tblEXIF.setHorizontalHeaderItem(0, QTableWidgetItem("Field"))
+        self.tblEXIF.setHorizontalHeaderItem(1, QTableWidgetItem("Value"))
+        self.tblEXIF.horizontalHeader().setStretchLastSection(True)
+        boxEXIF = QVBoxLayout()
+        boxEXIF.setSpacing(0)
+        boxEXIF.setContentsMargins(0, 0, 0, 0)
+        boxEXIF.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        boxEXIF.addWidget(self.tblEXIF)
+        pnlEXIF = QWidget()
+        pnlEXIF.setLayout(boxEXIF)
 
         # horizontal splitter
         self.splitHoriz = QSplitter(Qt.Horizontal)
         self.splitHoriz.addWidget(self.wgtFisheye)
-        self.splitHoriz.addWidget(pnlInfo)
-        self.splitHoriz.setSizes([self.Settings["HorizSplitLeft"] if self.Settings["HorizSplitLeft"] >= 0 else self.Settings["WindowWidth"] * 0.75,
-                                  self.Settings["HorizSplitRight"] if self.Settings["HorizSplitRight"] >= 0 else self.Settings["WindowWidth"] * 0.25])
+        self.splitHoriz.addWidget(pnlEXIF)
+        self.splitHoriz.setSizes([self.settings["HorizSplitLeft"] if self.settings["HorizSplitLeft"] >= 0 else self.settings["WindowWidth"] * 0.75,
+                                  self.settings["HorizSplitRight"] if self.settings["HorizSplitRight"] >= 0 else self.settings["WindowWidth"] * 0.25])
 
         # upper panel
         boxUpperHalf = QHBoxLayout()
@@ -292,15 +297,20 @@ class SkyDataViewer(QMainWindow):
         pnlUpperHalf.setLayout(boxUpperHalf)
 
         # energy graph
-        self.wgtGraph = QTextEdit()
-        self.wgtGraph.setFocusPolicy(Qt.ClickFocus)
+        self.wgtGraph = pg.PlotWidget(name='ASD')
+        self.wgtGraph.setLabel('left', 'Spectral Irradiance', units='W/m^2/nm')
+        self.wgtGraph.setLabel('bottom', 'Wavelength', units='nm')
+        self.wgtGraph.setXRange(350, 2500)
+        self.wgtGraph.setYRange(0, 0.5)
+        #self.wgtGraph = QTextEdit()
+        #self.wgtGraph.setFocusPolicy(Qt.ClickFocus)
 
         # vertical splitter
         self.splitVert = QSplitter(Qt.Vertical)
         self.splitVert.addWidget(pnlUpperHalf)
         self.splitVert.addWidget(self.wgtGraph)
-        self.splitVert.setSizes([self.Settings["VertSplitTop"] if self.Settings["VertSplitTop"] >= 0 else self.Settings["WindowHeight"] * 0.75,
-                                 self.Settings["VertSplitBottom"] if self.Settings["VertSplitBottom"] >= 0 else self.Settings["WindowHeight"] * 0.25])
+        self.splitVert.setSizes([self.settings["VertSplitTop"] if self.settings["VertSplitTop"] >= 0 else self.settings["WindowHeight"] * 0.75,
+                                 self.settings["VertSplitBottom"] if self.settings["VertSplitBottom"] >= 0 else self.settings["WindowHeight"] * 0.25])
 
         # attach high level panels and vertical splitter to layout of window
         gridMain = QGridLayout()
@@ -314,18 +324,18 @@ class SkyDataViewer(QMainWindow):
 
         # window
         # self.setGeometry(0, 0, 1024, 768)
-        self.resize(self.Settings["WindowWidth"], self.Settings["WindowHeight"])
+        self.resize(self.settings["WindowWidth"], self.settings["WindowHeight"])
         self.setWindowTitle("Sky Data Viewer")
         self.setWindowIcon(QIcon('res/icon.png'))
         self.statusBar().showMessage('Ready')
-        if (self.Settings["ShowStatusBar"]):
+        if (self.settings["ShowStatusBar"]):
             self.statusBar().show()
         else:
             self.statusBar().hide()
 
     def resetAll(self):
-        self.hdrCaptureDirs = []
-        self.asdMeasures = []
+        self.captureTimeHDRDirs = []
+        self.captureTimeASDDir = []
         self.lblData.clear()
         self.cbxDate.clear()
         self.cbxDate.addItem("-date-")
@@ -333,47 +343,49 @@ class SkyDataViewer(QMainWindow):
         self.cbxTime.addItem("-time-")
         self.cbxExposure.clear()
         self.cbxExposure.addItem("-exposure-")
-        self.cbxExposure.addItems([str(x) for x in self.Exposures])
+        self.cbxExposure.addItems([str(x) for x in SkyDataViewer.Exposures])
         self.exposure = -1
         self.sldTime.setRange(0, 0)
         self.wgtFisheye.setPhoto(None)
-        self.wgtFisheye.showMask(self.Settings["ShowMask"])
-        self.wgtFisheye.showHUD(self.Settings["ShowHUD"])
-        self.wgtFisheye.showCompass(self.Settings["ShowCompass"])
-        self.wgtFisheye.showSunPath(self.Settings["ShowSunPath"])
-        self.wgtFisheye.showSamples(self.Settings["ShowSamples"])
-        self.wgtFisheye.showUVGrid(self.Settings["ShowUVGrid"])
+        self.wgtFisheye.showMask(self.settings["ShowMask"])
+        self.wgtFisheye.showHUD(self.settings["ShowHUD"])
+        self.wgtFisheye.showCompass(self.settings["ShowCompass"])
+        self.wgtFisheye.showSunPath(self.settings["ShowSunPath"])
+        self.wgtFisheye.showSamples(self.settings["ShowSamples"])
+        self.wgtFisheye.showUVGrid(self.settings["ShowUVGrid"])
         self.wgtFisheye.repaint()
-        self.tblInfo.clearContents()
+        self.wgtGraph.clear()
+        self.tblEXIF.clearContents()
 
     def resetDay(self):
-        self.hdrCaptureDirs = []
-        self.asdMeasures = []
-        self.lblData.setText(self.Settings["DataDirectory"])
+        self.captureTimeHDRDirs = []
+        self.captureTimeASDDir = []
+        self.lblData.setText(self.settings["DataDirectory"])
         self.cbxTime.clear()
         self.cbxTime.addItem("-time-")
         self.sldTime.setRange(0, 0)
         self.wgtFisheye.setPhoto(None)
         self.wgtFisheye.resetRotation()
         self.wgtFisheye.repaint()
-        self.tblInfo.clearContents()
+        self.wgtGraph.clear()
+        self.tblEXIF.clearContents()
 
     def browseForData(self):
-        directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', self.Settings["DataDirectory"])
+        directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', self.settings["DataDirectory"])
         directory = QDir.toNativeSeparators(directory)
-        if (directory is not None and len(directory) > 0 and directory != self.Settings["DataDirectory"]):
-            self.Settings["DataDirectory"] = directory
+        if (directory is not None and len(directory) > 0 and directory != self.settings["DataDirectory"]):
+            self.settings["DataDirectory"] = directory
             self.loadData()
 
     def loadData(self):
-        if (len(self.Settings["DataDirectory"]) <= 0 or not os.path.exists(self.Settings["DataDirectory"])):
+        if (len(self.settings["DataDirectory"]) <= 0 or not os.path.exists(self.settings["DataDirectory"])):
             return
 
         # GUI
         self.resetAll()
 
         # find capture dates
-        captureDateDirs = utility.findFiles(self.Settings["DataDirectory"], mode=2)
+        captureDateDirs = utility.findFiles(self.settings["DataDirectory"], mode=2)
         captureDateDirs[:] = [dir for dir in captureDateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
         captureDates = [os.path.basename(dir) for dir in captureDateDirs]
         if (len(captureDates) > 0):
@@ -383,11 +395,10 @@ class SkyDataViewer(QMainWindow):
         if (index < 0 or index >= self.cbxDate.count()):
             return
 
-        # GUI
         self.resetDay()
 
         # find HDR data path
-        pathDate = os.path.join(self.Settings["DataDirectory"], self.cbxDate.itemText(index))
+        pathDate = os.path.join(self.settings["DataDirectory"], self.cbxDate.itemText(index))
         if not os.path.exists(pathDate):
             return
         pathHDR = os.path.join(pathDate, "HDR")
@@ -396,38 +407,53 @@ class SkyDataViewer(QMainWindow):
             return
 
         # find all capture time dirs
-        self.hdrCaptureDirs = utility.findFiles(pathHDR, mode=2)
-        self.hdrCaptureDirs[:] = [dir for dir in self.hdrCaptureDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
-        if (len(self.hdrCaptureDirs) <= 0):
+        self.captureTimeHDRDirs = utility.findFiles(pathHDR, mode=2)
+        self.captureTimeHDRDirs[:] = [dir for dir in self.captureTimeHDRDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
+        if (len(self.captureTimeHDRDirs) <= 0):
             QMessageBox.critical(self, "Error", "No HDR capture folders found.\nFormat is time of capture (e.g. 08.57.23).", QMessageBox.Ok)
             return
-
-        # find ASD data
 
         # load sun path for this capture date
         sunpath = utility_data.loadSunPath(pathDate)
         self.wgtFisheye.setSunPath(sunpath)
 
-        # load GUI
-        self.cbxTime.addItems([os.path.basename(x) for x in self.hdrCaptureDirs])
+        # update datetime panel
+        self.cbxTime.blockSignals(True) # prevent calling event handlers until we're ready
+        self.sldTime.blockSignals(True)
+        self.cbxExposure.blockSignals(True)
+        self.cbxTime.addItems([os.path.basename(x) for x in self.captureTimeHDRDirs])
         self.cbxTime.setCurrentIndex(1) # because combobox first element is not a valid value
-        self.sldTime.setRange(0, len(self.hdrCaptureDirs)-1)
-        self.sldTime.valueChanged.emit(0)
+        self.sldTime.setRange(0, len(self.captureTimeHDRDirs) - 1)
         if (self.exposure < 0):
             self.cbxExposure.setCurrentIndex(1) # because combobox first element is not a valid value
             self.exposure = 0
+        self.cbxTime.blockSignals(False)
+        self.sldTime.blockSignals(False)
+        self.cbxExposure.blockSignals(False) # ok, we're ready
+
+        # cache capture datetime
+        captureStr = self.cbxDate.itemText(index) + " " + os.path.basename(self.captureTimeHDRDirs[0])
+        self.capture = datetime.strptime(captureStr, "%Y-%m-%d %H.%M.%S")
+        #print("date: " + str(self.capture))
+
+        # trigger event for selecting first capture time
+        self.sldTime.valueChanged.emit(0)
+
+        # reset sample selection
+        self.wgtFisheye.selectSamples("none")
 
     def timeSelected(self, index):
         if (index < 0 or index >= self.cbxTime.count()):
             return
 
         # get sender of event
+        # both capture time choicebox and slider route to this event handler, so we need to know who sent the event
         widget = self.sender()
         if (widget == self.cbxTime):
             index -= 1  # because combobox first element is not a valid value
 
         # handle unselected time, exposure, or rare events triggered when we have no data loaded yet
-        if (index < 0 or self.exposure < 0 or len(self.hdrCaptureDirs) <= 0):
+        if (index < 0 or self.exposure < 0 or len(self.captureTimeHDRDirs) <= 0):
             self.wgtFisheye.setPhoto(None)
             self.wgtFisheye.repaint()
             return
@@ -436,7 +462,7 @@ class SkyDataViewer(QMainWindow):
         # A safer method would be to gather all EXIF DateTimeOriginal fields and sort manually
 
         # gather all exposure photos taken at time selected
-        photos = utility.findFiles(self.hdrCaptureDirs[index], mode=1, ext=["jpg"])
+        photos = utility.findFiles(self.captureTimeHDRDirs[index], mode=1, ext=["jpg"])
         if (len(photos) <= 0):
             #QMessageBox.critical(self, "Error", "No photos found in:\n" + self.hdrCaptureDirs[index], QMessageBox.Ok)
             return
@@ -451,33 +477,108 @@ class SkyDataViewer(QMainWindow):
         exif = utility_data.imageEXIF(photos[self.exposure])
         exif = {k: v for k, v in exif.items() if k.startswith("EXIF")} # filter down to EXIF tags only
 
-        # datetime panel
+        # update datetime panel
+        # both capture time choicebox and slider route to this event handler, so only update the other one
         self.lblData.setText(photos[self.exposure])
         if (widget == self.cbxTime):
+            self.sldTime.blockSignals(True)       # prevent calling this event handler again
             self.sldTime.setSliderPosition(index)
+            self.sldTime.blockSignals(False)
         elif (widget == self.sldTime):
+            self.cbxTime.blockSignals(True)       # prevent calling this event handler again
             self.cbxTime.setCurrentIndex(index+1) # because combobox first element is not a valid value
+            self.cbxTime.blockSignals(False)
 
-        # info panel
-        self.tblInfo.setRowCount(len(exif.keys()))
+        # exif panel
+        self.tblEXIF.setRowCount(len(exif.keys()))
         row = 0
         for key in sorted(exif.keys()):
-            self.tblInfo.setItem(row, 0, QTableWidgetItem(str(key)[5:]))
-            self.tblInfo.setItem(row, 1, QTableWidgetItem(str(exif[key])))
+            self.tblEXIF.setItem(row, 0, QTableWidgetItem(str(key)[5:]))
+            self.tblEXIF.setItem(row, 1, QTableWidgetItem(str(exif[key])))
             row += 1
-        self.tblInfo.resizeColumnToContents(0)
+        self.tblEXIF.resizeColumnToContents(0)
 
         # render pane
         self.wgtFisheye.setPhoto(photos[self.exposure], exif=exif)
         self.wgtFisheye.repaint()
 
+        # cache capture datetime
+        captureStr = str(self.capture.date()) + " " + os.path.basename(self.captureTimeHDRDirs[index])
+        self.capture = datetime.strptime(captureStr, "%Y-%m-%d %H.%M.%S")
+        #print("date: " + str(self.capture), widget)
+        self.statusBar().showMessage("Capture: " + str(self.capture) + ", Exposure: " + str(SkyDataViewer.Exposures[self.exposure]) + "s")
+
+        # graph
+        self.samplesSelected(self.wgtFisheye.samplesSelected)
+
     def exposureSelected(self, index):
         index -= 1 # -1 because combobox first element is not a valid value
-
         self.exposure = index
-
-        if (self.hdrCaptureDirs is not None and len(self.hdrCaptureDirs) > 0):
+        if (self.captureTimeHDRDirs is not None and len(self.captureTimeHDRDirs) > 0):
             self.sldTime.valueChanged.emit(self.sldTime.value())
+
+    def samplesSelected(self, indices):
+        # clear it
+        self.wgtGraph.clear()
+
+        if (len(indices) <= 0):
+            return
+        if (len(self.captureTimeHDRDirs) <= 0):
+            return
+
+        # find ASD data path
+        pathDate = os.path.join(self.settings["DataDirectory"], str(self.capture.date()))
+        if not os.path.exists(pathDate):
+            return
+        pathASD = os.path.join(pathDate, "ASD")
+        if not os.path.exists(pathASD):
+            print("Error: No ASD data found for: " + str(self.capture.date()))
+            return
+
+        # find all capture time dirs
+        captureTimeASDDirs = utility.findFiles(pathASD, mode=2)
+        captureTimeASDDirs[:] = [dir for dir in captureTimeASDDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
+        if (len(captureTimeASDDirs) <= 0):
+            print("Error: No ASD capture time dirs found: " + str(self.capture.date()))
+            return
+
+        # find an ASD capture time within small threshold of HDR capture time
+        asdTime = None
+        threshold = 60 # seconds
+        for dir in captureTimeASDDirs:
+            timestr = str(self.capture.date()) + " " + os.path.basename(dir)
+            time = datetime.strptime(timestr, "%Y-%m-%d %H.%M.%S")
+            delta = (self.capture - time).total_seconds()
+            if (abs(delta) <= threshold):
+                asdTime = time
+                break
+
+        # is there an equivalent ASD capture?
+        if (asdTime is None):
+            print("Error: No ASD capture time dir found within " + str(threshold) + "s of HDR capture time: " + str(self.capture))
+            return
+
+        # gather all ASD files for capture time
+        asdTimeDir = os.path.join(pathASD, str(asdTime.time()).replace(":", "."))
+        asdFiles = utility.findFiles(asdTimeDir, mode=1, ext=[".txt"])
+        if (len(asdFiles) <= 0):
+            print("Error: No .txt files found for: " + str(asdTime))
+            return
+        if (len(asdFiles) < 81):
+            QMessageBox.critical(self, "Warning!", "Number of ASD .txt files is " + str(len(asdFiles)) + ".\nSample pattern should have " + str(len(ViewFisheye.SamplingPattern)), QMessageBox.Ok)
+
+        # load and plot the data
+        for i in indices:
+            if (i > len(asdFiles)):
+                break
+            # load ASD .txt files
+            xs, ys = utility_data.loadASDFile(asdFiles[i])
+            # plot it
+            self.wgtGraph.plot(y=ys, x=xs, pen=(i, len(indices)))
+            #self.wgtGraph.addItem() # add a label/icon to graph with number of samples available
+
+    def selectSamples(self, message):
+        self.wgtFisheye.selectSamples(message)
 
     def resetViewPressed(self):
         self.wgtFisheye.resetRotation()
@@ -541,9 +642,6 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.showSamples(state)
         self.wgtFisheye.repaint()
 
-    def selectSamples(self, message):
-        self.wgtFisheye.selectSamples(message)
-
     def center(self):
         frame = self.frameGeometry()
         centerPoint = QDesktopWidget().availableGeometry().center()
@@ -560,26 +658,26 @@ class SkyDataViewer(QMainWindow):
         event.accept()
 
         # cache settings
-        self.Settings["WindowWidth"] = self.width()
-        self.Settings["WindowHeight"] = self.height()
+        self.settings["WindowWidth"] = self.width()
+        self.settings["WindowHeight"] = self.height()
         left, right = self.splitHoriz.sizes()
-        self.Settings["HorizSplitLeft"] = left
-        self.Settings["HorizSplitRight"] = right
+        self.settings["HorizSplitLeft"] = left
+        self.settings["HorizSplitRight"] = right
         top, bottom = self.splitVert.sizes()
-        self.Settings["VertSplitTop"] = top
-        self.Settings["VertSplitBottom"] = bottom
-        self.Settings["ShowEXIF"] = self.actEXIF.isChecked()
-        self.Settings["ShowStatusBar"] = self.actStatusBar.isChecked()
-        self.Settings["ShowMask"] = self.actMask.isChecked()
-        self.Settings["ShowHUD"] = self.actHUD.isChecked()
-        self.Settings["ShowCompass"] = self.actCompass.isChecked()
-        self.Settings["ShowSunPath"] = self.actSunPath.isChecked()
-        self.Settings["ShowSamples"] = self.actSamples.isChecked()
-        self.Settings["ShowUVGrid"] = self.actUVGrid.isChecked()
+        self.settings["VertSplitTop"] = top
+        self.settings["VertSplitBottom"] = bottom
+        self.settings["ShowEXIF"] = self.actEXIF.isChecked()
+        self.settings["ShowStatusBar"] = self.actStatusBar.isChecked()
+        self.settings["ShowMask"] = self.actMask.isChecked()
+        self.settings["ShowHUD"] = self.actHUD.isChecked()
+        self.settings["ShowCompass"] = self.actCompass.isChecked()
+        self.settings["ShowSunPath"] = self.actSunPath.isChecked()
+        self.settings["ShowSamples"] = self.actSamples.isChecked()
+        self.settings["ShowUVGrid"] = self.actUVGrid.isChecked()
 
         # dump settings to file
-        with open(self.Settings["Filename"], 'w') as file:
-            json.dump(self.Settings, file, indent=4)
+        with open(self.settings["Filename"], 'w') as file:
+            json.dump(self.settings, file, indent=4)
 
 
 if __name__ == '__main__':

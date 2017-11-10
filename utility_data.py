@@ -28,11 +28,11 @@
 import os
 import csv
 from datetime import datetime
+import numpy as np
 import exifread
 
 
 HDRRawExts = ['.cr2', '.raw', '.dng']
-
 
 '''
 Function to extract the "DateTimeOriginal" EXIF value of an image.
@@ -68,22 +68,6 @@ def imageEXIF(filepath):
     return data
 
 '''
-Function to check if a raw data photo is available, given a path to an existing photo.
-:param hdrImgpath: Path to a photo in the HDR folder of a capture date in the data directory.
-:note: This assumes the raw data file is the same name (but different extension) of given file.
-'''
-def isHDRRawAvailable(hdrImgPath):
-    if (not os.path.exists(hdrImgPath)):
-        return False
-    pathSplit = os.path.splitext(hdrImgPath.lower())
-    for ext in HDRRawExts:
-        if (pathSplit[1] == ext):
-            return True
-        elif (os.path.exists(pathSplit[0] + ext)):
-            return True
-    return False
-
-'''
 '''
 def loadSunPath(filepath, isDir=True):
     # format should be a csv with the following columns:
@@ -115,3 +99,27 @@ def loadSunPath(filepath, isDir=True):
             if (point[1] >=0 and point[1] <= 90):
                 sunpath.append(point)
     return sunpath
+
+'''
+Function to check if a raw data photo is available, given a path to an existing photo.
+:param hdrImgpath: Path to a photo in the HDR folder of a capture date in the data directory.
+:note: This assumes the raw data file is the same name (but different extension) of given file.
+'''
+def isHDRRawAvailable(hdrImgPath):
+    if (not os.path.exists(hdrImgPath)):
+        return False
+    pathSplit = os.path.splitext(hdrImgPath.lower())
+    for ext in HDRRawExts:
+        if (pathSplit[1] == ext):
+            return True
+        elif (os.path.exists(pathSplit[0] + ext)):
+            return True
+    return False
+
+'''
+'''
+def loadASDFile(filepath):
+    if (not os.path.exists(filepath)):
+        return [], []
+    xdata, ydata = np.loadtxt(filepath, skiprows=1, unpack=True)
+    return xdata, ydata
