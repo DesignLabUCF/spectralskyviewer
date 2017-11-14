@@ -32,7 +32,7 @@ from datetime import datetime
 from PyQt5.QtCore import QCoreApplication, Qt, QDir
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import *
-#from PyQt5.QtWidgets import qApp
+from PyQt5.QtWidgets import qApp, QGraphicsPixmapItem
 import numpy as np
 import pyqtgraph as pg
 import utility
@@ -509,7 +509,7 @@ class SkyDataViewer(QMainWindow):
         self.statusBar().showMessage("Capture: " + str(self.capture) + ", Exposure: " + str(SkyDataViewer.Exposures[self.exposure]) + "s")
 
         # graph
-        self.samplesSelected(self.wgtFisheye.samplesSelected)
+        self.graphSamples(self.wgtFisheye.samplesSelected)
 
     def exposureSelected(self, index):
         index -= 1 # -1 because combobox first element is not a valid value
@@ -517,7 +517,7 @@ class SkyDataViewer(QMainWindow):
         if (self.captureTimeHDRDirs is not None and len(self.captureTimeHDRDirs) > 0):
             self.sldTime.valueChanged.emit(self.sldTime.value())
 
-    def samplesSelected(self, indices):
+    def graphSamples(self, indices):
         # clear it
         self.wgtGraph.clear()
 
@@ -566,10 +566,15 @@ class SkyDataViewer(QMainWindow):
             return
         if (len(asdFiles) < 81):
             QMessageBox.critical(self, "Warning!", "Number of ASD .txt files is " + str(len(asdFiles)) + ".\nSample pattern should have " + str(len(ViewFisheye.SamplingPattern)), QMessageBox.Ok)
+            #print("WARNING!")
+            #rect = QtGui.QGraphicsRectItem(QtCore.QRectF(0, 0, 1, 5e-11))
+            #rect.setPen(pg.mkPen(100, 200, 100))
+            #pw.addItem(rect)
+            #self.wgtGraph.addItem(QGraphicsPixmapItem(self.wgtFisheye.iconWarning))
 
         # load and plot the data
         for i in indices:
-            if (i > len(asdFiles)):
+            if (i >= len(asdFiles)):
                 break
             # load ASD .txt files
             xs, ys = utility_data.loadASDFile(asdFiles[i])

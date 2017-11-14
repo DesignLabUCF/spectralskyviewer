@@ -48,11 +48,11 @@ def normalize(n, minval, maxval):
     return float(n-minval)/float(maxval-minval)
 
 '''
-Function that takes a RECT and ensures that it is unflipped facing forward (width >= 0, height >= 0).
+Function that takes a RECT and ensures that it is forward facing (x,y in top left, width >= 0, height >= 0).
 If the rect has been flipped so that either the width or height is negative, this function returns it unflipped.
 :param rect: The rect as a list of numbers in order [x1, y1, x2, y2]
 '''
-def unflipRect(rect):
+def rectForwardFacing(rect):
     newrect = rect
     # rect is flipped horizontally and vertically
     if (rect[2] < rect[0] and rect[3] < rect[1]):
