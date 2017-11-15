@@ -310,13 +310,12 @@ class ViewFisheye(QWidget):
             self.dragSelectRect.setCoords(r[0], r[1], r[2], r[3])
 
             # select samples
-            prevCount = len(self.samplesSelected)
+            prevSelected = list(self.samplesSelected)
             if (self.dragSelectRect.width() < ViewFisheye.SelectionRectMin and
                 self.dragSelectRect.height() < ViewFisheye.SelectionRectMin):
                 self.computeSelectedSamples(ViewFisheye.SelectionType.Closest, mode)
             else:
                 self.computeSelectedSamples(ViewFisheye.SelectionType.Rect, mode)
-            diff = abs(len(self.samplesSelected) - prevCount)
 
             # reset drag selection
             self.dragSelectRect.setX(event.x())
@@ -326,7 +325,7 @@ class ViewFisheye(QWidget):
 
             # update
             self.repaint()
-            if (diff > 0):
+            if (self.samplesSelected != prevSelected):
                 self.parent.graphSamples(self.samplesSelected)
 
     def leaveEvent(self, event):
@@ -399,7 +398,7 @@ class ViewFisheye(QWidget):
                 if (px >= x1 and px <= x2 and py >= y1 and py <= y2):
                     sampleAdjustments.append(i)
 
-        # no changes
+        # no changes to be made
         if (len(sampleAdjustments) <= 0):
             return
 
@@ -414,6 +413,9 @@ class ViewFisheye(QWidget):
                     self.samplesSelected.remove(sampleAdjustments[i])
                 except:
                     pass # ignore trying to remove indices that aren't currently selected
+
+        # sort selection for easier searching later
+        self.samplesSelected.sort()
 
     def computeBounds(self):
         if (self.myPhoto.isNull()):
