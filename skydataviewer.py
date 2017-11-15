@@ -54,6 +54,16 @@ class SkyDataViewer(QMainWindow):
         4.000000,
     ]
 
+    # ASD graph settings
+    XAxisMin = 0
+    XAxisMax = 3000 # nm
+    XAxisMinDef = 350
+    XAxisMaxDef = 2500
+    YAxisMin = 0
+    YAxisMax = 1.0  # W/m²/nm
+    YAxisMinDef = 0
+    YAxisMaxDef = 0.4
+
     def __init__(self):
         super().__init__()
 
@@ -298,10 +308,9 @@ class SkyDataViewer(QMainWindow):
 
         # energy graph
         self.wgtGraph = pg.PlotWidget(name='ASD')
-        self.wgtGraph.setLabel('left', 'Spectral Irradiance', units='W/m^2/nm')
+        self.wgtGraph.setLabel('left', 'Spectral Irradiance', units='W/m²/nm')
         self.wgtGraph.setLabel('bottom', 'Wavelength', units='nm')
-        self.wgtGraph.setXRange(350, 2500)
-        self.wgtGraph.setYRange(0, 0.5)
+        self.resetGraph()
         #self.wgtGraph = QTextEdit()
         #self.wgtGraph.setFocusPolicy(Qt.ClickFocus)
 
@@ -346,6 +355,7 @@ class SkyDataViewer(QMainWindow):
         self.cbxExposure.addItems([str(x) for x in SkyDataViewer.Exposures])
         self.exposure = -1
         self.sldTime.setRange(0, 0)
+        self.tblEXIF.clearContents()
         self.wgtFisheye.setPhoto(None)
         self.wgtFisheye.showMask(self.settings["ShowMask"])
         self.wgtFisheye.showHUD(self.settings["ShowHUD"])
@@ -355,7 +365,7 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.showUVGrid(self.settings["ShowUVGrid"])
         self.wgtFisheye.repaint()
         self.wgtGraph.clear()
-        self.tblEXIF.clearContents()
+        self.resetGraph()
 
     def resetDay(self):
         self.captureTimeHDRDirs = []
@@ -364,11 +374,12 @@ class SkyDataViewer(QMainWindow):
         self.cbxTime.clear()
         self.cbxTime.addItem("-time-")
         self.sldTime.setRange(0, 0)
+        self.tblEXIF.clearContents()
         self.wgtFisheye.setPhoto(None)
         self.wgtFisheye.resetRotation()
         self.wgtFisheye.repaint()
         self.wgtGraph.clear()
-        self.tblEXIF.clearContents()
+        self.resetGraph()
 
     def browseForData(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', self.settings["DataDirectory"])
@@ -588,6 +599,15 @@ class SkyDataViewer(QMainWindow):
     def resetViewPressed(self):
         self.wgtFisheye.resetRotation()
         self.wgtFisheye.repaint()
+
+    def resetGraph(self):
+        self.wgtGraph.setXRange(SkyDataViewer.XAxisMinDef, SkyDataViewer.XAxisMaxDef)
+        self.wgtGraph.setYRange(SkyDataViewer.YAxisMinDef, SkyDataViewer.YAxisMaxDef)
+        self.wgtGraph.setLimits(xMin=SkyDataViewer.XAxisMin, xMax=SkyDataViewer.XAxisMax,
+                                minXRange=100, maxXRange=SkyDataViewer.XAxisMax - SkyDataViewer.XAxisMin,
+                                yMin=SkyDataViewer.YAxisMin, yMax=SkyDataViewer.YAxisMax,
+                                minYRange=0.05, maxYRange=SkyDataViewer.YAxisMax-SkyDataViewer.YAxisMin)
+        #self.wgtGraph.setAspectLocked(True, None)
 
     def triggerContextMenu(self, widget, event):
         if (widget == self.wgtFisheye):
