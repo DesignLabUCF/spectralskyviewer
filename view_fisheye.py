@@ -310,12 +310,13 @@ class ViewFisheye(QWidget):
             self.dragSelectRect.setCoords(r[0], r[1], r[2], r[3])
 
             # select samples
-            diff = 0
+            prevCount = len(self.samplesSelected)
             if (self.dragSelectRect.width() < ViewFisheye.SelectionRectMin and
                 self.dragSelectRect.height() < ViewFisheye.SelectionRectMin):
-                diff = self.computeSelectedSamples(ViewFisheye.SelectionType.Closest, mode)
+                self.computeSelectedSamples(ViewFisheye.SelectionType.Closest, mode)
             else:
-                diff = self.computeSelectedSamples(ViewFisheye.SelectionType.Rect, mode)
+                self.computeSelectedSamples(ViewFisheye.SelectionType.Rect, mode)
+            diff = abs(len(self.samplesSelected) - prevCount)
 
             # reset drag selection
             self.dragSelectRect.setX(event.x())
@@ -400,22 +401,19 @@ class ViewFisheye(QWidget):
 
         # no changes
         if (len(sampleAdjustments) <= 0):
-            return 0
+            return
 
         # finally modify sample selection and return difference
-        difference = 0
         if (mode == ViewFisheye.SelectionMode.Select or mode == ViewFisheye.SelectionMode.Add):
-            difference = len(self.samplesSelected) + len(sampleAdjustments)
             for i in range(0, len(sampleAdjustments)):
-                self.samplesSelected.append(sampleAdjustments[i])
+                if (sampleAdjustments[i] not in self.samplesSelected): # don't readd existing indices
+                    self.samplesSelected.append(sampleAdjustments[i])
         elif (mode == ViewFisheye.SelectionMode.Remove):
-            difference = len(self.samplesSelected) - len(sampleAdjustments)
             for i in range(0, len(sampleAdjustments)):
                 try:
                     self.samplesSelected.remove(sampleAdjustments[i])
                 except:
-                    pass # ignore trying to remove indicies that aren't currently selected
-        return difference
+                    pass # ignore trying to remove indices that aren't currently selected
 
     def computeBounds(self):
         if (self.myPhoto.isNull()):
