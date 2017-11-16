@@ -38,6 +38,7 @@ import pyqtgraph as pg
 import utility
 import utility_data
 from view_fisheye import ViewFisheye
+from dialog_export import DialogExport
 
 
 class SkyDataViewer(QMainWindow):
@@ -64,28 +65,29 @@ class SkyDataViewer(QMainWindow):
     YAxisMinDef = 0
     YAxisMaxDef = 0.4
 
+    # default application settings
+    Settings = {
+        "Filename": "res\\settings.json",
+        "DataDirectory": "",
+        "WindowWidth": 1024,
+        "WindowHeight": 768,
+        "HorizSplitLeft": -1,
+        "HorizSplitRight": -1,
+        "VertSplitTop": -1,
+        "VertSplitBottom": -1,
+        "ShowMask": True,
+        "ShowHUD": True,
+        "ShowCompass": False,
+        "ShowSunPath": False,
+        "ShowSamples": False,
+        "ShowUVGrid": False,
+        "ShowEXIF": True,
+        "ShowStatusBar": True,
+    }
+    Settings.update({"ExportOptions": DialogExport.ExportOptions})
+
     def __init__(self):
         super().__init__()
-
-        # app settings, set to defaults
-        self.settings = {
-            "Filename": "res\\settings.json",
-            "DataDirectory": "",
-            "WindowWidth": 1024,
-            "WindowHeight": 768,
-            "HorizSplitLeft": -1,
-            "HorizSplitRight": -1,
-            "VertSplitTop": -1,
-            "VertSplitBottom": -1,
-            "ShowMask": True,
-            "ShowHUD": True,
-            "ShowCompass": False,
-            "ShowSunPath": False,
-            "ShowSamples": False,
-            "ShowUVGrid": False,
-            "ShowEXIF": True,
-            "ShowStatusBar": True,
-        }
 
         # member variables
         self.capture = datetime.min
@@ -94,6 +96,7 @@ class SkyDataViewer(QMainWindow):
         self.exposure = 0
 
         # load and validate settings
+        self.settings = dict(SkyDataViewer.Settings)  # this must be first!
         if (os.path.exists(self.settings["Filename"])):
             with open(self.settings["Filename"], 'r') as file:
                 self.settings = json.load(file)
@@ -105,6 +108,15 @@ class SkyDataViewer(QMainWindow):
         # uic.loadUi('design.ui', self)
         self.initMenu()
         self.initWidgets()
+        # self.setGeometry(0, 0, 1024, 768)
+        self.resize(self.settings["WindowWidth"], self.settings["WindowHeight"])
+        self.setWindowTitle("Sky Data Viewer")
+        self.setWindowIcon(QIcon('res/icon.png'))
+        self.statusBar().showMessage('Ready')
+        if (self.settings["ShowStatusBar"]):
+            self.statusBar().show()
+        else:
+            self.statusBar().hide()
 
         # startup
         self.loadData()
@@ -163,7 +175,7 @@ class SkyDataViewer(QMainWindow):
         self.actUVGrid.setStatusTip('Toggle display of UV grid')
         self.actUVGrid.triggered.connect(self.toggleUVGrid)
 
-        # file menu actions
+        # sky sample menu actions
         self.actClearAll = QAction(QIcon(), '&Clear', self)
         self.actClearAll.setStatusTip('Clear selected samples')
         self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
@@ -171,6 +183,14 @@ class SkyDataViewer(QMainWindow):
         self.actSelectAll.setShortcut('Ctrl+A')
         self.actSelectAll.setStatusTip('Select all samples')
         self.actSelectAll.triggered.connect(lambda: self.selectSamples('all'))
+        self.actExportSetup = QAction(QIcon(), 'Setup Export &File', self)
+        self.actExportSetup.setStatusTip('Setup export file')
+        self.actExportSetup.triggered.connect(self.setupExportFile)
+        self.actExportSelected = QAction(QIcon(), '&Export Selected', self)
+        self.actExportSelected.setShortcut('Ctrl+E')
+        self.actExportSelected.setStatusTip('Export selected samples')
+        self.actExportSelected.setEnabled(False)
+        self.actExportSelected.triggered.connect(lambda: self.exportSamples('selected'))
 
         # help menu actions
         actAbout = QAction(QIcon(), '&About', self)
@@ -179,26 +199,29 @@ class SkyDataViewer(QMainWindow):
 
         # menubar
         menubar = self.menuBar()
-        menuFile = menubar.addMenu('&File')
-        menuFile.addAction(actLoad)
-        menuFile.addSeparator()
-        menuFile.addAction(actExit)
-        menuView = menubar.addMenu('&View')
-        menuView.addAction(self.actEXIF)
-        menuView.addAction(self.actStatusBar)
-        menuView.addSeparator()
-        menuView.addAction(self.actMask)
-        menuView.addAction(self.actHUD)
-        menuView.addSeparator()
-        menuView.addAction(self.actCompass)
-        menuView.addAction(self.actSunPath)
-        menuView.addAction(self.actSamples)
-        menuView.addAction(self.actUVGrid)
-        menuView = menubar.addMenu('&Samples')
-        menuView.addAction(self.actSelectAll)
-        menuView.addAction(self.actClearAll)
-        menuHelp = menubar.addMenu('&Help')
-        menuHelp.addAction(actAbout)
+        menu = menubar.addMenu('&File')
+        menu.addAction(actLoad)
+        menu.addSeparator()
+        menu.addAction(actExit)
+        menu = menubar.addMenu('&View')
+        menu.addAction(self.actEXIF)
+        menu.addAction(self.actStatusBar)
+        menu.addSeparator()
+        menu.addAction(self.actMask)
+        menu.addAction(self.actHUD)
+        menu.addSeparator()
+        menu.addAction(self.actCompass)
+        menu.addAction(self.actSunPath)
+        menu.addAction(self.actSamples)
+        menu.addAction(self.actUVGrid)
+        menu = menubar.addMenu('&Samples')
+        menu.addAction(self.actSelectAll)
+        menu.addAction(self.actClearAll)
+        menu.addSeparator()
+        menu.addAction(self.actExportSetup)
+        menu.addAction(self.actExportSelected)
+        menu = menubar.addMenu('&Help')
+        menu.addAction(actAbout)
 
         # # toolbar
         # toolbar = self.addToolBar('Toolbar')
@@ -308,7 +331,7 @@ class SkyDataViewer(QMainWindow):
 
         # energy graph
         self.wgtGraph = pg.PlotWidget(name='ASD')
-        self.wgtGraph.setLabel('left', 'Spectral Irradiance', units='W/m²/nm')
+        self.wgtGraph.setLabel('left', 'Solar Irradiance', units='W/m²/nm')
         self.wgtGraph.setLabel('bottom', 'Wavelength', units='nm')
         self.resetGraph()
         #self.wgtGraph = QTextEdit()
@@ -330,17 +353,6 @@ class SkyDataViewer(QMainWindow):
         pnlMain = QWidget()
         pnlMain.setLayout(gridMain)
         self.setCentralWidget(pnlMain)
-
-        # window
-        # self.setGeometry(0, 0, 1024, 768)
-        self.resize(self.settings["WindowWidth"], self.settings["WindowHeight"])
-        self.setWindowTitle("Sky Data Viewer")
-        self.setWindowIcon(QIcon('res/icon.png'))
-        self.statusBar().showMessage('Ready')
-        if (self.settings["ShowStatusBar"]):
-            self.statusBar().show()
-        else:
-            self.statusBar().hide()
 
     def resetAll(self):
         self.captureTimeHDRDirs = []
@@ -595,6 +607,17 @@ class SkyDataViewer(QMainWindow):
 
     def selectSamples(self, message):
         self.wgtFisheye.selectSamples(message)
+
+    def exportSamples(self, message):
+        #if (message == "selected"):
+        print("hi")
+
+    def setupExportFile(self):
+        dialog = DialogExport()
+
+        code = dialog.exec()
+        if (code == QDialog.Accepted):
+            print("yay!")
 
     def resetViewPressed(self):
         self.wgtFisheye.resetRotation()
