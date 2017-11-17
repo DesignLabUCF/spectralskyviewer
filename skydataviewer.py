@@ -84,22 +84,28 @@ class SkyDataViewer(QMainWindow):
         "ShowEXIF": True,
         "ShowStatusBar": True,
     }
-    Settings.update({"ExportOptions": DialogExport.ExportOptions})
+    Settings.update({"ExportOptions": dict(DialogExport.ExportOptions)})
 
     def __init__(self):
         super().__init__()
 
         # member variables
         self.capture = datetime.min
-        self.captureTimeHDRDirs = [] # some number of these per day
-        self.captureTimeASDDir = []  # ASD capture time directory of selected HDR capture time
+        self.captureTimeHDRDirs = []  # some number of these per day
+        self.captureTimeASDFiles = [] # length should be equal to sampling pattern length
         self.exposure = 0
 
-        # load and validate settings
+        # load settings
         self.settings = dict(SkyDataViewer.Settings)  # this must be first!
         if (os.path.exists(self.settings["Filename"])):
+            loaded = []
             with open(self.settings["Filename"], 'r') as file:
-                self.settings = json.load(file)
+                loaded = json.load(file)
+            for key in loaded:
+                if (key in self.settings):
+                    self.settings.update({key: loaded[key]})
+        # validate settings
+        self.settings["ExportOptions"]["Attributes"].sort()
         if (len(self.settings["DataDirectory"]) > 0 and not os.path.exists(self.settings["DataDirectory"])):
             self.settings["DataDirectory"] = ""
 
@@ -176,16 +182,16 @@ class SkyDataViewer(QMainWindow):
         self.actUVGrid.triggered.connect(self.toggleUVGrid)
 
         # sky sample menu actions
-        self.actClearAll = QAction(QIcon(), '&Clear', self)
-        self.actClearAll.setStatusTip('Clear selected samples')
-        self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
+        self.actExportSetup = QAction(QIcon(), 'Setup Export &File', self)
+        self.actExportSetup.setStatusTip('Setup export file')
+        self.actExportSetup.triggered.connect(self.setupExportFile)
         self.actSelectAll = QAction(QIcon(), 'Select &All', self)
         self.actSelectAll.setShortcut('Ctrl+A')
         self.actSelectAll.setStatusTip('Select all samples')
         self.actSelectAll.triggered.connect(lambda: self.selectSamples('all'))
-        self.actExportSetup = QAction(QIcon(), 'Setup Export &File', self)
-        self.actExportSetup.setStatusTip('Setup export file')
-        self.actExportSetup.triggered.connect(self.setupExportFile)
+        self.actClearAll = QAction(QIcon(), '&Clear All', self)
+        self.actClearAll.setStatusTip('Clear selected samples')
+        self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
         self.actExportSelected = QAction(QIcon(), '&Export Selected', self)
         self.actExportSelected.setShortcut('Ctrl+E')
         self.actExportSelected.setStatusTip('Export selected samples')
@@ -215,10 +221,10 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actSamples)
         menu.addAction(self.actUVGrid)
         menu = menubar.addMenu('&Samples')
+        menu.addAction(self.actExportSetup)
+        menu.addSeparator()
         menu.addAction(self.actSelectAll)
         menu.addAction(self.actClearAll)
-        menu.addSeparator()
-        menu.addAction(self.actExportSetup)
         menu.addAction(self.actExportSelected)
         menu = menubar.addMenu('&Help')
         menu.addAction(actAbout)
@@ -356,7 +362,7 @@ class SkyDataViewer(QMainWindow):
 
     def resetAll(self):
         self.captureTimeHDRDirs = []
-        self.captureTimeASDDir = []
+        self.captureTimeASDFiles = []
         self.lblData.clear()
         self.cbxDate.clear()
         self.cbxDate.addItem("-date-")
@@ -381,7 +387,7 @@ class SkyDataViewer(QMainWindow):
 
     def resetDay(self):
         self.captureTimeHDRDirs = []
-        self.captureTimeASDDir = []
+        self.captureTimeASDFiles = []
         self.lblData.setText(self.settings["DataDirectory"])
         self.cbxTime.clear()
         self.cbxTime.addItem("-time-")
@@ -531,24 +537,6 @@ class SkyDataViewer(QMainWindow):
         #print("date: " + str(self.capture), widget)
         self.statusBar().showMessage("Capture: " + str(self.capture) + ", Exposure: " + str(SkyDataViewer.Exposures[self.exposure]) + "s")
 
-        # graph
-        self.graphSamples(self.wgtFisheye.samplesSelected)
-
-    def exposureSelected(self, index):
-        index -= 1 # -1 because combobox first element is not a valid value
-        self.exposure = index
-        if (self.captureTimeHDRDirs is not None and len(self.captureTimeHDRDirs) > 0):
-            self.sldTime.valueChanged.emit(self.sldTime.value())
-
-    def graphSamples(self, indices):
-        # clear it
-        self.wgtGraph.clear()
-
-        if (len(indices) <= 0):
-            return
-        if (len(self.captureTimeHDRDirs) <= 0):
-            return
-
         # find ASD data path
         pathDate = os.path.join(self.settings["DataDirectory"], str(self.capture.date()))
         if not os.path.exists(pathDate):
@@ -567,7 +555,7 @@ class SkyDataViewer(QMainWindow):
 
         # find an ASD capture time within small threshold of HDR capture time
         asdTime = None
-        threshold = 60 # seconds
+        threshold = 60  # seconds
         for dir in captureTimeASDDirs:
             timestr = str(self.capture.date()) + " " + os.path.basename(dir)
             time = datetime.strptime(timestr, "%Y-%m-%d %H.%M.%S")
@@ -583,25 +571,43 @@ class SkyDataViewer(QMainWindow):
 
         # gather all ASD files for capture time
         asdTimeDir = os.path.join(pathASD, str(asdTime.time()).replace(":", "."))
-        asdFiles = utility.findFiles(asdTimeDir, mode=1, ext=[".txt"])
-        if (len(asdFiles) <= 0):
+        self.captureTimeASDFiles = utility.findFiles(asdTimeDir, mode=1, ext=[".txt"])
+        if (len(self.captureTimeASDFiles) <= 0):
             print("Error: No .txt files found for: " + str(asdTime))
             return
-        if (len(asdFiles) < 81):
-            QMessageBox.critical(self, "Warning!", "Number of ASD .txt files is " + str(len(asdFiles)) + ".\nSample pattern should have " + str(len(ViewFisheye.SamplingPattern)), QMessageBox.Ok)
-            #print("WARNING!")
-            #rect = QtGui.QGraphicsRectItem(QtCore.QRectF(0, 0, 1, 5e-11))
-            #rect.setPen(pg.mkPen(100, 200, 100))
-            #pw.addItem(rect)
-            #self.wgtGraph.addItem(QGraphicsPixmapItem(self.wgtFisheye.iconWarning))
+        if (len(self.captureTimeASDFiles) < 81):
+            QMessageBox.critical(self, "WARNING!!!", "Number of ASD .txt files is " + str(len(self.captureTimeASDFiles)) + ".\nSample pattern should have " + str(len(ViewFisheye.SamplingPattern)), QMessageBox.Ok)
+            # rect = QtGui.QGraphicsRectItem(QtCore.QRectF(0, 0, 1, 5e-11))
+            # rect.setPen(pg.mkPen(100, 200, 100))
+            # pw.addItem(rect)
+            # self.wgtGraph.addItem(QGraphicsPixmapItem(self.wgtFisheye.iconWarning))
 
-        # load and plot the data
+        # graph ASD data
+        self.graphSamples(self.wgtFisheye.samplesSelected)
+
+    def exposureSelected(self, index):
+        index -= 1 # -1 because combobox first element is not a valid value
+        self.exposure = index
+        if (self.captureTimeHDRDirs is not None and len(self.captureTimeHDRDirs) > 0):
+            self.sldTime.valueChanged.emit(self.sldTime.value())
+
+    def graphSamples(self, indices):
+        # clear the graph
+        self.wgtGraph.clear()
+
+        # nothing to graph
+        if (len(indices) <= 0):
+            return
+        if (len(self.captureTimeHDRDirs) <= 0):   # no HDR photo
+            return
+        if (len(self.captureTimeASDFiles) <= 0):  # no ASD files
+            return
+
+        # load and plot data
         for i in indices:
-            if (i >= len(asdFiles)):
+            if (i >= len(self.captureTimeASDFiles)):
                 break
-            # load ASD .txt files
-            xs, ys = utility_data.loadASDFile(asdFiles[i])
-            # plot it
+            xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[i])
             self.wgtGraph.plot(y=ys, x=xs, pen=(i, len(indices)))
             #self.wgtGraph.addItem() # add a label/icon to graph with number of samples available
 
@@ -609,15 +615,97 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.selectSamples(message)
 
     def exportSamples(self, message):
-        #if (message == "selected"):
-        print("hi")
+        xoptions = self.settings["ExportOptions"]
+
+        # we shouldn't be here if export file hasn't been configured
+        if (len(xoptions["Filename"]) <= 0):
+            QMessageBox.critical(self, "Error", "Please configure export file first!", QMessageBox.Ok)
+            return
+
+        # nothing to export
+        if (len(self.captureTimeHDRDirs) <= 0):   # no HDR photo
+            return
+        if (len(self.captureTimeASDFiles) <= 0):  # no ASD files
+            return
+        if (len(self.wgtFisheye.samplesSelected) <= 0): # nothing selected
+            return
+
+        delimiter = xoptions["Delimiter"]
+        newfile = True
+        if (os.path.exists(xoptions["Filename"])):
+            newfile = False
+
+        # create new or open existing file
+        with open(xoptions["Filename"], "a") as file:
+
+            # export header
+            if (newfile):
+                if (0 in xoptions["Attributes"]):
+                    for i in range(1, len(xoptions["Attributes"])):
+                        attr = DialogExport.attributeFromIndex(xoptions["Attributes"][i])
+                        if (attr == "1 Pixel"):
+                            file.write("R" + delimiter + "G" + delimiter + "B")
+                            file.write(delimiter)
+                        else:
+                            file.write(attr)
+                            file.write(delimiter)
+                    file.write("\n")
+
+            for sIdx in self.wgtFisheye.samplesSelected:
+                angle = ViewFisheye.SamplingPattern[sIdx]
+                #rect = self.wgtFisheye.samplesLocations[sIdx]
+
+                # export each attributes
+                for aIdx in xoptions["Attributes"]:
+                    attr = DialogExport.attributeFromIndex(aIdx)
+                    # export date
+                    if (attr == "Date"):
+                        file.write(str(self.capture.date()))
+                        file.write(delimiter)
+                    # export time
+                    elif (attr == "Time"):
+                        file.write(str(self.capture.time()))
+                        file.write(delimiter)
+                    # export index
+                    elif (attr == "Pattern Index"):
+                        file.write(str(sIdx))
+                        file.write(delimiter)
+                    # export azimuth
+                    elif (attr == "Azimuth (E from N)"):
+                        file.write('{0:06.02f}'.format(angle[0]))
+                        file.write(delimiter)
+                    # export altitude
+                    elif (attr == "Altitude (90 - Zenith)"):
+                        file.write('{0:07.04f}'.format(angle[1]))
+                        file.write(delimiter)
+                    # export pixel
+                    elif (attr == "1 Pixel"):
+                        file.write(str(255))
+                        file.write(delimiter)
+                        file.write(str(255))
+                        file.write(delimiter)
+                        file.write(str(255))
+                        file.write(delimiter)
+                    # export solar spectrum
+                    elif (attr == "Solar Irradiance Spectrum (350-2500)"):
+                        xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[sIdx])
+                        for i in range(0, len(xs)):
+                            file.write(str(int(xs[i])) + delimiter + str(ys[i]) + delimiter)
+
+                # next sample
+                file.write("\n")
 
     def setupExportFile(self):
-        dialog = DialogExport()
-
+        dialog = DialogExport(self.settings["ExportOptions"])
         code = dialog.exec()
-        if (code == QDialog.Accepted):
-            print("yay!")
+        if (code != QDialog.Accepted):
+            return
+
+        # save the export options in app settings
+        self.settings.update({"ExportOptions": dialog.exportOptions})
+
+        # now that export options are configured, enable export commands
+        self.actExportSelected.setEnabled(True)
 
     def resetViewPressed(self):
         self.wgtFisheye.resetRotation()
@@ -645,6 +733,7 @@ class SkyDataViewer(QMainWindow):
             menuCtx.addSeparator()
             menuCtx.addAction(self.actSelectAll)
             menuCtx.addAction(self.actClearAll)
+            menuCtx.addAction(self.actExportSelected)
             menuCtx.exec_(widget.mapToGlobal(event.pos()))
 
     def toggleEXIFPanel(self, state):
