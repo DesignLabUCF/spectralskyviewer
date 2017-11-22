@@ -670,6 +670,10 @@ class SkyDataViewer(QMainWindow):
                     elif (attr == "Time"):
                         file.write(str(self.capture.time()))
                         file.write(delimiter)
+                    # export exposure time
+                    elif (attr == "Exposure"):
+                        file.write(str(SkyDataViewer.Exposures[self.exposure]))
+                        file.write(delimiter)
                     # export index
                     elif (attr == "Pattern Index"):
                         file.write(str(sIdx))

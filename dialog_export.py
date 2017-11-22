@@ -38,6 +38,7 @@ class DialogExport(QDialog):
         "Header",
         "Date",
         "Time",
+        "Exposure",
         "Pattern Index",
         "Azimuth (E from N)",
         "Altitude (90 - Zenith)",
@@ -55,7 +56,7 @@ class DialogExport(QDialog):
     ExportOptions = {
         "Filename": "",
         "Delimiter": ",",
-        "Attributes": [0, 1, 2, 4, 5, 6, 13]
+        "Attributes": [0, 1, 2, 5, 6, 7, 14]
     }
 
     @staticmethod
