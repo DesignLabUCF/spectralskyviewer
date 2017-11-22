@@ -504,7 +504,7 @@ class SkyDataViewer(QMainWindow):
 
         # extract EXIF data from photo
         exif = utility_data.imageEXIF(photos[self.exposure])
-        exif = {k: v for k, v in exif.items() if k.startswith("EXIF")} # filter down to EXIF tags only
+        #exif = {k: v for k, v in exif.items() if k.startswith("EXIF")} # filter down to EXIF tags only
 
         # update datetime panel
         # both capture time choicebox and slider route to this event handler, so only update the other one
@@ -522,7 +522,7 @@ class SkyDataViewer(QMainWindow):
         self.tblEXIF.setRowCount(len(exif.keys()))
         row = 0
         for key in sorted(exif.keys()):
-            self.tblEXIF.setItem(row, 0, QTableWidgetItem(str(key)[5:]))
+            self.tblEXIF.setItem(row, 0, QTableWidgetItem(str(key)))
             self.tblEXIF.setItem(row, 1, QTableWidgetItem(str(exif[key])))
             row += 1
         self.tblEXIF.resizeColumnToContents(0)
@@ -651,11 +651,15 @@ class SkyDataViewer(QMainWindow):
                             file.write(delimiter)
                     file.write("\n")
 
-            for sIdx in self.wgtFisheye.samplesSelected:
-                angle = ViewFisheye.SamplingPattern[sIdx]
-                #rect = self.wgtFisheye.samplesLocations[sIdx]
+            # pre-compute what we can
+            points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
+            pixels = utility_data.imageRGBPixels(self.wgtFisheye.myPhotoPath, points)
 
-                # export each attributes
+            # export each selected sample
+            for i in range(0, len(self.wgtFisheye.samplesSelected)):
+                sIdx = self.wgtFisheye.samplesSelected[i]
+
+                # export each attribute per sample
                 for aIdx in xoptions["Attributes"]:
                     attr = DialogExport.attributeFromIndex(aIdx)
                     # export date
@@ -672,25 +676,27 @@ class SkyDataViewer(QMainWindow):
                         file.write(delimiter)
                     # export azimuth
                     elif (attr == "Azimuth (E from N)"):
+                        angle = ViewFisheye.SamplingPattern[sIdx]
                         file.write('{0:06.02f}'.format(angle[0]))
                         file.write(delimiter)
                     # export altitude
                     elif (attr == "Altitude (90 - Zenith)"):
+                        angle = ViewFisheye.SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(angle[1]))
                         file.write(delimiter)
                     # export pixel
                     elif (attr == "1 Pixel"):
-                        file.write(str(255))
+                        file.write(str(pixels[i][0])) # red
                         file.write(delimiter)
-                        file.write(str(255))
+                        file.write(str(pixels[i][1])) # green
                         file.write(delimiter)
-                        file.write(str(255))
+                        file.write(str(pixels[i][2])) # blue
                         file.write(delimiter)
                     # export solar spectrum
                     elif (attr == "Solar Irradiance Spectrum (350-2500)"):
                         xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[sIdx])
-                        for i in range(0, len(xs)):
-                            file.write(str(int(xs[i])) + delimiter + str(ys[i]) + delimiter)
+                        for j in range(0, len(xs)):
+                            file.write(str(int(xs[j])) + delimiter + str(ys[j]) + delimiter)
 
                 # next sample
                 file.write("\n")

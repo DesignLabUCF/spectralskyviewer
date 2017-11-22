@@ -29,6 +29,7 @@ import os
 import csv
 from datetime import datetime
 import numpy as np
+from PIL import Image
 import exifread
 
 
@@ -60,6 +61,7 @@ def imageEXIFTag(filepath, tag):
 '''
 Function to extract all important EXIF data from an image.
 :param filepath: Path to image
+:return: A dict of key,value pairs for each EXIF metadata tag
 '''
 def imageEXIF(filepath):
     data = {}
@@ -68,37 +70,31 @@ def imageEXIF(filepath):
     return data
 
 '''
+Function to get the RGB pixels of specific coordinates of an image.
+:param filepath: Path to the image file.
+:param coords: A list of (x, y) points to lookup in the image file.
+:return: A list of (R,G,B,A) tuples representing the pixel colors.
+:note: Coordinates outside image bounds are black, no alpha.
+:note: Alpha may or may not be included, depending on the image.
 '''
-def loadSunPath(filepath, isDir=True):
-    # format should be a csv with the following columns:
-    # Date, Time, Topocentric zenith angle, Topocentric azimuth angle (eastward from N)
-
-    if (isDir):
-        filepath = os.path.join(filepath, 'spa.csv')
+def imageRGBPixels(filepath, coords):
     if (not os.path.exists(filepath)):
         return []
+    elif (coords is None or len(coords) <= 0):
+        return []
 
-    # we will swap the order of (zenith, azimuth) to be consistent with rest of program (theta, phi)
-    # theta = solar azimuth
-    # phi = solar altitude (90 - solar zenith)
+    pixelTuples = []
 
-    sunpath = []
-    with open(filepath, 'r') as f:
-        reader = csv.reader(f, delimiter=',')
-        next(reader, None)
-        for row in reader:
-            # we only care about rows with a valid timestamp
-            dt = datetime.min
-            try:
-                dts = row[0] + " " + row[1]
-                dt = datetime.strptime(dts, "%m/%d/%Y %H:%M:%S")
-            except ValueError:
-                continue
-            point = [float(row[3]), 90-float(row[2]), dt]
-            # we only care about phi when sun is visible (not on other side of Earth)
-            if (point[1] >=0 and point[1] <= 90):
-                sunpath.append(point)
-    return sunpath
+    with Image.open(filepath) as img:
+        pixels = img.load()
+        if (pixels is not None):
+            for c in coords:
+                pix = (0,0,0)
+                if (c[0] < img.size[0] and c[1] < img.size[1]):
+                    pix = pixels[c[0], c[1]]
+                pixelTuples.append(pix)
+
+    return pixelTuples
 
 '''
 Function to check if a raw data photo is available, given a path to an existing photo.
@@ -117,6 +113,48 @@ def isHDRRawAvailable(hdrImgPath):
     return False
 
 '''
+Function to load a solar position file exported from NREL's SPA website.
+:param filepath: Path to file with SPA data
+:param isDir: If filepath specified is a directory, then filename is assumed to be 'spa.csv'
+:note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
+:note: File format should be a CSV with the following columns:
+       Date, Time, Topocentric zenith angle, Topocentric azimuth angle (eastward from N)
+:return: A list of (azimuthm, altitude, datetime) tuples of solar position and timestamp
+'''
+def loadSunPath(filepath, isDir=True):
+    if (isDir):
+        filepath = os.path.join(filepath, 'spa.csv') # assumes this filename if dir specified
+    if (not os.path.exists(filepath)):
+        return []
+
+    # we will swap the order of (zenith, azimuth) to be consistent with rest of program (azimuth, altitude)
+    # altitude (90 - zenith)
+
+    sunpath = []
+    with open(filepath, 'r') as f:
+        reader = csv.reader(f, delimiter=',')
+        next(reader, None)
+        for row in reader:
+            # we only care about rows with a valid timestamp
+            dt = datetime.min
+            try:
+                dts = row[0] + " " + row[1]
+                dt = datetime.strptime(dts, "%m/%d/%Y %H:%M:%S")
+            except ValueError:
+                continue
+            point = [float(row[3]), 90-float(row[2]), dt]
+            # we only care about altitude when sun is visible (not on other side of Earth)
+            if (point[1] >=0 and point[1] <= 90):
+                sunpath.append(point)
+    return sunpath
+
+'''
+Function to load a ViewSpecPro spectroradiometer ASD file.
+:param filepath: Path to TXT file with ASD data
+:note: File format should be a TXT with the following data per line: Wavelength, Reading
+:note: The TXT files were converted from ViewSpecPro's software in the order .asd to .asd.rad to .asd.rad.txt .
+       That may not be a requirement for ASD data of future projects.
+:return: 2 lists, Xs (wavelengths) and Ys (irradiance)        
 '''
 def loadASDFile(filepath):
     if (not os.path.exists(filepath)):

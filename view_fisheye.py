@@ -30,7 +30,7 @@ import math
 from enum import Enum
 from datetime import datetime
 from PyQt5.QtCore import Qt, QRect, QPoint, QPointF
-from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QIcon
+from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QIcon, QColor
 from PyQt5.QtWidgets import QWidget, QStyle, QAction, QMenu
 import utility
 import utility_angles
@@ -38,97 +38,98 @@ import utility_data
 
 
 class ViewFisheye(QWidget):
-    # selection types and modes
-    SelectionType = Enum('SelectType', 'Exact Closest Rect')
-    SelectionMode = Enum('SelectMode', 'Select Add Remove')
-    SelectionRectMin = 10 # pixels, width and height
-
-    # skydome sampling pattern: 81 samples (theta, phi)
+    # sampling pattern: 81 samples (azimuth, altitude)
     SamplingPattern = [
-        [000.00, 12.1151],
-        [011.25, 12.1151],
-        [022.50, 12.1151],
-        [033.75, 12.1151],
-        [045.00, 12.1151],
-        [056.25, 12.1151],
-        [067.50, 12.1151],
-        [078.75, 12.1151],
-        [090.00, 12.1151],
-        [101.25, 12.1151],
-        [112.50, 12.1151],
-        [123.75, 12.1151],
-        [135.00, 12.1151],
-        [146.25, 12.1151],
-        [157.50, 12.1151],
-        [168.75, 12.1151],
-        [180.00, 12.1151],
-        [191.25, 12.1151],
-        [202.50, 12.1151],
-        [213.75, 12.1151],
-        [225.00, 12.1151],
-        [236.25, 12.1151],
-        [247.50, 12.1151],
-        [258.75, 12.1151],
-        [270.00, 12.1151],
-        [281.25, 12.1151],
-        [292.50, 12.1151],
-        [303.75, 12.1151],
-        [315.00, 12.1151],
-        [326.25, 12.1151],
-        [337.50, 12.1151],
-        [348.75, 12.1151],
-        [345.00, 33.7490],
-        [330.00, 33.7490],
-        [315.00, 33.7490],
-        [300.00, 33.7490],
-        [285.00, 33.7490],
-        [270.00, 33.7490],
-        [255.00, 33.7490],
-        [240.00, 33.7490],
-        [225.00, 33.7490],
-        [210.00, 33.7490],
-        [195.00, 33.7490],
-        [180.00, 33.7490],
-        [165.00, 33.7490],
-        [150.00, 33.7490],
-        [135.00, 33.7490],
-        [120.00, 33.7490],
-        [105.00, 33.7490],
-        [090.00, 33.7490],
-        [075.00, 33.7490],
-        [060.00, 33.7490],
-        [045.00, 33.7490],
-        [030.00, 33.7490],
-        [015.00, 33.7490],
-        [000.00, 33.7490],
-        [000.00, 53.3665],
-        [022.50, 53.3665],
-        [045.00, 53.3665],
-        [067.50, 53.3665],
-        [090.00, 53.3665],
-        [112.50, 53.3665],
-        [135.00, 53.3665],
-        [157.50, 53.3665],
-        [180.00, 53.3665],
-        [202.50, 53.3665],
-        [225.00, 53.3665],
-        [247.50, 53.3665],
-        [270.00, 53.3665],
-        [292.50, 53.3665],
-        [315.00, 53.3665],
-        [337.50, 53.3665],
-        [315.00, 71.9187],
-        [270.00, 71.9187],
-        [225.00, 71.9187],
-        [180.00, 71.9187],
-        [135.00, 71.9187],
-        [090.00, 71.9187],
-        [045.00, 71.9187],
-        [000.00, 71.9187],
-        [000.00, 90.0000],
+        (000.00, 12.1151),
+        (011.25, 12.1151),
+        (022.50, 12.1151),
+        (033.75, 12.1151),
+        (045.00, 12.1151),
+        (056.25, 12.1151),
+        (067.50, 12.1151),
+        (078.75, 12.1151),
+        (090.00, 12.1151),
+        (101.25, 12.1151),
+        (112.50, 12.1151),
+        (123.75, 12.1151),
+        (135.00, 12.1151),
+        (146.25, 12.1151),
+        (157.50, 12.1151),
+        (168.75, 12.1151),
+        (180.00, 12.1151),
+        (191.25, 12.1151),
+        (202.50, 12.1151),
+        (213.75, 12.1151),
+        (225.00, 12.1151),
+        (236.25, 12.1151),
+        (247.50, 12.1151),
+        (258.75, 12.1151),
+        (270.00, 12.1151),
+        (281.25, 12.1151),
+        (292.50, 12.1151),
+        (303.75, 12.1151),
+        (315.00, 12.1151),
+        (326.25, 12.1151),
+        (337.50, 12.1151),
+        (348.75, 12.1151),
+        (345.00, 33.7490),
+        (330.00, 33.7490),
+        (315.00, 33.7490),
+        (300.00, 33.7490),
+        (285.00, 33.7490),
+        (270.00, 33.7490),
+        (255.00, 33.7490),
+        (240.00, 33.7490),
+        (225.00, 33.7490),
+        (210.00, 33.7490),
+        (195.00, 33.7490),
+        (180.00, 33.7490),
+        (165.00, 33.7490),
+        (150.00, 33.7490),
+        (135.00, 33.7490),
+        (120.00, 33.7490),
+        (105.00, 33.7490),
+        (090.00, 33.7490),
+        (075.00, 33.7490),
+        (060.00, 33.7490),
+        (045.00, 33.7490),
+        (030.00, 33.7490),
+        (015.00, 33.7490),
+        (000.00, 33.7490),
+        (000.00, 53.3665),
+        (022.50, 53.3665),
+        (045.00, 53.3665),
+        (067.50, 53.3665),
+        (090.00, 53.3665),
+        (112.50, 53.3665),
+        (135.00, 53.3665),
+        (157.50, 53.3665),
+        (180.00, 53.3665),
+        (202.50, 53.3665),
+        (225.00, 53.3665),
+        (247.50, 53.3665),
+        (270.00, 53.3665),
+        (292.50, 53.3665),
+        (315.00, 53.3665),
+        (337.50, 53.3665),
+        (315.00, 71.9187),
+        (270.00, 71.9187),
+        (225.00, 71.9187),
+        (180.00, 71.9187),
+        (135.00, 71.9187),
+        (090.00, 71.9187),
+        (045.00, 71.9187),
+        (000.00, 71.9187),
+        (000.00, 90.0000),
     ]
     # convert to radians
-    # ViewFisheye.SamplingPattern[:] = [[math.radians(s[0]), math.radians(s[1])] for s in ViewFisheye.SamplingPattern]
+    # ViewFisheye.SamplingPattern = [(math.radians(s[0]), math.radians(s[1])) for s in ViewFisheye.SamplingPattern]
+
+    # sample selection
+    SelectionType = Enum('SelectType', 'Exact Closest Rect')
+    SelectionMode = Enum('SelectMode', 'Select Add Remove')
+    SelectionRectMin = 10       # pixels, width and height, scales as photo scales
+    SelectedPixelBox = 64  # pixels, width and height
 
     def __init__(self, parent):
         super().__init__()
@@ -149,15 +150,14 @@ class ViewFisheye(QWidget):
         self.enableSunPath = False
         self.enableSamples = False
         self.rawAvailable = False
-        self.coordsMouse = [0, 0]
-        self.viewCenter = [0, 0]
+        self.coordsMouse = (0, 0)
+        self.viewCenter = (0, 0)
         self.dragSelectRect = QRect(0, 0, 0, 0)
-        self.sunPathPoints = []    # [theta (azimuth), phi (90-zenith), datetime]
-        self.compassTicks = []     # [x1, y1, x2, y2, x1lbl, y1lbl, angle]
-        self.samplesLocations = [] # all sample locations in the sampling pattern
-        self.samplesSelected = []  # indices of sample locations selected
-        for i in range(0, len(ViewFisheye.SamplingPattern)):
-            self.samplesLocations.append(QRect(0, 0, 0, 0))
+        self.sunPathPoints = []       # [azimuth (theta), altitude (90-zenith)(phi), datetime]
+        self.compassTicks = []        # [x1, y1, x2, y2, x1lbl, y1lbl, angle]
+        self.sampleBoundsVisible = [] # bounds [x,y,w,h] of all samples on the photo rendered on screen (scaled)
+        self.samplePointsInFile = []  # points (x,y) of all samples in the photo on file
+        self.samplesSelected = []     # indices of selected samples
 
         # members - preloaded graphics
         self.painter = QPainter()
@@ -171,10 +171,13 @@ class ViewFisheye(QWidget):
         self.fontFixed = QFont('Courier New', 8)
         self.fontScaled = QFont('Courier New', 8)
         self.fontBounds = 50
-        self.iconWarning = self.style().standardIcon(QStyle.SP_MessageBoxWarning).pixmap(16)
+        self.iconWarning = self.style().standardIcon(QStyle.SP_MessageBoxWarning).pixmap(ViewFisheye.SelectedPixelBox / 2)
 
         # init
         self.setMouseTracking(True)
+        for i in range(0, len(ViewFisheye.SamplingPattern)):
+            self.sampleBoundsVisible.append(QRect(0, 0, 0, 0)) # these will need to be recomputed as photo scales
+            self.samplePointsInFile.append((0, 0))             # these only need to be computed once per photo
 
     def setPhoto(self, path, exif=None):
         # if photo is valid
@@ -188,6 +191,17 @@ class ViewFisheye(QWidget):
                 self.myPhotoTime = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
             else:
                 self.myPhotoTime = utility_data.imageEXIFDateTime(path)
+            # compute each sample's coordinate in the photo
+            self.samplePointsInFile = []
+            center = (self.myPhotoSrcRect.width() / 2, self.myPhotoSrcRect.height()/2)
+            radius = self.myPhotoSrcRect.height() / 2
+            diameter = radius * 2
+            for i in range(0, len(ViewFisheye.SamplingPattern)):
+                u, v = utility_angles.FisheyeAngleWarp(ViewFisheye.SamplingPattern[i][0], ViewFisheye.SamplingPattern[i][1], inRadians=False)
+                u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
+                x = (center[0] - radius) + (u * diameter)
+                y = (center[1] - radius) + (v * diameter)
+                self.samplePointsInFile.append((x, y))
         # photo is null or missing
         else:
             self.myPhoto = QImage()
@@ -235,7 +249,7 @@ class ViewFisheye(QWidget):
         # if (message == "none"):
         if (message == "all"):
             self.samplesSelected.clear()
-            for i in range(0, len(self.samplesLocations)):
+            for i in range(0, len(self.sampleBoundsVisible)):
                 self.samplesSelected.append(i)
 
         # update
@@ -246,7 +260,6 @@ class ViewFisheye(QWidget):
         # nothing to do if no photo loaded
         if (self.myPhoto.isNull()):
             return
-
         # we only care about a left click for point and drag selection
         # right click is for context menu - handled elsewhere
         # middle click is for rotation - handled elsewhere
@@ -272,8 +285,8 @@ class ViewFisheye(QWidget):
 
         # detect middle mouse button drag for image rotation
         if (event.buttons() == Qt.MidButton):
-            old = [self.coordsMouse[0] - self.viewCenter[0], self.coordsMouse[1] - self.viewCenter[1]]
-            new = [event.x() - self.viewCenter[0], event.y() - self.viewCenter[1]]
+            old = (self.coordsMouse[0] - self.viewCenter[0], self.coordsMouse[1] - self.viewCenter[1])
+            new = (event.x() - self.viewCenter[0], event.y() - self.viewCenter[1])
             # clockwise drag increases rotation
             if (old[1]*new[0] < old[0]*new[1]):
                 self.myPhotoRotation += 1
@@ -287,7 +300,7 @@ class ViewFisheye(QWidget):
                 self.myPhotoRotation %= -360
 
         # lastly, cache mouse coordinates and update
-        self.coordsMouse = [event.x(), event.y()]
+        self.coordsMouse = (event.x(), event.y())
         self.repaint()
 
     def mouseReleaseEvent(self, event):
@@ -329,7 +342,7 @@ class ViewFisheye(QWidget):
                 self.parent.graphSamples(self.samplesSelected)
 
     def leaveEvent(self, event):
-        self.coordsMouse = [-1, -1]
+        self.coordsMouse = (-1, -1)
         self.repaint()
 
     def resizeEvent(self, event):
@@ -361,11 +374,11 @@ class ViewFisheye(QWidget):
         if (type == ViewFisheye.SelectionType.Exact):
             px = self.coordsMouse[0]
             py = self.coordsMouse[1]
-            for i in range(0, len(self.samplesLocations)):
-                x1 = self.samplesLocations[i].x()
-                y1 = self.samplesLocations[i].y()
-                x2 = self.samplesLocations[i].x() + self.samplesLocations[i].width()
-                y2 = self.samplesLocations[i].y() + self.samplesLocations[i].width()
+            for i in range(0, len(self.sampleBoundsVisible)):
+                x1 = self.sampleBoundsVisible[i].x()
+                y1 = self.sampleBoundsVisible[i].y()
+                x2 = self.sampleBoundsVisible[i].x() + self.sampleBoundsVisible[i].width()
+                y2 = self.sampleBoundsVisible[i].y() + self.sampleBoundsVisible[i].width()
                 if (px >= x1 and px <= x2 and py >= y1 and py <= y2):
                     sampleAdjustments.append(i)
                     break
@@ -377,9 +390,9 @@ class ViewFisheye(QWidget):
             if (dist <= self.myPhotoRadius):
                 close = math.inf
                 closest = -1
-                for i in range(0, len(self.samplesLocations)):
-                    x1 = self.samplesLocations[i].center().x()
-                    y1 = self.samplesLocations[i].center().y()
+                for i in range(0, len(self.sampleBoundsVisible)):
+                    x1 = self.sampleBoundsVisible[i].center().x()
+                    y1 = self.sampleBoundsVisible[i].center().y()
                     dist = math.sqrt((y1-py)*(y1-py) + (x1-px)*(x1-px))
                     if (dist < close):
                         close = dist
@@ -392,9 +405,9 @@ class ViewFisheye(QWidget):
             y1 = self.dragSelectRect.y()
             x2 = self.dragSelectRect.x() + self.dragSelectRect.width()
             y2 = self.dragSelectRect.y() + self.dragSelectRect.height()
-            for i in range(0, len(self.samplesLocations)):
-                px = self.samplesLocations[i].center().x()
-                py = self.samplesLocations[i].center().y()
+            for i in range(0, len(self.sampleBoundsVisible)):
+                px = self.sampleBoundsVisible[i].center().x()
+                py = self.sampleBoundsVisible[i].center().y()
                 if (px >= x1 and px <= x2 and py >= y1 and py <= y2):
                     sampleAdjustments.append(i)
 
@@ -420,10 +433,10 @@ class ViewFisheye(QWidget):
     def computeBounds(self):
         if (self.myPhoto.isNull()):
             self.myPhotoDestRect = QRect(0, 0, self.width(), self.height())
-            self.viewCenter = [self.width() / 2, self.height() / 2]
+            self.viewCenter = (self.width() / 2, self.height() / 2)
             self.myPhotoRadius = 0
             for i in range(0, len(ViewFisheye.SamplingPattern)):
-                self.samplesLocations[i].setRect(self.viewCenter[0], self.viewCenter[1], 0, 0)
+                self.sampleBoundsVisible[i].setRect(self.viewCenter[0], self.viewCenter[1], 0, 0)
             return
 
         # scale the photo dest rect
@@ -442,8 +455,8 @@ class ViewFisheye(QWidget):
                                     self.height() / 2 - self.myPhotoDestRect.height() / 2)
 
         # compute grid center
-        self.viewCenter[0] = self.myPhotoDestRect.x() + self.myPhotoDestRect.width() / 2
-        self.viewCenter[1] = self.myPhotoDestRect.y() + self.myPhotoDestRect.height() / 2
+        self.viewCenter = (self.myPhotoDestRect.x() + self.myPhotoDestRect.width() / 2,
+                           self.myPhotoDestRect.y() + self.myPhotoDestRect.height() / 2)
         self.myPhotoRadius = self.myPhotoDestRect.height() / 2
 
         # compute new scaled font size
@@ -460,7 +473,7 @@ class ViewFisheye(QWidget):
             u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
             u = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
             v = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
-            self.samplesLocations[i].setRect(u - sampleRadius, v - sampleRadius, sampleDiameter, sampleDiameter)
+            self.sampleBoundsVisible[i].setRect(u - sampleRadius, v - sampleRadius, sampleDiameter, sampleDiameter)
 
         # compute compass lines
         self.compassTicks.clear()
@@ -610,14 +623,14 @@ class ViewFisheye(QWidget):
                 # draw sampling pattern
                 if (self.enableSamples):
                     painter.setPen(self.penText)
-                    for r in self.samplesLocations:
+                    for r in self.sampleBoundsVisible:
                         painter.drawEllipse(r)
 
                 # always draw selected samples
                 painter.setPen(self.penSelected)
                 r = QRect()
                 for i in self.samplesSelected:
-                    r.setCoords(self.samplesLocations[i].x(), self.samplesLocations[i].y(), self.samplesLocations[i].right()+1, self.samplesLocations[i].bottom()+1)
+                    r.setCoords(self.sampleBoundsVisible[i].x(), self.sampleBoundsVisible[i].y(), self.sampleBoundsVisible[i].right() + 1, self.sampleBoundsVisible[i].bottom() + 1)
                     painter.drawEllipse(r)
 
                 # draw selection bounds
@@ -644,24 +657,24 @@ class ViewFisheye(QWidget):
 
                 # coordinates we are interested in
                 #self.coordsMouse   # x,y of this widget
-                coordsxy = [-1, -1] # x,y over photo as scaled/rendered on this widget
-                coordsXY = [-1, -1] # x,y over actual original photo on disk
-                coordsUC = [-1, -1] # unit circle coords [0-1] from center of photo to edge of fisheye radius
-                coordsUV = [-1, -1] # u,v coords of fisheye portion of photo w/ 0,0 top left and 1,1 bottom right
-                coordsTP = [-1, -1] # theta,phi polar coordinates
+                coordsxy = (-1, -1) # x,y over photo as scaled/rendered on this widget
+                coordsXY = (-1, -1) # x,y over actual original photo on disk
+                coordsUC = (-1, -1) # unit circle coords [0-1] from center of photo to edge of fisheye radius
+                coordsUV = (-1, -1) # u,v coords of fisheye portion of photo w/ 0,0 top left and 1,1 bottom right
+                coordsTP = (-1, -1) # theta,phi polar coordinates
                 distance = math.inf # distance from center of fisheye to mouse in unit circle
 
-                # compute all relevant coordinates only when mouse is over fisheye portion of photo
+                # compute all relevant coordinates only when mouse is within fisheye portion of photo
                 if (self.coordsMouse[0] >= self.myPhotoDestRect.x() and
                     self.coordsMouse[1] >= self.myPhotoDestRect.y() and
                     self.coordsMouse[0] < self.myPhotoDestRect.x() + self.myPhotoDestRect.width() and
                     self.coordsMouse[1] < self.myPhotoDestRect.y() + self.myPhotoDestRect.height()):
-                    coordsxy[0] = self.coordsMouse[0] - self.myPhotoDestRect.x()
-                    coordsxy[1] = self.coordsMouse[1] - self.myPhotoDestRect.y()
-                    coordsUC[0] = (coordsxy[0] - self.myPhotoDestRect.width()/2) / self.myPhotoRadius
-                    coordsUC[1] = (coordsxy[1] - self.myPhotoDestRect.height()/2) / self.myPhotoRadius
-                    coordsXY[0] = int(coordsxy[0] / self.myPhotoDestRect.width() * self.myPhoto.width())
-                    coordsXY[1] = int(coordsxy[1] / self.myPhotoDestRect.height() * self.myPhoto.height())
+                    coordsxy = (self.coordsMouse[0] - self.myPhotoDestRect.x(),
+                                self.coordsMouse[1] - self.myPhotoDestRect.y())
+                    coordsUC = ((coordsxy[0] - self.myPhotoDestRect.width()/2) / self.myPhotoRadius,
+                                (coordsxy[1] - self.myPhotoDestRect.height()/2) / self.myPhotoRadius)
+                    coordsXY = (int(coordsxy[0] / self.myPhotoDestRect.width() * self.myPhoto.width()),
+                                int(coordsxy[1] / self.myPhotoDestRect.height() * self.myPhoto.height()))
                     # rads = self.myPhotoRotation * math.pi / 180.0
                     # preRotX = coordsxy[0] - self.myPhotoDestRect.width()/2
                     # preRotY = coordsxy[1] - self.myPhotoDestRect.height()/2
@@ -675,62 +688,71 @@ class ViewFisheye(QWidget):
                     # preRotY = preRotY + self.myPhotoDestRect.height()/2
                     # coordsXY[0] = int(preRotX / self.myPhotoDestRect.width() * self.myPhoto.width())
                     # coordsXY[1] = int(preRotY / self.myPhotoDestRect.height() * self.myPhoto.height())
-                    coordsUV[0] = (coordsUC[0] + 1) / 2
-                    coordsUV[1] = (coordsUC[1] + 1) / 2
+                    coordsUV = ((coordsUC[0] + 1) / 2,
+                                (coordsUC[1] + 1) / 2)
                     coordsTP = utility_angles.GetAngleFromUV(coordsUV[0], coordsUV[1])
                     distance = math.sqrt((coordsUC[0] * coordsUC[0]) + (coordsUC[1] * coordsUC[1]))
 
                 # formatted text strings for coordinates
                 textxy = "-1, -1 xy"
-                textXY = "-1, -1 uv"
+                textXY = "-1, -1 xy"
                 textUC = "-1, -1 uc"
-                textUV = "-1, -1 fr"
+                textUV = "-1, -1 uv"
                 textTP = "-1, -1 θφ"
+                textPX = "0 0 0 px"
+                color = QColor()
                 if (distance <= 1.0):
                     textxy = str(coordsxy[0]) + ", " + str(coordsxy[1]) + " xy"
                     textXY = str(coordsXY[0]) + ", " + str(coordsXY[1]) + " xy"
                     textUC = "{:.2f}".format(coordsUC[0]) + ", " + "{:.2f}".format(coordsUC[1]) + " uc"
                     textUV = "{:.2f}".format(coordsUV[0]) + ", " + "{:.2f}".format(coordsUV[1]) + " uv"
                     textTP = "{:.2f}".format(coordsTP[0]) + ", " + "{:.2f}".format(coordsTP[1]) + " θφ"
+                    color = self.myPhoto.pixelColor(coordsXY[0], coordsXY[1])
+                    textPX = str(color.red()) + " " + str(color.green()) + " " + str(color.blue()) + " px"
 
                 # draw x,y coords
-                destRect.setCoords(10, 10, self.width()-10, self.height()- 124)
+                destRect.setCoords(10, 10, self.width()-10, self.height()- 134)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textxy)
                 # draw u,v coords
-                destRect.setCoords(10, 10, self.width() - 10, self.height() - 114)
+                destRect.setCoords(10, 10, self.width() - 10, self.height() - 124)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textXY)
                 # draw unit circle coords
-                destRect.setCoords(10, 10, self.width() - 10, self.height() - 104)
+                destRect.setCoords(10, 10, self.width() - 10, self.height() - 114)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textUC)
                 # draw fractional coords
-                destRect.setCoords(10, 10, self.width() - 10, self.height() - 94)
+                destRect.setCoords(10, 10, self.width() - 10, self.height() - 104)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textUV)
                 # draw t,p coords
-                destRect.setCoords(10, 10, self.width() - 10, self.height() - 84)
+                destRect.setCoords(10, 10, self.width() - 10, self.height() - 94)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textTP)
+                # draw pixel color
+                destRect.setCoords(10, 10, self.width() - 10, self.height() - 84)
+                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textPX)
 
                 # draw cursor visual indicators (outlines)
-                circleX = self.width() - 10 - 64 - 10 - 64
-                circleY = self.height() - 10 - 64
-                pixelX = self.width() - 64 - 10
-                pixelY = self.height() - 64 - 10
-                painter.drawEllipse(circleX, circleY, 64, 64)
-                painter.drawRect(pixelX, pixelY, 64, 64)
+                circleX = self.width() - 10 - ViewFisheye.SelectedPixelBox - 10 - ViewFisheye.SelectedPixelBox
+                circleY = self.height() - 10 - ViewFisheye.SelectedPixelBox
+                pixelX = self.width() - ViewFisheye.SelectedPixelBox - 10
+                pixelY = self.height() - ViewFisheye.SelectedPixelBox - 10
+                painter.drawEllipse(circleX, circleY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
+                painter.drawRect(pixelX, pixelY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
 
                 # draw cursor visual indicators (filled if cursor is within fisheye radius)
                 if (distance <= 1.0):
-                    color = self.myPhoto.pixelColor(coordsXY[0], coordsXY[1])
+                    #color = self.myPhoto.pixelColor(coordsXY[0], coordsXY[1])
                     painter.setBackgroundMode(Qt.OpaqueMode)
                     painter.setBackground(color)
                     painter.setBrush(QBrush(color, Qt.SolidPattern))
-                    cx = circleX + (coordsUV[0] * 64)
-                    cy = circleY + (coordsUV[1] * 64)
+                    cx = circleX + (coordsUV[0] * ViewFisheye.SelectedPixelBox)
+                    cy = circleY + (coordsUV[1] * ViewFisheye.SelectedPixelBox)
                     painter.drawEllipse(cx - 5, cy - 5, 10, 10)
-                    painter.drawRect(pixelX, pixelY, 64, 64)
+                    painter.drawRect(pixelX, pixelY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
 
-                # raw notice
+                # raw data missing indicator
                 if (not self.rawAvailable):
-                    painter.drawPixmap(self.width()-16-16, 16, self.iconWarning)
+                    painter.drawPixmap(pixelX + ViewFisheye.SelectedPixelBox / 2,
+                                       pixelY + ViewFisheye.SelectedPixelBox / 2,
+                                       self.iconWarning)
 
         # end draw
         painter.end()
