@@ -644,8 +644,10 @@ class SkyDataViewer(QMainWindow):
                     for i in range(1, len(xoptions["Attributes"])):
                         attr = DialogExport.attributeFromIndex(xoptions["Attributes"][i])
                         if (attr == "1 Pixel"):
-                            file.write("R" + delimiter + "G" + delimiter + "B")
-                            file.write(delimiter)
+                            file.write("R" + delimiter + "G" + delimiter + "B" + delimiter)
+                        elif (attr == "Radiance (350-2500)nm"):
+                            for w in range(350, 2501):
+                                file.write("Wavelength:"+str(w) + delimiter + "Radiance:"+str(w) + delimiter)
                         else:
                             file.write(attr)
                             file.write(delimiter)
@@ -697,7 +699,7 @@ class SkyDataViewer(QMainWindow):
                         file.write(str(pixels[i][2])) # blue
                         file.write(delimiter)
                     # export solar spectrum
-                    elif (attr == "Solar Irradiance Spectrum (350-2500)"):
+                    elif (attr == "Radiance (350-2500)nm"):
                         xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[sIdx])
                         for j in range(0, len(xs)):
                             file.write(str(int(xs[j])) + delimiter + str(ys[j]) + delimiter)

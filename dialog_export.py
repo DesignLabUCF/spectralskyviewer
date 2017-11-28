@@ -49,7 +49,7 @@ class DialogExport(QDialog):
         "25 Pixels Downsampled to 1",
         "1° Steridian Pixels",
         "1° Steridian Pixels Downsampled to 1",
-        "Solar Irradiance Spectrum (350-2500)"
+        "Radiance (350-2500)nm"
     ]
 
     # default export options
