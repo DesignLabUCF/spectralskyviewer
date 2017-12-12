@@ -424,6 +424,7 @@ class SkyDataViewer(QMainWindow):
         if (index < 0 or index >= self.cbxDate.count()):
             return
 
+        # reset
         self.resetDay()
 
         # find HDR data path
@@ -474,6 +475,10 @@ class SkyDataViewer(QMainWindow):
     def timeSelected(self, index):
         if (index < 0 or index >= self.cbxTime.count()):
             return
+
+        # reset
+        self.captureTimeASDFiles = []
+        self.wgtGraph.clear()
 
         # get sender of event
         # both capture time choicebox and slider route to this event handler, so we need to know who sent the event
@@ -630,32 +635,34 @@ class SkyDataViewer(QMainWindow):
         if (len(self.wgtFisheye.samplesSelected) <= 0): # nothing selected
             return
 
+        # init / pre-compute
         delimiter = xoptions["Delimiter"]
-        newfile = True
-        if (os.path.exists(xoptions["Filename"])):
-            newfile = False
+        points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
+        pixels = utility_data.imageRGBPixels(self.wgtFisheye.myPhotoPath, points)
 
-        # create new or open existing file
-        with open(xoptions["Filename"], "a") as file:
-
-            # export header
-            if (newfile):
-                if (0 in xoptions["Attributes"]):
+        # create file if not exists
+        if (not os.path.exists(xoptions["Filename"])):
+            # create dirs if not exists
+            if (not os.path.exists(os.path.dirname(xoptions["Filename"]))):
+                os.makedirs(os.path.dirname(xoptions["Filename"]))
+            # open file and write header if user desires
+            with open(xoptions["Filename"], "w") as file:
+                if (0 in xoptions["Attributes"]):  # header
                     for i in range(1, len(xoptions["Attributes"])):
                         attr = DialogExport.attributeFromIndex(xoptions["Attributes"][i])
-                        if (attr == "1 Pixel"):
-                            file.write("R" + delimiter + "G" + delimiter + "B" + delimiter)
-                        elif (attr == "Radiance (350-2500)nm"):
-                            for w in range(350, 2501):
-                                file.write("Wavelength:"+str(w) + delimiter + "Radiance:"+str(w) + delimiter)
+                        if (attr == "1Pixel"):
+                            file.write("Red" + delimiter + "Green" + delimiter + "Blue" + delimiter)
+                        elif (attr == "Radiance"):
+                            for w in range(350, 2500):
+                                file.write(str(w) + delimiter)
+                            file.write(str(2500))
                         else:
                             file.write(attr)
                             file.write(delimiter)
                     file.write("\n")
 
-            # pre-compute what we can
-            points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
-            pixels = utility_data.imageRGBPixels(self.wgtFisheye.myPhotoPath, points)
+        # append export to existing file
+        with open(xoptions["Filename"], "a") as file:
 
             # export each selected sample
             for i in range(0, len(self.wgtFisheye.samplesSelected)):
@@ -677,32 +684,34 @@ class SkyDataViewer(QMainWindow):
                         file.write(str(SkyDataViewer.Exposures[self.exposure]))
                         file.write(delimiter)
                     # export index
-                    elif (attr == "Pattern Index"):
+                    elif (attr == "SamplePatternIndex"):
                         file.write(str(sIdx))
                         file.write(delimiter)
                     # export azimuth
-                    elif (attr == "Azimuth (E from N)"):
+                    elif (attr == "Azimuth"):
                         angle = ViewFisheye.SamplingPattern[sIdx]
                         file.write('{0:06.02f}'.format(angle[0]))
                         file.write(delimiter)
                     # export altitude
-                    elif (attr == "Altitude (90 - Zenith)"):
+                    elif (attr == "Altitude"):
                         angle = ViewFisheye.SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(angle[1]))
                         file.write(delimiter)
                     # export pixel
-                    elif (attr == "1 Pixel"):
+                    elif (attr == "1Pixel"):
                         file.write(str(pixels[i][0])) # red
                         file.write(delimiter)
                         file.write(str(pixels[i][1])) # green
                         file.write(delimiter)
                         file.write(str(pixels[i][2])) # blue
                         file.write(delimiter)
-                    # export solar spectrum
-                    elif (attr == "Radiance (350-2500)nm"):
+                    # export solar radiance spectrum
+                    elif (attr == "Radiance"):
                         xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[sIdx])
-                        for j in range(0, len(xs)):
-                            file.write(str(int(xs[j])) + delimiter + str(ys[j]) + delimiter)
+                        count = len(xs)
+                        for j in range(0, count-1):
+                            file.write(str(ys[j]) + delimiter)
+                        file.write(str(ys[count-1]))
 
                 # next sample
                 file.write("\n")

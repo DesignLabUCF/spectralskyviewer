@@ -35,21 +35,22 @@ class DialogExport(QDialog):
 
     # export attributes
     ExportAttributes = [
-        "Header",
-        "Date",
-        "Time",
-        "Exposure",
-        "Pattern Index",
-        "Azimuth (E from N)",
-        "Altitude (90 - Zenith)",
-        "1 Pixel",
-        "9 Pixels",
-        "9 Pixels Downsampled to 1",
-        "25 Pixels",
-        "25 Pixels Downsampled to 1",
-        "1° Steridian Pixels",
-        "1° Steridian Pixels Downsampled to 1",
-        "Radiance (350-2500)nm"
+        # column name           description
+        ("Header",              "Header Row"),
+        ("Date",                "Date of Capture"),
+        ("Time",                "Time of Capture"),
+        ("Exposure",            "Exposure Time (s)"),
+        ("SamplePatternIndex",  "Sample Pattern Index"),
+        ("Azimuth",             "Azimuth (East from North)"),
+        ("Altitude",            "Altitude (90 - Zenith)"),
+        ("1Pixel",              "1 RGB Pixel"),
+        ("9Pixels",             "9 RGB Pixels"),
+        ("9PixelsTo1",          "9 RGB Pixels to 1 (Gaussian weighting)"),
+        ("25Pixels",            "25 RGB Pixels"),
+        ("25PixelsTo1",         "25 RGB Pixels to 1 (Gaussian weighting)"),
+        ("1degPixels",          "1° Steridian RGB Pixels"),
+        ("1degPixelsTo1",       "1° Steridian RGB Pixels to 1 (Gaussian weighting)"),
+        ("Radiance",            "Radiance (W/m²/sr) Per Wavelength (350-2500nm)"),
     ]
 
     # default export options
@@ -70,7 +71,7 @@ class DialogExport(QDialog):
 
     @staticmethod
     def attributeFromIndex(index):
-        return DialogExport.ExportAttributes[index]
+        return DialogExport.ExportAttributes[index][0]
 
     def __init__(self, options=None):
         super().__init__(None, Qt.WindowSystemMenuHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
@@ -138,7 +139,7 @@ class DialogExport(QDialog):
         self.lstAttributes = QListView()
         model = QStandardItemModel()
         for i in range(0, len(DialogExport.ExportAttributes)):
-            item = QStandardItem(DialogExport.ExportAttributes[i])
+            item = QStandardItem(DialogExport.ExportAttributes[i][1])
             item.setCheckable(True)
             if (i in self.exportOptions["Attributes"]):
                 item.setCheckState(Qt.Checked)
