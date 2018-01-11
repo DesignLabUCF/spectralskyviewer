@@ -340,6 +340,8 @@ class SkyDataViewer(QMainWindow):
         self.wgtGraph.setLabel('left', 'Solar Irradiance', units='W/m²/nm')
         self.wgtGraph.setLabel('bottom', 'Wavelength', units='nm')
         self.resetGraph()
+        #self.wgtGraphErrors = QLabel()
+        #self.wgtGraphErrors.setText("hello, world!")
         #self.wgtGraph = QTextEdit()
         #self.wgtGraph.setFocusPolicy(Qt.ClickFocus)
 
@@ -398,6 +400,19 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.repaint()
         self.wgtGraph.clear()
         self.resetGraph()
+
+    def resetViewPressed(self):
+        self.wgtFisheye.resetRotation()
+        self.wgtFisheye.repaint()
+
+    def resetGraph(self):
+        self.wgtGraph.setXRange(SkyDataViewer.XAxisMinDef, SkyDataViewer.XAxisMaxDef)
+        self.wgtGraph.setYRange(SkyDataViewer.YAxisMinDef, SkyDataViewer.YAxisMaxDef)
+        self.wgtGraph.setLimits(xMin=SkyDataViewer.XAxisMin, xMax=SkyDataViewer.XAxisMax,
+                                minXRange=100, maxXRange=SkyDataViewer.XAxisMax - SkyDataViewer.XAxisMin,
+                                yMin=SkyDataViewer.YAxisMin, yMax=SkyDataViewer.YAxisMax,
+                                minYRange=0.05, maxYRange=SkyDataViewer.YAxisMax-SkyDataViewer.YAxisMin)
+        #self.wgtGraph.setAspectLocked(True, None)
 
     def browseForData(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', self.settings["DataDirectory"])
@@ -498,7 +513,7 @@ class SkyDataViewer(QMainWindow):
         # gather all exposure photos taken at time selected
         photos = utility.findFiles(self.captureTimeHDRDirs[index], mode=1, ext=["jpg"])
         if (len(photos) <= 0):
-            #QMessageBox.critical(self, "Error", "No photos found in:\n" + self.hdrCaptureDirs[index], QMessageBox.Ok)
+            self.log("Error: No photos found in:\n" + self.captureTimeHDRDirs[index])
             return
 
         # is there a photo for the currently selected exposure?
@@ -548,14 +563,14 @@ class SkyDataViewer(QMainWindow):
             return
         pathASD = os.path.join(pathDate, "ASD")
         if not os.path.exists(pathASD):
-            print("Error: No ASD data found for: " + str(self.capture.date()))
+            self.log("Error: No ASD data found for: " + str(self.capture.date()))
             return
 
         # find all capture time dirs
         captureTimeASDDirs = utility.findFiles(pathASD, mode=2)
         captureTimeASDDirs[:] = [dir for dir in captureTimeASDDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
         if (len(captureTimeASDDirs) <= 0):
-            print("Error: No ASD capture time dirs found: " + str(self.capture.date()))
+            self.log("Error: No ASD capture time dirs found: " + str(self.capture.date()))
             return
 
         # find an ASD capture time within small threshold of HDR capture time
@@ -571,21 +586,18 @@ class SkyDataViewer(QMainWindow):
 
         # is there an equivalent ASD capture?
         if (asdTime is None):
-            print("Error: No ASD capture time dir found within " + str(threshold) + "s of HDR capture time: " + str(self.capture))
+            self.log("Error: No ASD capture time dir found within " + str(threshold) + "s of HDR capture time: " + str(self.capture))
             return
 
         # gather all ASD files for capture time
         asdTimeDir = os.path.join(pathASD, str(asdTime.time()).replace(":", "."))
         self.captureTimeASDFiles = utility.findFiles(asdTimeDir, mode=1, ext=[".txt"])
         if (len(self.captureTimeASDFiles) <= 0):
-            print("Error: No .txt files found for: " + str(asdTime))
+            self.log("Error: No ASD .txt files found for: " + str(asdTime))
             return
         if (len(self.captureTimeASDFiles) < 81):
-            QMessageBox.critical(self, "WARNING!!!", "Number of ASD .txt files is " + str(len(self.captureTimeASDFiles)) + ".\nSample pattern should have " + str(len(ViewFisheye.SamplingPattern)), QMessageBox.Ok)
-            # rect = QtGui.QGraphicsRectItem(QtCore.QRectF(0, 0, 1, 5e-11))
-            # rect.setPen(pg.mkPen(100, 200, 100))
-            # pw.addItem(rect)
-            # self.wgtGraph.addItem(QGraphicsPixmapItem(self.wgtFisheye.iconWarning))
+            self.log("Error: Number of ASD files is " + str(len(self.captureTimeASDFiles)) + ". Sample pattern should have " + str(len(ViewFisheye.SamplingPattern)))
+            return
 
         # graph ASD data
         self.graphSamples(self.wgtFisheye.samplesSelected)
@@ -728,19 +740,6 @@ class SkyDataViewer(QMainWindow):
         # now that export options are configured, enable export commands
         self.actExportSelected.setEnabled(True)
 
-    def resetViewPressed(self):
-        self.wgtFisheye.resetRotation()
-        self.wgtFisheye.repaint()
-
-    def resetGraph(self):
-        self.wgtGraph.setXRange(SkyDataViewer.XAxisMinDef, SkyDataViewer.XAxisMaxDef)
-        self.wgtGraph.setYRange(SkyDataViewer.YAxisMinDef, SkyDataViewer.YAxisMaxDef)
-        self.wgtGraph.setLimits(xMin=SkyDataViewer.XAxisMin, xMax=SkyDataViewer.XAxisMax,
-                                minXRange=100, maxXRange=SkyDataViewer.XAxisMax - SkyDataViewer.XAxisMin,
-                                yMin=SkyDataViewer.YAxisMin, yMax=SkyDataViewer.YAxisMax,
-                                minYRange=0.05, maxYRange=SkyDataViewer.YAxisMax-SkyDataViewer.YAxisMin)
-        #self.wgtGraph.setAspectLocked(True, None)
-
     def triggerContextMenu(self, widget, event):
         if (widget == self.wgtFisheye):
             menuCtx = QMenu(self)
@@ -836,6 +835,11 @@ class SkyDataViewer(QMainWindow):
         # dump settings to file
         with open(self.settings["Filename"], 'w') as file:
             json.dump(self.settings, file, indent=4)
+
+    def log(self, message):
+        self.statusBar().showMessage(message)
+        print(message)
+        #QMessageBox.critical(self, "Error", message, QMessageBox.Ok)
 
 
 if __name__ == '__main__':
