@@ -269,8 +269,8 @@ class ViewFisheye(QWidget):
         self.enableSamples = b
 
     def setPixelRegion(self, r):
-        if (r < 1):
-            self.pixelRegion = 1
+        if (r < utility_data.PixelRegionMin):
+            self.pixelRegion = utility_data.PixelRegionMin
         else:
             self.pixelRegion = r
 

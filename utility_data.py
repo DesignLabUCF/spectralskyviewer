@@ -36,6 +36,8 @@ import exifread
 
 
 HDRRawExts = ['.cr2', '.raw', '.dng']
+PixelRegionMin = 1
+PixelRegionMax = 99
 PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')
 GaussianKernels = {}
 
@@ -133,7 +135,7 @@ def gaussianKernel(width):
     # normalize
     kernel = kernel / total
     return kernel
-GaussianKernels = {w:gaussianKernel(w) for w in range(3, 63+1, 2)}
+GaussianKernels = {w:gaussianKernel(w) for w in range(PixelRegionMin+2, PixelRegionMax+1, 2)}
 
 def pixelWeightedMean(pixels, coord, dim):
     radius = int(dim / 2)

@@ -863,17 +863,17 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.repaint()
 
     def togglePixelRegion(self, action):
-        region = 1 # n for (n x n) pixel region
+        region = utility_data.PixelRegionMin # n for (n x n) pixel region
         ok = True
 
         if (action == self.actPixel1):
             region = 1
         elif (action == self.actPixelnxn):
-            region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, DialogExport.MinPixelRegion, DialogExport.MaxPixelRegion, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+            region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, utility_data.PixelRegionMin, utility_data.PixelRegionMax, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
         elif (action == self.actPixel1deg):
             region = 15
 
-        if ok and region >= 1 and region % 2 == 1:
+        if ok and region >= utility_data.PixelRegionMin and region % 2 == 1:
             self.wgtFisheye.setPixelRegion(region)
         else:
             QMessageBox.warning(self, "Input Validation", "Pixel Region must be an odd positive number.", QMessageBox.Ok)

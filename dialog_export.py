@@ -29,13 +29,11 @@ import os
 from PyQt5.QtGui import QIcon, QStandardItem, QStandardItemModel
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
+import utility_data
 from utility_data import PixelWeighting
 
 
 class DialogExport(QDialog):
-
-    MinPixelRegion = 1
-    MaxPixelRegion = 99
 
     # export attributes
     ExportAttributes = [
@@ -57,7 +55,7 @@ class DialogExport(QDialog):
     ExportOptions = {
         "Filename": "",
         "Delimiter": ",",
-        "PixelRegion": MinPixelRegion,
+        "PixelRegion": utility_data.PixelRegionMin,
         "PixelWeighting": PixelWeighting.Mean.value,
         "Attributes": [0, 1, 2, 5, 6, 7, 10]
     }
@@ -148,7 +146,7 @@ class DialogExport(QDialog):
         self.cbxPixelRegion = QComboBox()
         self.cbxPixelRegion.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         #self.cbxPixelRegion.currentIndexChanged.connect(self.pixelRegionEntered)
-        self.cbxPixelRegion.addItems([str(x) for x in range(DialogExport.MinPixelRegion,DialogExport.MaxPixelRegion+1,2)])
+        self.cbxPixelRegion.addItems([str(x) for x in range(utility_data.PixelRegionMin,utility_data.PixelRegionMax+1,2)])
         boxPixelRegion = QHBoxLayout()
         boxPixelRegion.addWidget(self.cbxPixelRegion)
         grpPixelRegion = QGroupBox("(n x n) Pixel Region:", self)
