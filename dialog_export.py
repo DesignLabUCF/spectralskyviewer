@@ -29,9 +29,13 @@ import os
 from PyQt5.QtGui import QIcon, QStandardItem, QStandardItemModel
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
+from utility_data import PixelWeighting
 
 
 class DialogExport(QDialog):
+
+    MinPixelRegion = 1
+    MaxPixelRegion = 99
 
     # export attributes
     ExportAttributes = [
@@ -43,13 +47,9 @@ class DialogExport(QDialog):
         ("SamplePatternIndex",  "Sample Pattern Index"),
         ("Azimuth",             "Azimuth (East from North)"),
         ("Altitude",            "Altitude (90 - Zenith)"),
-        ("1Pixel",              "1 RGB Pixel"),
-        ("9Pixels",             "9 RGB Pixels"),
-        ("9PixelsTo1",          "9 RGB Pixels to 1 (Gaussian weighting)"),
-        ("25Pixels",            "25 RGB Pixels"),
-        ("25PixelsTo1",         "25 RGB Pixels to 1 (Gaussian weighting)"),
-        ("1degPixels",          "1° Steridian RGB Pixels"),
-        ("1degPixelsTo1",       "1° Steridian RGB Pixels to 1 (Gaussian weighting)"),
+        ("PixelRGB",            "Sample Pixel RGB Channels"),
+        ("PixelRegion",         "Region of Pixels Used Per Sample"),
+        ("PixelWeighting",      "Pixel Weighting Used Per Sample"),
         ("Radiance",            "Radiance (W/m²/sr) Per Wavelength (350-2500nm)"),
     ]
 
@@ -57,7 +57,9 @@ class DialogExport(QDialog):
     ExportOptions = {
         "Filename": "",
         "Delimiter": ",",
-        "Attributes": [0, 1, 2, 5, 6, 7, 14]
+        "PixelRegion": MinPixelRegion,
+        "PixelWeighting": PixelWeighting.Mean.value,
+        "Attributes": [0, 1, 2, 5, 6, 7, 10]
     }
 
     @staticmethod
@@ -86,9 +88,22 @@ class DialogExport(QDialog):
         self.initWidgets()
         self.setWindowTitle("Export Configuration")
         self.setWindowIcon(QIcon('res/icon.png'))
-        # self.setGeometry(0, 0, 1024, 768)
-        # self.resize(20, 20)
-        # self.setFixedSize(self.size())
+        if (self.exportOptions["Delimiter"] == "\t"):
+            self.radTab.setChecked(True)
+        elif (self.exportOptions["Delimiter"] == " "):
+            self.radSpace.setChecked(True)
+        else:
+            self.radCSV.setChecked(True)
+        for i in range(0, self.cbxPixelRegion.count()):
+            if int(self.cbxPixelRegion.itemText(i)) == self.exportOptions["PixelRegion"]:
+                self.cbxPixelRegion.setCurrentIndex(i)
+        pw = PixelWeighting(self.exportOptions["PixelWeighting"])
+        if (pw == PixelWeighting.Mean):
+            self.radPixelMean.setChecked(True)
+        elif (pw == PixelWeighting.Median):
+            self.radPixelMedian.setChecked(True)
+        elif (pw == PixelWeighting.Gaussian):
+            self.radPixelGaussian.setChecked(True)
 
     def initWidgets(self):
         # layout
@@ -114,19 +129,13 @@ class DialogExport(QDialog):
         pnlFile.setLayout(boxFile)
         layout.addWidget(pnlFile, 0, Qt.AlignTop)
 
-        # format
+        # file format
         self.radCSV = QRadioButton("CSV")
         self.radCSV.clicked.connect(lambda: self.formatPressed(self.radCSV))
         self.radTab = QRadioButton("Tab")
         self.radTab.clicked.connect(lambda: self.formatPressed(self.radTab))
         self.radSpace = QRadioButton("Space")
         self.radSpace.clicked.connect(lambda: self.formatPressed(self.radSpace))
-        if (self.exportOptions["Delimiter"] == "\t"):
-            self.radTab.setChecked(True)
-        elif (self.exportOptions["Delimiter"] == " "):
-            self.radSpace.setChecked(True)
-        else:
-            self.radCSV.setChecked(True)
         boxFormat = QHBoxLayout()
         boxFormat.addWidget(self.radCSV)
         boxFormat.addWidget(self.radTab)
@@ -134,6 +143,29 @@ class DialogExport(QDialog):
         grpFormat = QGroupBox("File Format:", self)
         grpFormat.setLayout(boxFormat)
         layout.addWidget(grpFormat, 0, Qt.AlignTop)
+
+        # pixel region
+        self.cbxPixelRegion = QComboBox()
+        self.cbxPixelRegion.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        #self.cbxPixelRegion.currentIndexChanged.connect(self.pixelRegionEntered)
+        self.cbxPixelRegion.addItems([str(x) for x in range(DialogExport.MinPixelRegion,DialogExport.MaxPixelRegion+1,2)])
+        boxPixelRegion = QHBoxLayout()
+        boxPixelRegion.addWidget(self.cbxPixelRegion)
+        grpPixelRegion = QGroupBox("(n x n) Pixel Region:", self)
+        grpPixelRegion.setLayout(boxPixelRegion)
+        layout.addWidget(grpPixelRegion, 0, Qt.AlignTop)
+
+        # pixel weighting
+        self.radPixelMean = QRadioButton("Mean")
+        self.radPixelMedian = QRadioButton("Median")
+        self.radPixelGaussian = QRadioButton("Gaussian")
+        boxPixelWeighting = QHBoxLayout()
+        boxPixelWeighting.addWidget(self.radPixelMean)
+        boxPixelWeighting.addWidget(self.radPixelMedian)
+        boxPixelWeighting.addWidget(self.radPixelGaussian)
+        grpPixelWeighting = QGroupBox("Pixel Weighting:", self)
+        grpPixelWeighting.setLayout(boxPixelWeighting)
+        layout.addWidget(grpPixelWeighting, 0, Qt.AlignTop)
 
         # attributes
         self.lstAttributes = QListView()
@@ -203,6 +235,14 @@ class DialogExport(QDialog):
         if (self.radCSV.isChecked()):     self.exportOptions["Delimiter"] = ","
         elif (self.radTab.isChecked()):   self.exportOptions["Delimiter"] = "\t"
         elif (self.radSpace.isChecked()): self.exportOptions["Delimiter"] = " "
+
+        # save pixel region
+        self.exportOptions["PixelRegion"] = int(self.cbxPixelRegion.currentText())
+
+        # save pixel weighting
+        if (self.radPixelMean.isChecked()):       self.exportOptions["PixelWeighting"] = PixelWeighting.Mean.value
+        elif (self.radPixelMedian.isChecked()):   self.exportOptions["PixelWeighting"] = PixelWeighting.Median.value
+        elif (self.radPixelGaussian.isChecked()): self.exportOptions["PixelWeighting"] = PixelWeighting.Gaussian.value
 
         # save selected attributes
         attributes = []

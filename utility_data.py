@@ -25,15 +25,30 @@
 # @since: 11/02/2017
 # @summary: A module that handles loading/checking sky data from the data directory.
 # ====================================================================
+import math
 import os
 import csv
 from datetime import datetime
+from enum import Enum
 import numpy as np
 from PIL import Image
 import exifread
 
 
 HDRRawExts = ['.cr2', '.raw', '.dng']
+PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')
+GaussianKernels = {}
+
+# for row in range(0, kernel.shape[0]):
+#     for col in range(0, kernel.shape[1]):
+#         print("%.4f " % round(kernel[row, col, 0], 4), end='')
+#     print()
+# print(np.sum(kernel))
+# for row in range(0, utility_data.KernelGauss5x5SD1.shape[0]):
+#     for col in range(0, utility_data.KernelGauss5x5SD1.shape[1]):
+#         print("%.4f " % round(utility_data.KernelGauss5x5SD1[row, col, 0], 4), end='')
+#     print()
+# print(np.sum(utility_data.KernelGauss5x5SD1)
 
 '''
 Function to extract the "DateTimeOriginal" EXIF value of an image.
@@ -70,31 +85,87 @@ def imageEXIF(filepath):
     return data
 
 '''
-Function to get the RGB pixels of specific coordinates of an image.
-:param filepath: Path to the image file.
+Function to retrieve the pixels of specific coordinates of an image.
 :param coords: A list of (x, y) points to lookup in the image file.
-:return: A list of (R,G,B,A) tuples representing the pixel colors.
-:note: Coordinates outside image bounds are black, no alpha.
-:note: Alpha may or may not be included, depending on the image.
+:param file: Optional path to the image file.
+:param pixels: Optional numpy array of pixels in format [[[R G B (A)]]].
+:param region: n for (n x n) region of pixels considered in pixel weighting.
+:param weighting: Pixel weighting convolution algorithm.
+:return: A list of (R,G,B(,A)) tuples representing the pixel colors.
+:note: Coordinates MUST be within image bounds or this function will throw an exception!
+:note: Alpha component may or may not be included, depending on image format.
 '''
-def imageRGBPixels(filepath, coords):
-    if (not os.path.exists(filepath)):
-        return []
-    elif (coords is None or len(coords) <= 0):
-        return []
+def collectPixels(coords, file='', pixels=None, region=1, weighting=PixelWeighting.Mean):
+    if pixels is None:
+        if not os.path.exists(file) or not coords:
+            return []
+        image = Image.open(file)
+        #imgPixels = img.load()
+        pixels = np.array(image)
+        image.close()
 
-    pixelTuples = []
+    result = []
+    if pixels.any():
+        if region <= 1:
+            result = [pixels[int(c[1]), int(c[0])] for c in coords]
+        else:
+            if weighting == PixelWeighting.Mean:
+                result = [pixelWeightedMean(pixels, c, region) for c in coords]
+            elif weighting == PixelWeighting.Median:
+                result = [pixelWeightedMedian(pixels, c, region) for c in coords]
+            elif weighting == PixelWeighting.Gaussian:
+                result = [pixelWeightedGaussian(pixels, c, GaussianKernels[region]) for c in coords]
+    return result
 
-    with Image.open(filepath) as img:
-        pixels = img.load()
-        if (pixels is not None):
-            for c in coords:
-                pix = (0,0,0)
-                if (c[0] < img.size[0] and c[1] < img.size[1]):
-                    pix = pixels[c[0], c[1]]
-                pixelTuples.append(pix)
+def gaussianKernel(width):
+    kernel = np.zeros(shape=(width,width,1), dtype=np.float32)
+    radius = int(width/2)
+    # sigma = 1.0
+    sigma = radius/2.0 # for [-2*sigma, 2*sigma]
+    total = 0.0
+    # gaussian function
+    #gaussian = lambda x: x + 1
+    #kernel = gaussian(kernel)
+    for row in range(0, width):
+        for col in range(0, width):
+            kernel[row,col,0] = math.exp(-0.5 * (pow((col - radius) / sigma, 2.0) + pow((row - radius) / sigma, 2.0))) / (2 * math.pi * sigma * sigma)
+            total += kernel[row,col,0]
+    # normalize
+    kernel = kernel / total
+    return kernel
+GaussianKernels = {w:gaussianKernel(w) for w in range(3, 63+1, 2)}
 
-    return pixelTuples
+def pixelWeightedMean(pixels, coord, dim):
+    radius = int(dim / 2)
+    scale = 1.0 / (dim * dim)
+    pixelset = pixels[coord[1]-radius:coord[1]+radius+1, coord[0]-radius:coord[0]+radius+1]
+    pixelset = pixelset * scale
+    pixelset = np.sum(pixelset, axis=0)
+    pxl = np.sum(pixelset, axis=0)
+    # pxl = np.zeros(pixels.shape[2], np.float32)
+    # for j in dim:
+    #     for i in dim:
+    #         pxl += scale * pixels[coord[1]+j-radius, coord[0]+i-radius]
+    pxl = np.around(pxl, decimals=1, out=pxl)
+    pxl = pxl.astype(np.uint8, copy=False)
+    return pxl
+
+def pixelWeightedMedian(pixels, coord, dim):
+    return None
+
+def pixelWeightedGaussian(pixels, coord, kernel):
+    radius = int(kernel.shape[1] / 2)
+    pixelset = pixels[coord[1]-radius:coord[1]+radius+1, coord[0]-radius:coord[0]+radius+1]
+    pixelset = pixelset * kernel
+    pixelset = np.sum(pixelset, axis=0)
+    pxl = np.sum(pixelset, axis=0)
+    # pxl = np.zeros(pixels.shape[2], np.float32)
+    # for j in range(0, kernel.shape[0]):
+    #     for i in range(0, kernel.shape[1]):
+    #         pxl += kernel[j][i] * pixels[coord[1]+j-radius, coord[0]+i-radius]
+    pxl = np.around(pxl, decimals=1, out=pxl)
+    pxl = pxl.astype(np.uint8, copy=False)
+    return pxl
 
 '''
 Function to check if a raw data photo is available, given a path to an existing photo.
@@ -119,7 +190,7 @@ Function to load a solar position file exported from NREL's SPA website.
 :note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
 :note: File format should be a CSV with the following columns:
        Date, Time, Topocentric zenith angle, Topocentric azimuth angle (eastward from N)
-:return: A list of (azimuthm, altitude, datetime) tuples of solar position and timestamp
+:return: A list of (azimuth, altitude, datetime) tuples of solar position and timestamp
 '''
 def loadSunPath(filepath, isDir=True):
     if (isDir):
@@ -142,7 +213,7 @@ def loadSunPath(filepath, isDir=True):
                 dt = datetime.strptime(dts, "%m/%d/%Y %H:%M:%S")
             except ValueError:
                 continue
-            point = [float(row[3]), 90-float(row[2]), dt]
+            point = (float(row[3]), 90-float(row[2]), dt)
             # we only care about altitude when sun is visible (not on other side of Earth)
             if (point[1] >=0 and point[1] <= 90):
                 sunpath.append(point)

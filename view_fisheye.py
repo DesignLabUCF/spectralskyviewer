@@ -32,14 +32,16 @@ from datetime import datetime
 from PyQt5.QtCore import Qt, QRect, QPoint, QPointF
 from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QIcon, QColor
 from PyQt5.QtWidgets import QWidget, QStyle, QAction, QMenu
+import numpy as np
 import utility
 import utility_angles
 import utility_data
+from utility_data import PixelWeighting
 
 
 class ViewFisheye(QWidget):
     # sampling pattern: 81 samples (azimuth, altitude)
-    SamplingPattern = [
+    SamplingPattern = (
         (000.00, 12.1151),
         (011.25, 12.1151),
         (022.50, 12.1151),
@@ -121,15 +123,15 @@ class ViewFisheye(QWidget):
         (045.00, 71.9187),
         (000.00, 71.9187),
         (000.00, 90.0000),
-    ]
+    )
     # convert to radians
     # ViewFisheye.SamplingPattern = [(math.radians(s[0]), math.radians(s[1])) for s in ViewFisheye.SamplingPattern]
 
     # sample selection
     SelectionType = Enum('SelectType', 'Exact Closest Rect')
     SelectionMode = Enum('SelectMode', 'Select Add Remove')
-    SelectionRectMin = 10       # pixels, width and height, scales as photo scales
-    SelectedPixelBox = 64  # pixels, width and height
+    SelectionRectMin = 10   # pixels, width and height, scales as photo scales
+    SelectedPixelBox = 64   # pixels, width and height
 
     def __init__(self, parent):
         super().__init__()
@@ -137,6 +139,7 @@ class ViewFisheye(QWidget):
         # members
         self.parent = parent
         self.myPhoto = QImage()
+        self.myPhotoPixels = np.zeros(shape=(1, 1, 4))
         self.myPhotoPath = ""
         self.myPhotoTime = datetime(1,1,1)
         self.myPhotoSrcRect = QRect()
@@ -158,6 +161,8 @@ class ViewFisheye(QWidget):
         self.sampleBoundsVisible = [] # bounds [x,y,w,h] of all samples on the photo rendered on screen (scaled)
         self.samplePointsInFile = []  # points (x,y) of all samples in the photo on file
         self.samplesSelected = []     # indices of selected samples
+        self.pixelRegion = 1
+        self.pixelWeighting = PixelWeighting.Mean
 
         # members - preloaded graphics
         self.painter = QPainter()
@@ -165,7 +170,7 @@ class ViewFisheye(QWidget):
         self.pathSun = QPainterPath()
         self.brushBG = QBrush(Qt.black, Qt.SolidPattern)
         self.penText = QPen(Qt.white, 1, Qt.SolidLine)
-        self.penSelected = QPen(Qt.magenta, 3, Qt.SolidLine)
+        self.penSelected = [] # list of pens, one for each sampling pattern location
         self.penSelectRect = QPen(Qt.white, 1, Qt.DashLine)
         self.penSun = QPen(Qt.yellow, 1, Qt.SolidLine)
         self.fontFixed = QFont('Courier New', 8)
@@ -175,9 +180,17 @@ class ViewFisheye(QWidget):
 
         # init
         self.setMouseTracking(True)
+        rgbStride = 200 / len(ViewFisheye.SamplingPattern)
         for i in range(0, len(ViewFisheye.SamplingPattern)):
             self.sampleBoundsVisible.append(QRect(0, 0, 0, 0)) # these will need to be recomputed as photo scales
             self.samplePointsInFile.append((0, 0))             # these only need to be computed once per photo
+            self.penSelected.append(QPen(QColor(255, i * rgbStride + 55, 255), 3, Qt.SolidLine))
+
+    def getSamplePatternRGB(self, index):
+        if (index < 0 or index >= len(ViewFisheye.SamplingPattern)):
+            return (0,0,0)
+        color = self.penSelected[index].color()
+        return (color.red(), color.green(), color.blue())
 
     def setPhoto(self, path, exif=None):
         # if photo is valid
@@ -191,9 +204,10 @@ class ViewFisheye(QWidget):
                 self.myPhotoTime = datetime.strptime(str(exif["EXIF DateTimeOriginal"]), '%Y:%m:%d %H:%M:%S')
             else:
                 self.myPhotoTime = utility_data.imageEXIFDateTime(path)
+
             # compute each sample's coordinate in the photo
             self.samplePointsInFile = []
-            center = (self.myPhotoSrcRect.width() / 2, self.myPhotoSrcRect.height()/2)
+            center = (int(self.myPhotoSrcRect.width() / 2), int(self.myPhotoSrcRect.height()/2))
             radius = self.myPhotoSrcRect.height() / 2
             diameter = radius * 2
             for i in range(0, len(ViewFisheye.SamplingPattern)):
@@ -201,17 +215,33 @@ class ViewFisheye(QWidget):
                 u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
                 x = (center[0] - radius) + (u * diameter)
                 y = (center[1] - radius) + (v * diameter)
-                self.samplePointsInFile.append((x, y))
+                self.samplePointsInFile.append((int(x), int(y)))
+
+            # keep a copy the image's pixels in memory (used later for exporting, etc.)
+            ptr = self.myPhoto.bits()
+            ptr.setsize(self.myPhoto.byteCount())
+            pixbgr = np.asarray(ptr).reshape(self.myPhoto.height(), self.myPhoto.width(), 4)
+            # HACKAROONIE: byte order is not the same as image format, so swapped it around. should handle this better :/
+            self.myPhotoPixels = np.copy(pixbgr)
+            red = np.copy(self.myPhotoPixels[:, :, 0])
+            self.myPhotoPixels[:, :, 0] = self.myPhotoPixels[:, :, 2]
+            self.myPhotoPixels[:, :, 2] = red
+            # rgba = self.myPhoto.pixelColor(center[0], center[1])
+            # print((rgba.red(), rgba.green(), rgba.blue()))
+            # rgba = pixrgb[center[1], center[0]]
+            # print(rgba)
+
         # photo is null or missing
         else:
             self.myPhoto = QImage()
+            self.myPhotoPixels = np.zeros(shape=(1,1,4))
             self.myPhotoPath = ""
             self.myPhotoTime = datetime(1, 1, 1)
             self.myPhotoSrcRect = QRect()
             self.myPhotoDestRect = QRect()
             self.rawAvailable = False
 
-        # precompute as much as we can before drawing
+        # precompute as much as we can before any drawing
         self.computeBounds()
 
     def setSunPath(self, sunpath):
@@ -237,6 +267,18 @@ class ViewFisheye(QWidget):
 
     def showSamples(self, b):
         self.enableSamples = b
+
+    def setPixelRegion(self, r):
+        if (r < 1):
+            self.pixelRegion = 1
+        else:
+            self.pixelRegion = r
+
+    def setPixelWeighting(self, w):
+        if (w not in PixelWeighting):
+            self.pixelWeighting = PixelWeighting.Mean
+        else:
+            self.pixelWeighting = w
 
     def selectSamples(self, message="none"):
         # nothing to do if no photo loaded
@@ -627,10 +669,11 @@ class ViewFisheye(QWidget):
                         painter.drawEllipse(r)
 
                 # always draw selected samples
-                painter.setPen(self.penSelected)
+                #painter.setPen(self.penSelected)
                 r = QRect()
                 for i in self.samplesSelected:
                     r.setCoords(self.sampleBoundsVisible[i].x(), self.sampleBoundsVisible[i].y(), self.sampleBoundsVisible[i].right() + 1, self.sampleBoundsVisible[i].bottom() + 1)
+                    painter.setPen(self.penSelected[i])
                     painter.drawEllipse(r)
 
                 # draw selection bounds
@@ -655,7 +698,7 @@ class ViewFisheye(QWidget):
                     destRect.moveTo(10, self.height()-25)
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "Rotation: " + str(self.myPhotoRotation) + "°")
 
-                # coordinates we are interested in
+                # information we are interested in displaying
                 #self.coordsMouse   # x,y of this widget
                 coordsxy = (-1, -1) # x,y over photo as scaled/rendered on this widget
                 coordsXY = (-1, -1) # x,y over actual original photo on disk
@@ -664,7 +707,7 @@ class ViewFisheye(QWidget):
                 coordsTP = (-1, -1) # theta,phi polar coordinates
                 distance = math.inf # distance from center of fisheye to mouse in unit circle
 
-                # compute all relevant coordinates only when mouse is within fisheye portion of photo
+                # compute all relevant information only when mouse is within fisheye portion of photo
                 if (self.coordsMouse[0] >= self.myPhotoDestRect.x() and
                     self.coordsMouse[1] >= self.myPhotoDestRect.y() and
                     self.coordsMouse[0] < self.myPhotoDestRect.x() + self.myPhotoDestRect.width() and
@@ -693,23 +736,32 @@ class ViewFisheye(QWidget):
                     coordsTP = utility_angles.GetAngleFromUV(coordsUV[0], coordsUV[1])
                     distance = math.sqrt((coordsUC[0] * coordsUC[0]) + (coordsUC[1] * coordsUC[1]))
 
-                # formatted text strings for coordinates
+                # pixels colors
+                colorsRegion = np.array([[[0,0,0,255]]])
+                colorFinal = colorsRegion[0,0] # RGBA of pixel under mouse of photo on disk
+                # colorFinal = self.myPhoto.pixelColor(coordsXY[0], coordsXY[1])
+                if (distance <= 1.0):
+                    halfdim = int(self.pixelRegion / 2)
+                    colorsRegion = self.myPhotoPixels[coordsXY[1]-halfdim:coordsXY[1]+halfdim+1, coordsXY[0]-halfdim:coordsXY[0]+halfdim+1]
+                    colorFinal = colorsRegion[halfdim, halfdim]
+                    # pixel color weighting
+                    if self.pixelRegion > 1:
+                        colorFinal = utility_data.collectPixels([coordsXY], pixels=self.myPhotoPixels, region=self.pixelRegion, weighting=self.pixelWeighting)[0]
+
+                # text strings for information we want to display on HUD
                 textxy = "-1, -1 xy"
                 textXY = "-1, -1 xy"
                 textUC = "-1, -1 uc"
                 textUV = "-1, -1 uv"
                 textTP = "-1, -1 θφ"
                 textPX = "0 0 0 px"
-                color = QColor()
                 if (distance <= 1.0):
                     textxy = str(coordsxy[0]) + ", " + str(coordsxy[1]) + " xy"
                     textXY = str(coordsXY[0]) + ", " + str(coordsXY[1]) + " xy"
                     textUC = "{:.2f}".format(coordsUC[0]) + ", " + "{:.2f}".format(coordsUC[1]) + " uc"
                     textUV = "{:.2f}".format(coordsUV[0]) + ", " + "{:.2f}".format(coordsUV[1]) + " uv"
                     textTP = "{:.2f}".format(coordsTP[0]) + ", " + "{:.2f}".format(coordsTP[1]) + " θφ"
-                    color = self.myPhoto.pixelColor(coordsXY[0], coordsXY[1])
-                    textPX = str(color.red()) + " " + str(color.green()) + " " + str(color.blue()) + " px"
-
+                    textPX = str(colorFinal[0]) + " " + str(colorFinal[1]) + " " + str(colorFinal[2]) + " px"
                 # draw x,y coords
                 destRect.setCoords(10, 10, self.width()-10, self.height()- 134)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textxy)
@@ -729,30 +781,45 @@ class ViewFisheye(QWidget):
                 destRect.setCoords(10, 10, self.width() - 10, self.height() - 84)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textPX)
 
-                # draw cursor visual indicators (outlines)
-                circleX = self.width() - 10 - ViewFisheye.SelectedPixelBox - 10 - ViewFisheye.SelectedPixelBox
+                # compute pixel visualization coordinates
+                circleX = self.width() - 10 - ViewFisheye.SelectedPixelBox - 10 - ViewFisheye.SelectedPixelBox - 10 - ViewFisheye.SelectedPixelBox
                 circleY = self.height() - 10 - ViewFisheye.SelectedPixelBox
-                pixelX = self.width() - ViewFisheye.SelectedPixelBox - 10
-                pixelY = self.height() - ViewFisheye.SelectedPixelBox - 10
-                painter.drawEllipse(circleX, circleY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
-                painter.drawRect(pixelX, pixelY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
+                pixelsX = self.width() - 10 - ViewFisheye.SelectedPixelBox - 10 - ViewFisheye.SelectedPixelBox
+                pixelsY = self.height() - 10 - ViewFisheye.SelectedPixelBox
+                pixelsWeightedX = self.width() - ViewFisheye.SelectedPixelBox - 10
+                pixelsWeightedY = self.height() - 10 - ViewFisheye.SelectedPixelBox
 
-                # draw cursor visual indicators (filled if cursor is within fisheye radius)
+                # draw cursor visual indicators - fills (if cursor is within fisheye radius)
                 if (distance <= 1.0):
-                    #color = self.myPhoto.pixelColor(coordsXY[0], coordsXY[1])
-                    painter.setBackgroundMode(Qt.OpaqueMode)
-                    painter.setBackground(color)
+                    painter.setPen(Qt.NoPen)
+                    # pixel region
+                    pixdim = ViewFisheye.SelectedPixelBox / self.pixelRegion
+                    for row in range(0, self.pixelRegion):
+                        for col in range(0, self.pixelRegion):
+                            color = colorsRegion[row, col]
+                            color = QColor(color[0], color[1], color[2])
+                            painter.setBrush(QBrush(color, Qt.SolidPattern))
+                            painter.drawRect(pixelsX + (col * pixdim), pixelsY + (row * pixdim), math.ceil(pixdim), math.ceil(pixdim))
+                    # final pixel color
+                    color = QColor(colorFinal[0], colorFinal[1], colorFinal[2])
                     painter.setBrush(QBrush(color, Qt.SolidPattern))
                     cx = circleX + (coordsUV[0] * ViewFisheye.SelectedPixelBox)
                     cy = circleY + (coordsUV[1] * ViewFisheye.SelectedPixelBox)
                     painter.drawEllipse(cx - 5, cy - 5, 10, 10)
-                    painter.drawRect(pixelX, pixelY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
+                    painter.drawRect(pixelsWeightedX, pixelsWeightedY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
+
+                # draw cursor visual indicators - outlines
+                painter.setPen(self.penText)
+                painter.setBrush(Qt.NoBrush)
+                painter.drawEllipse(circleX, circleY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
+                painter.drawRect(pixelsX, pixelsY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
+                painter.drawRect(pixelsWeightedX, pixelsWeightedY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
 
                 # raw data missing indicator
-                if (not self.rawAvailable):
-                    painter.drawPixmap(pixelX + ViewFisheye.SelectedPixelBox / 2,
-                                       pixelY + ViewFisheye.SelectedPixelBox / 2,
-                                       self.iconWarning)
+                # if (not self.rawAvailable):
+                #     painter.drawPixmap(pixelX + ViewFisheye.SelectedPixelBox / 2,
+                #                        pixelY + ViewFisheye.SelectedPixelBox / 2,
+                #                        self.iconWarning)
 
         # end draw
         painter.end()

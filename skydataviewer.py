@@ -37,13 +37,14 @@ import numpy as np
 import pyqtgraph as pg
 import utility
 import utility_data
+from utility_data import PixelWeighting
 from view_fisheye import ViewFisheye
 from dialog_export import DialogExport
 
 
 class SkyDataViewer(QMainWindow):
     # exposure times of the HDR data (in seconds)
-    Exposures = [
+    Exposures = (
         0.000125,
         0.001000,
         0.008000,
@@ -53,7 +54,7 @@ class SkyDataViewer(QMainWindow):
         1.000000,
         2.000000,
         4.000000,
-    ]
+    )
 
     # ASD graph settings
     XAxisMin = 0
@@ -83,6 +84,8 @@ class SkyDataViewer(QMainWindow):
         "ShowUVGrid": False,
         "ShowEXIF": True,
         "ShowStatusBar": True,
+        "PixelRegion": 1,
+        "PixelWeighting": PixelWeighting.Mean.value,
     }
     Settings.update({"ExportOptions": dict(DialogExport.ExportOptions)})
 
@@ -123,6 +126,8 @@ class SkyDataViewer(QMainWindow):
             self.statusBar().show()
         else:
             self.statusBar().hide()
+        self.wgtFisheye.setPixelRegion(self.settings["PixelRegion"])
+        self.wgtFisheye.setPixelWeighting(PixelWeighting(self.settings["PixelWeighting"]))
 
         # startup
         self.loadData()
@@ -182,9 +187,11 @@ class SkyDataViewer(QMainWindow):
         self.actUVGrid.triggered.connect(self.toggleUVGrid)
 
         # sky sample menu actions
-        self.actExportSetup = QAction(QIcon(), 'Setup Export &File', self)
-        self.actExportSetup.setStatusTip('Setup export file')
-        self.actExportSetup.triggered.connect(self.setupExportFile)
+        self.actExportSelected = QAction(QIcon(), '&Export Selected', self)
+        self.actExportSelected.setShortcut('Ctrl+E')
+        self.actExportSelected.setStatusTip('Export selected samples')
+        self.actExportSelected.setEnabled(False)
+        self.actExportSelected.triggered.connect(lambda: self.exportSamples('selected'))
         self.actSelectAll = QAction(QIcon(), 'Select &All', self)
         self.actSelectAll.setShortcut('Ctrl+A')
         self.actSelectAll.setStatusTip('Select all samples')
@@ -192,11 +199,42 @@ class SkyDataViewer(QMainWindow):
         self.actClearAll = QAction(QIcon(), '&Clear All', self)
         self.actClearAll.setStatusTip('Clear selected samples')
         self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
-        self.actExportSelected = QAction(QIcon(), '&Export Selected', self)
-        self.actExportSelected.setShortcut('Ctrl+E')
-        self.actExportSelected.setStatusTip('Export selected samples')
-        self.actExportSelected.setEnabled(False)
-        self.actExportSelected.triggered.connect(lambda: self.exportSamples('selected'))
+        self.actPixel1 = QAction(QIcon(), '1 Pixel', self)
+        self.actPixel1.setStatusTip('Use a single pixel as region.')
+        self.actPixel1.triggered.connect(lambda: self.togglePixelRegion(self.actPixel1))
+        self.actPixelnxn = QAction(QIcon(), '(n x n) Pixels', self)
+        self.actPixelnxn.setStatusTip('Use an (n x n) pixel region.')
+        self.actPixelnxn.triggered.connect(lambda: self.togglePixelRegion(self.actPixelnxn))
+        self.actPixel1deg = QAction(QIcon(), '1° Steridian Pixels', self)
+        self.actPixel1deg.setStatusTip('Use a 1° steridian pixel region.')
+        self.actPixel1deg.triggered.connect(lambda: self.togglePixelRegion(self.actPixel1deg))
+        self.actPixelMean = QAction(QIcon(), 'Mean Weighting', self)
+        self.actPixelMean.setCheckable(True)
+        self.actPixelMean.setStatusTip('Apply mean weighting to pixels.')
+        self.actPixelMean.triggered.connect(lambda: self.togglePixelWeighting(self.actPixelMean))
+        self.actPixelMedian = QAction(QIcon(), 'Median Weighting', self)
+        self.actPixelMedian.setCheckable(True)
+        self.actPixelMedian.setStatusTip('Apply median weighting to pixels.')
+        self.actPixelMedian.triggered.connect(lambda: self.togglePixelWeighting(self.actPixelMedian))
+        self.actPixelGaussian = QAction(QIcon(), 'Gaussian Weighting', self)
+        self.actPixelGaussian.setCheckable(True)
+        self.actPixelGaussian.setStatusTip('Apply Gaussian weighting to pixels.')
+        self.actPixelGaussian.triggered.connect(lambda: self.togglePixelWeighting(self.actPixelGaussian))
+        pixWeightGroup = QActionGroup(self)
+        pixWeightGroup.addAction(self.actPixelMean)
+        pixWeightGroup.addAction(self.actPixelMedian)
+        pixWeightGroup.addAction(self.actPixelGaussian)
+        pixWeight = PixelWeighting(self.settings["PixelWeighting"])
+        if (pixWeight == PixelWeighting.Mean):
+            self.actPixelMean.setChecked(True)
+        elif (pixWeight == PixelWeighting.Median):
+            self.actPixelMedian.setChecked(True)
+        elif (pixWeight == PixelWeighting.Gaussian):
+            self.actPixelGaussian.setChecked(True)
+
+        self.actExportSetup = QAction(QIcon(), 'Setup Export &File', self)
+        self.actExportSetup.setStatusTip('Setup export file')
+        self.actExportSetup.triggered.connect(self.setupExportFile)
 
         # help menu actions
         actAbout = QAction(QIcon(), '&About', self)
@@ -221,11 +259,22 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actSamples)
         menu.addAction(self.actUVGrid)
         menu = menubar.addMenu('&Samples')
-        menu.addAction(self.actExportSetup)
+        menu.addAction(self.actExportSelected)
         menu.addSeparator()
         menu.addAction(self.actSelectAll)
         menu.addAction(self.actClearAll)
-        menu.addAction(self.actExportSelected)
+        menu.addSeparator()
+        submenu = menu.addMenu('Pixel Region')
+        submenu.addAction(self.actPixel1)
+        submenu.addAction(self.actPixelnxn)
+        submenu.addAction(self.actPixel1deg)
+        submenu = menu.addMenu('Pixel Weighting')
+        submenu.addAction(self.actPixelMean)
+        submenu.addAction(self.actPixelMedian)
+        submenu.addAction(self.actPixelGaussian)
+        menu.addSeparator()
+        menu.addAction(self.actExportSetup)
+
         menu = menubar.addMenu('&Help')
         menu.addAction(actAbout)
 
@@ -625,7 +674,7 @@ class SkyDataViewer(QMainWindow):
             if (i >= len(self.captureTimeASDFiles)):
                 break
             xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[i])
-            self.wgtGraph.plot(y=ys, x=xs, pen=(i, len(indices)))
+            self.wgtGraph.plot(y=ys, x=xs, pen=self.wgtFisheye.getSamplePatternRGB(i)) # pen=(i, len(indices))
             #self.wgtGraph.addItem() # add a label/icon to graph with number of samples available
 
     def selectSamples(self, message):
@@ -647,22 +696,26 @@ class SkyDataViewer(QMainWindow):
         if (len(self.wgtFisheye.samplesSelected) <= 0): # nothing selected
             return
 
+        self.log("Exporting... ")
+
         # init / pre-compute
         delimiter = xoptions["Delimiter"]
+        pixregion = xoptions["PixelRegion"]
+        pixweight = PixelWeighting(xoptions["PixelWeighting"])
         points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
-        pixels = utility_data.imageRGBPixels(self.wgtFisheye.myPhotoPath, points)
+        pixels = utility_data.collectPixels(points, pixels=self.wgtFisheye.myPhotoPixels, region=pixregion, weighting=pixweight)
 
         # create file if not exists
         if (not os.path.exists(xoptions["Filename"])):
             # create dirs if not exists
             if (not os.path.exists(os.path.dirname(xoptions["Filename"]))):
                 os.makedirs(os.path.dirname(xoptions["Filename"]))
-            # open file and write header if user desires
+            # write header if user desires
             with open(xoptions["Filename"], "w") as file:
                 if (0 in xoptions["Attributes"]):  # header
                     for i in range(1, len(xoptions["Attributes"])):
                         attr = DialogExport.attributeFromIndex(xoptions["Attributes"][i])
-                        if (attr == "1Pixel"):
+                        if (attr == "PixelRGB"):
                             file.write("Red" + delimiter + "Green" + delimiter + "Blue" + delimiter)
                         elif (attr == "Radiance"):
                             for w in range(350, 2500):
@@ -710,12 +763,20 @@ class SkyDataViewer(QMainWindow):
                         file.write('{0:07.04f}'.format(angle[1]))
                         file.write(delimiter)
                     # export pixel
-                    elif (attr == "1Pixel"):
+                    elif (attr == "PixelRGB"):
                         file.write(str(pixels[i][0])) # red
                         file.write(delimiter)
                         file.write(str(pixels[i][1])) # green
                         file.write(delimiter)
                         file.write(str(pixels[i][2])) # blue
+                        file.write(delimiter)
+                    # export pixel neighborhood
+                    elif (attr == "PixelRegion"):
+                        file.write(str(xoptions["PixelRegion"]))
+                        file.write(delimiter)
+                    # export pixel weighting method
+                    elif (attr == "PixelWeighting"):
+                        file.write(str(xoptions["PixelWeighting"]))
                         file.write(delimiter)
                     # export solar radiance spectrum
                     elif (attr == "Radiance"):
@@ -727,6 +788,8 @@ class SkyDataViewer(QMainWindow):
 
                 # next sample
                 file.write("\n")
+
+        self.log("Exported " + str(len(self.wgtFisheye.samplesSelected)) + " sample(s)")
 
     def setupExportFile(self):
         dialog = DialogExport(self.settings["ExportOptions"])
@@ -799,6 +862,30 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.showSamples(state)
         self.wgtFisheye.repaint()
 
+    def togglePixelRegion(self, action):
+        region = 1 # n for (n x n) pixel region
+        ok = True
+
+        if (action == self.actPixel1):
+            region = 1
+        elif (action == self.actPixelnxn):
+            region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, DialogExport.MinPixelRegion, DialogExport.MaxPixelRegion, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+        elif (action == self.actPixel1deg):
+            region = 15
+
+        if ok and region >= 1 and region % 2 == 1:
+            self.wgtFisheye.setPixelRegion(region)
+        else:
+            QMessageBox.warning(self, "Input Validation", "Pixel Region must be an odd positive number.", QMessageBox.Ok)
+
+    def togglePixelWeighting(self, action):
+        if (action == self.actPixelMean):
+            self.wgtFisheye.setPixelWeighting(PixelWeighting.Mean)
+        elif (action == self.actPixelMedian):
+            self.wgtFisheye.setPixelWeighting(PixelWeighting.Median)
+        elif (action == self.actPixelGaussian):
+            self.wgtFisheye.setPixelWeighting(PixelWeighting.Gaussian)
+
     def center(self):
         frame = self.frameGeometry()
         centerPoint = QDesktopWidget().availableGeometry().center()
@@ -831,6 +918,8 @@ class SkyDataViewer(QMainWindow):
         self.settings["ShowSunPath"] = self.actSunPath.isChecked()
         self.settings["ShowSamples"] = self.actSamples.isChecked()
         self.settings["ShowUVGrid"] = self.actUVGrid.isChecked()
+        self.settings["PixelRegion"] = self.wgtFisheye.pixelRegion
+        self.settings["PixelWeighting"] = self.wgtFisheye.pixelWeighting.value
 
         # dump settings to file
         with open(self.settings["Filename"], 'w') as file:
