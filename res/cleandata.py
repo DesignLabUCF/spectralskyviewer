@@ -30,7 +30,8 @@ import os
 import shutil
 import argparse
 from datetime import datetime, timedelta
-# we need utility
+from PIL import Image
+# we need our utilities
 sys.path.insert(0, '../')
 import utility
 import utility_data
@@ -259,6 +260,34 @@ def HDRRenameFilesCounter(args):
         print("Rename: " + pName + "." + pExt + " to " + newName)
         if (not args.readonly):
             os.rename(p, os.path.join(os.path.dirname(p), newName))
+
+'''
+Function that rotate HDR photos by some specified degrees (+/-).
+This is useful an HDR image (or set of images in a capture) are offset by some rotation.
+:param args: ArgumentParser arguments parsed at program startup
+'''
+def HDRRotatePhotos(args):
+    print("Rotating photos in:\n" + args.directory)
+    # ensure directory exists
+    if (not os.path.exists(args.directory)):
+        return
+
+    # grab all photos
+    photos = utility.findFiles(args.directory, mode=1, recursive=True, ext=["jpg"]) # NOTE: .cr2 ignored atm!!
+    if (len(photos) <= 0):
+        print("No photos found in this directory.")
+        return
+    for p in photos:
+        # pName, pExt = os.path.basename(p).split(".")
+        # pNameNew = pName + "_new." + pExt
+        # pNew = os.path.join(os.path.dirname(p), pNameNew)
+        print("Rotate (" + str(args.hdrrotate) + "°): " + p)
+        if (not args.readonly):
+            img = Image.open(p)
+            dpi = img.info.get('dpi')
+            exif = img.info['exif']
+            img2 = img.rotate(args.hdrrotate)
+            img2.save(p, dpi=dpi, subsampling=-1, quality=100, exif=exif)
 
 '''
 Function that reorganizes HDR photos into capture directories (timestamps) based on a capture interval.
@@ -495,17 +524,21 @@ def main():
     parser = argparse.ArgumentParser(description='Script with tools to help reorganize a directory of sky data.', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_help = True
     parser.add_argument('directory', help='a directory to operate on')
+    # general arguments
     parser.add_argument('-r', '--readonly', dest='readonly', action='store_true', help='read only mode (no writes)', default=False)
     parser.add_argument('-l', '--listdirs', dest='listdirs', action='store_true', help='list sub dirs of directory', default=False)
     parser.add_argument('-t', '--timeoffset', dest='timeoffset', type=int, help='offset capture dirs by this number of hours +/-')
+    # specifies HDR or ASD operations
     parser.add_argument('-hdr', '--hdr', dest='hdr', action='store_true', help='HDR mode - working w/ HDR photos')
     parser.add_argument('-asd', '--asd', dest='asd', action='store_true', help='ASD mode - working w/ ASD files')
+    # arguments used by both HDR and ASD files/folders
     parser.add_argument('-d', '--renamedirs', dest='renamedirs', action='store_true', help='cleanup dir names', default=False)
     parser.add_argument('-f', '--renamefiles', dest='renamefiles', action='store_true', help='cleanup file names', default=False)
     parser.add_argument('-o', '--organize', dest='organize', action='store_true', help='organize files into dirs by capture interval', default=False)
     parser.add_argument('-n', '--interval', dest='interval', type=int, help='time interval between captures')
-    # HDR specific
+    # arguments specific to HDR
     parser.add_argument('-hc', '--hdrcounter', dest='hdrcounter', type=int, help='rename HDR photos starting from counter')
+    parser.add_argument('-hr', '--hdrrotate', dest='hdrrotate', type=int, help='rotate HDR photos by some +/- degrees')
     args = parser.parse_args()
 
     # file required as parameter
@@ -525,6 +558,8 @@ def main():
             HDRRenameFiles(args)
         elif (args.hdrcounter):
             HDRRenameFilesCounter(args)
+        elif (args.hdrrotate):
+            HDRRotatePhotos(args)
         elif (args.organize):
             HDROrganizePhotos(args)
     elif (args.asd):

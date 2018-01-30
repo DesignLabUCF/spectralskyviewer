@@ -329,12 +329,12 @@ class ViewFisheye(QWidget):
         if (event.buttons() == Qt.MidButton):
             old = (self.coordsMouse[0] - self.viewCenter[0], self.coordsMouse[1] - self.viewCenter[1])
             new = (event.x() - self.viewCenter[0], event.y() - self.viewCenter[1])
-            # clockwise drag increases rotation
+            # clockwise drag decreases rotation
             if (old[1]*new[0] < old[0]*new[1]):
-                self.myPhotoRotation += 1
-            # counter-clockwise drag decreases rotation
-            else:
                 self.myPhotoRotation -= 1
+            # counter-clockwise drag increases rotation
+            else:
+                self.myPhotoRotation += 1
             # rotation
             if (self.myPhotoRotation >= 0):
                 self.myPhotoRotation %= 360
@@ -580,7 +580,7 @@ class ViewFisheye(QWidget):
             # rotate and draw photo as specified by user
             transform = QTransform()
             transform.translate(self.myPhotoDestRect.center().x(), self.myPhotoDestRect.center().y())
-            transform.rotate(self.myPhotoRotation)
+            transform.rotate(-self.myPhotoRotation)
             transform.translate(-self.myPhotoDestRect.center().x(), -self.myPhotoDestRect.center().y())
             painter.setTransform(transform)
             painter.drawImage(self.myPhotoDestRect, self.myPhoto, self.myPhotoSrcRect) # draw it
