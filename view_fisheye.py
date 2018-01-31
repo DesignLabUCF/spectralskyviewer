@@ -737,16 +737,22 @@ class ViewFisheye(QWidget):
                     distance = math.sqrt((coordsUC[0] * coordsUC[0]) + (coordsUC[1] * coordsUC[1]))
 
                 # pixels colors
-                colorsRegion = np.array([[[0,0,0,255]]])
+                colorsRegion = np.zeros((self.pixelRegion, self.pixelRegion, 4))
                 colorFinal = colorsRegion[0,0] # RGBA of pixel under mouse of photo on disk
                 # colorFinal = self.myPhoto.pixelColor(coordsXY[0], coordsXY[1])
                 if (distance <= 1.0):
                     halfdim = int(self.pixelRegion / 2)
-                    colorsRegion = self.myPhotoPixels[coordsXY[1]-halfdim:coordsXY[1]+halfdim+1, coordsXY[0]-halfdim:coordsXY[0]+halfdim+1]
-                    colorFinal = colorsRegion[halfdim, halfdim]
-                    # pixel color weighting
-                    if self.pixelRegion > 1:
-                        colorFinal = utility_data.collectPixels([coordsXY], pixels=self.myPhotoPixels, region=self.pixelRegion, weighting=self.pixelWeighting)[0]
+                    rstart = coordsXY[1] - halfdim
+                    rstop = coordsXY[1]+halfdim+1
+                    cstart = coordsXY[0]-halfdim
+                    cstop = coordsXY[0]+halfdim+1
+                    if (rstart >= 0 and rstop<=self.myPhotoPixels.shape[0] and
+                        cstart >= 0 and cstop<=self.myPhotoPixels.shape[1]):
+                        colorsRegion = self.myPhotoPixels[rstart:rstop, cstart:cstop]
+                        colorFinal = colorsRegion[halfdim, halfdim]
+                        # pixel color weighting
+                        if self.pixelRegion > 1:
+                            colorFinal = utility_data.collectPixels([coordsXY], pixels=self.myPhotoPixels, region=self.pixelRegion, weighting=self.pixelWeighting)[0]
 
                 # text strings for information we want to display on HUD
                 textxy = "-1, -1 xy"
