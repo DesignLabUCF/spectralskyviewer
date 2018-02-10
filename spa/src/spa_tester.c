@@ -42,7 +42,7 @@ int main (int argc, char *argv[])
     spa.hour          = 12;
     spa.minute        = 30;
     spa.second        = 30;
-    spa.timezone      = -7.0;
+    spa.time_zone     = -7.0;
     spa.delta_ut1     = 0;
     spa.delta_t       = 67;
     spa.longitude     = -105.1786;

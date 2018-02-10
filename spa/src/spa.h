@@ -85,7 +85,8 @@ typedef struct
                          // where delta_t = 32.184 + (TAI-UTC) - DUT1
                          // valid range: -8000 to 8000 seconds, error code: 7
 
-    double timezone;     // Observer time zone (negative west of Greenwich)
+    //double timezone;
+	double time_zone;    // Observer time zone (negative west of Greenwich)
                          // valid range: -18   to   18 hours,   error code: 8
 
     double longitude;    // Observer longitude (negative west of Greenwich)

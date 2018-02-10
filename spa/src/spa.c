@@ -615,7 +615,7 @@ int validate_inputs(spa_data *spa)
     if ((spa->hour        == 24  ) && (spa->second      > 0   )) return 6;
 
     if (fabs(spa->delta_t)       > 8000    ) return 7;
-    if (fabs(spa->timezone)      > 18      ) return 8;
+    if (fabs(spa->time_zone)     > 18      ) return 8;
     if (fabs(spa->longitude)     > 180     ) return 9;
     if (fabs(spa->latitude)      > 90      ) return 10;
     if (fabs(spa->atmos_refract) > 5       ) return 16;
@@ -1070,10 +1070,10 @@ void calculate_eot_and_sun_rise_transit_set(spa_data *spa)
     spa->eot = eot(m, spa->alpha, spa->del_psi, spa->epsilon);
 
     sun_rts.hour = sun_rts.minute = sun_rts.second = 0;
-	sun_rts.delta_ut1 = sun_rts.timezone = 0.0;
+	sun_rts.delta_ut1 = sun_rts.time_zone = 0.0;
 
     sun_rts.jd = julian_day (sun_rts.year,   sun_rts.month,  sun_rts.day,       sun_rts.hour,
-		                     sun_rts.minute, sun_rts.second, sun_rts.delta_ut1, sun_rts.timezone);
+		                     sun_rts.minute, sun_rts.second, sun_rts.delta_ut1, sun_rts.time_zone);
 
     calculate_geocentric_sun_right_ascension_and_declination(&sun_rts);
     nu = sun_rts.nu;
@@ -1112,13 +1112,13 @@ void calculate_eot_and_sun_rise_transit_set(spa_data *spa)
         spa->sta  = h_rts[SUN_TRANSIT];
 
         spa->suntransit = dayfrac_to_local_hr(m_rts[SUN_TRANSIT] - h_prime[SUN_TRANSIT] / 360.0,
-                                              spa->timezone);
+                                              spa->time_zone);
 
         spa->sunrise = dayfrac_to_local_hr(sun_rise_and_set(m_rts, h_rts, delta_prime,
-                          spa->latitude, h_prime, h0_prime, SUN_RISE), spa->timezone);
+                          spa->latitude, h_prime, h0_prime, SUN_RISE), spa->time_zone);
 
         spa->sunset  = dayfrac_to_local_hr(sun_rise_and_set(m_rts, h_rts, delta_prime,
-                          spa->latitude, h_prime, h0_prime, SUN_SET),  spa->timezone);
+                          spa->latitude, h_prime, h0_prime, SUN_SET),  spa->time_zone);
 
     } else spa->srha= spa->ssha= spa->sta= spa->suntransit= spa->sunrise= spa->sunset= -99999;
 
@@ -1137,7 +1137,7 @@ int spa_calculate(spa_data *spa)
     if (result == 0)
     {
         spa->jd = julian_day (spa->year,   spa->month,  spa->day,       spa->hour,
-			                  spa->minute, spa->second, spa->delta_ut1, spa->timezone);
+			                  spa->minute, spa->second, spa->delta_ut1, spa->time_zone);
 
         calculate_geocentric_sun_right_ascension_and_declination(spa);
 
