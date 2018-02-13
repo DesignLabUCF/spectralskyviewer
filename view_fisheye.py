@@ -37,7 +37,28 @@ import utility
 import utility_angles
 import utility_data
 from utility_data import PixelWeighting
+import spa
 
+data = spa.spa_data()
+data.year          = 2003
+data.month         = 10
+data.day           = 17
+data.hour          = 12
+data.minute        = 30
+data.second        = 30
+data.time_zone     = -7.0
+data.delta_ut1     = 0
+data.delta_t       = 67
+data.longitude     = -105.1786
+data.latitude      = 39.742476
+data.elevation     = 1830.14
+data.pressure      = 820
+data.temperature   = 11
+data.slope         = 30
+data.azm_rotation  = -10
+data.atmos_refract = 0.5667
+data.function      = spa.SPA_ZA
+result = spa.spa_calculate(data)
 
 class ViewFisheye(QWidget):
     # sampling pattern: 81 samples (azimuth, altitude)
