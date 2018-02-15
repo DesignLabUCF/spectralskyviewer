@@ -27,6 +27,7 @@
 # ====================================================================
 import os
 import math
+import colorsys
 from enum import Enum
 from datetime import datetime
 from PyQt5.QtCore import Qt, QRect, QPoint, QPointF
@@ -160,7 +161,7 @@ class ViewFisheye(QWidget):
         self.sunPositionVisible = (0,0) # point (x,y) of sun location rendered on screen (scaled)
         self.sunPathPoints = []         # [(azimuth (theta), altitude (phi)(90-zenith), datetime)]
         self.compassTicks = []          # [[x1, y1, x2, y2, x1lbl, y1lbl, angle]]
-        self.sampleBoundsVisible = []   # bounds [x,y,w,h] of all samples on the photo rendered on screen (scaled)
+        self.sampleBoundsVisible = []   # bounds QRect(x,y,w,h) of all samples on the photo rendered on screen (scaled)
         self.samplePointsInFile = []    # points (x,y) of all samples in the photo on file
         self.samplesSelected = []       # indices of selected samples
         self.pixelRegion = 1
@@ -182,11 +183,12 @@ class ViewFisheye(QWidget):
 
         # init
         self.setMouseTracking(True)
-        rgbStride = 200 / len(ViewFisheye.SamplingPattern)
-        for i in range(0, len(ViewFisheye.SamplingPattern)):
+        color = QColor(255, 255, 255)
+        for t,p in ViewFisheye.SamplingPattern:
             self.sampleBoundsVisible.append(QRect(0, 0, 0, 0)) # these will need to be recomputed as photo scales
             self.samplePointsInFile.append((0, 0))             # these only need to be computed once per photo
-            self.penSelected.append(QPen(QColor(255, i * rgbStride + 55, 255), 3, Qt.SolidLine))
+            color.setHsv(t, int(utility.normalize(p, 0, 90)*127+128), 255)
+            self.penSelected.append(QPen(color, 3, Qt.SolidLine))
 
     def getSamplePatternRGB(self, index):
         if (index < 0 or index >= len(ViewFisheye.SamplingPattern)):
@@ -689,8 +691,9 @@ class ViewFisheye(QWidget):
                 # draw sampling pattern
                 if (self.enableSamples):
                     painter.setPen(self.penText)
-                    for r in self.sampleBoundsVisible:
+                    for i, r in enumerate(self.sampleBoundsVisible):
                         painter.drawEllipse(r)
+                        painter.drawText(r.x()-r.width(), r.y(), str(i))
 
                 # always draw selected samples
                 #painter.setPen(self.penSelected)
