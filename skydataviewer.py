@@ -35,6 +35,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtWidgets import qApp, QGraphicsPixmapItem
 import numpy as np
 import pyqtgraph as pg
+import spa
 import utility
 import utility_data
 from utility_data import PixelWeighting
@@ -97,6 +98,7 @@ class SkyDataViewer(QMainWindow):
         self.captureTimeHDRDirs = []  # some number of these per day
         self.captureTimeASDFiles = [] # length should be equal to sampling pattern length
         self.exposure = 0
+        self.spaData = spa.spa_data()
 
         # load settings
         self.settings = dict(SkyDataViewer.Settings)  # this must be first!
@@ -484,6 +486,9 @@ class SkyDataViewer(QMainWindow):
         if (len(captureDates) > 0):
             self.cbxDate.addItems(captureDates)
 
+        # load site info for SPA calculations
+        self.spaData = utility_data.loadSPASiteData(self.settings["DataDirectory"])
+
     def dateSelected(self, index):
         if (index < 0 or index >= self.cbxDate.count()):
             return
@@ -507,8 +512,17 @@ class SkyDataViewer(QMainWindow):
             QMessageBox.critical(self, "Error", "No HDR capture folders found.\nFormat is time of capture (e.g. 08.57.23).", QMessageBox.Ok)
             return
 
-        # load sun path for this capture date
-        sunpath = utility_data.loadSunPath(pathDate)
+        # cache capture datetime
+        captureStr = self.cbxDate.itemText(index) + " " + os.path.basename(self.captureTimeHDRDirs[0])
+        self.capture = datetime.strptime(captureStr, "%Y-%m-%d %H.%M.%S")
+        # print("date: " + str(self.capture))
+
+        # compute and apply sun path
+        data = utility_data.loadSPASiteData(pathDate) # reload site info per date directory if exists
+        if (data != None):
+            self.spaData = data
+        utility_data.fillSPADateTime(self.spaData, self.capture)
+        sunpath = utility_data.computeSunPath(self.spaData)
         self.wgtFisheye.setSunPath(sunpath)
 
         # update datetime panel
@@ -524,11 +538,6 @@ class SkyDataViewer(QMainWindow):
         self.cbxTime.blockSignals(False)
         self.sldTime.blockSignals(False)
         self.cbxExposure.blockSignals(False) # ok, we're ready
-
-        # cache capture datetime
-        captureStr = self.cbxDate.itemText(index) + " " + os.path.basename(self.captureTimeHDRDirs[0])
-        self.capture = datetime.strptime(captureStr, "%Y-%m-%d %H.%M.%S")
-        #print("date: " + str(self.capture))
 
         # trigger event for selecting first capture time
         self.sldTime.valueChanged.emit(0)
@@ -571,6 +580,12 @@ class SkyDataViewer(QMainWindow):
             self.wgtFisheye.repaint()
             return
 
+        # cache capture datetime
+        captureStr = str(self.capture.date()) + " " + os.path.basename(self.captureTimeHDRDirs[index])
+        self.capture = datetime.strptime(captureStr, "%Y-%m-%d %H.%M.%S")
+        # print("date: " + str(self.capture), widget)
+        self.statusBar().showMessage("Capture: " + str(self.capture) + ", Exposure: " + str(SkyDataViewer.Exposures[self.exposure]) + "s")
+
         # extract EXIF data from photo
         exif = utility_data.imageEXIF(photos[self.exposure])
         #exif = {k: v for k, v in exif.items() if k.startswith("EXIF")} # filter down to EXIF tags only
@@ -597,14 +612,11 @@ class SkyDataViewer(QMainWindow):
         self.tblEXIF.resizeColumnToContents(0)
 
         # render pane
+        utility_data.fillSPADateTime(self.spaData, self.capture)
+        sunpos = utility_data.computeSunPosition(self.spaData)
+        self.wgtFisheye.setSunPosition(sunpos)
         self.wgtFisheye.setPhoto(photos[self.exposure], exif=exif)
         self.wgtFisheye.repaint()
-
-        # cache capture datetime
-        captureStr = str(self.capture.date()) + " " + os.path.basename(self.captureTimeHDRDirs[index])
-        self.capture = datetime.strptime(captureStr, "%Y-%m-%d %H.%M.%S")
-        #print("date: " + str(self.capture), widget)
-        self.statusBar().showMessage("Capture: " + str(self.capture) + ", Exposure: " + str(SkyDataViewer.Exposures[self.exposure]) + "s")
 
         # find ASD data path
         pathDate = os.path.join(self.settings["DataDirectory"], str(self.capture.date()))

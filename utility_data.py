@@ -28,11 +28,13 @@
 import math
 import os
 import csv
+import copy
 from datetime import datetime
 from enum import Enum
 import numpy as np
 from PIL import Image
 import exifread
+import spa
 
 
 HDRRawExts = ['.cr2', '.raw', '.dng']
@@ -186,23 +188,173 @@ def isHDRRawAvailable(hdrImgPath):
     return False
 
 '''
-Function to load a solar position file exported from NREL's SPA website.
+Function to load a file with data used for NREL SPA's algorithm.
+:param filepath: Path to file with SPA data
+:param isDir: If filepath specified is a directory, then filename is assumed to be 'spa.csv'
+:note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
+:note: File format should be a CSV with the following columns: key, value, min, max, units, description.
+       Each key is a field needed to compute SPA.
+:return: A filled in spa.spa_data object.
+'''
+def loadSPASiteData(filepath, isDir=True):
+    if (isDir):
+        filepath = os.path.join(filepath, 'spa.csv') # assumes this filename if dir specified
+    if (not os.path.exists(filepath)):
+        return None
+
+    # create spa data and fill with default values from their example
+    data = spa.spa_data()
+    data.year = 2003
+    data.month = 10
+    data.day = 17
+    data.hour = 12
+    data.minute = 30
+    data.second = 30
+    data.time_zone = -7.0
+    data.delta_ut1 = 0
+    data.delta_t = 67
+    data.longitude = -105.1786
+    data.latitude = 39.742476
+    data.elevation = 1830.14
+    data.pressure = 820
+    data.temperature = 11
+    data.slope = 30
+    data.azm_rotation = -10
+    data.atmos_refract = 0.5667
+    data.function = spa.SPA_ZA
+
+    # overwrite with values read from spa site info
+    with open(filepath, 'r') as f:
+        reader = csv.reader(f, delimiter=',')
+        next(reader, None) # ignore header
+        for row in reader:
+            if row[0].lower() == "time_zone":
+                data.time_zone = float(row[1])
+            elif row[0].lower() == "delta_ut1":
+                data.delta_ut1 = float(row[1])
+            elif row[0].lower() == "delta_t":
+                data.delta_t = float(row[1])
+            elif row[0].lower() == "longitude":
+                data.longitude = float(row[1])
+            elif row[0].lower() == "latitude":
+                data.latitude = float(row[1])
+            elif row[0].lower() == "elevation":
+                data.elevation = float(row[1])
+            elif row[0].lower() == "pressure":
+                data.pressure = float(row[1])
+            elif row[0].lower() == "temperature":
+                data.temperature = float(row[1])
+            elif row[0].lower() == "slope":
+                data.slope = float(row[1])
+            elif row[0].lower() == "azm_rotation":
+                data.azm_rotation = float(row[1])
+            elif row[0].lower() == "atmos_refract":
+                data.atmos_refract = float(row[1])
+
+    return data
+
+'''
+Function to deep copy a spa_data object. This function is useful because SWIG didn't create pickling code for deep copy.
+:param src: source spa_data object
+:note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
+:return: A destination spa_data object
+'''
+def deepcopySPAData(src):
+    dest = spa.spa_data()
+    # input values
+    dest.year = src.year
+    dest.month = src.month
+    dest.day = src.day
+    dest.hour = src.hour
+    dest.minute = src.minute
+    dest.second = src.second
+    dest.time_zone = src.time_zone
+    dest.delta_ut1 = src.delta_ut1
+    dest.delta_t = src.delta_t
+    dest.longitude = src.longitude
+    dest.latitude = src.latitude
+    dest.elevation = src.elevation
+    dest.pressure = src.pressure
+    dest.temperature = src.temperature
+    dest.slope = src.slope
+    dest.azm_rotation = src.azm_rotation
+    dest.atmos_refract = src.atmos_refract
+    dest.function = src.function
+    # intermediate values not important
+    # output values
+    dest.zenith = src.zenith
+    dest.azimuth_astro = src.azimuth_astro
+    dest.azimuth = src.azimuth
+    dest.incidence = src.incidence
+    dest.suntransit = src.suntransit
+    dest.sunrise = src.sunrise
+    dest.sunset = src.sunset
+    return dest
+
+'''
+Function to fill a spa_data object from NREL SPA with specified date and time.
+:param spadata: spa_data object
+:param dt: datetime object
+:note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
+'''
+def fillSPADateTime(spadata, dt):
+    if (spadata == None or dt == None):
+        return
+    spadata.year = dt.year
+    spadata.month = dt.month
+    spadata.day = dt.day
+    spadata.hour = dt.hour
+    spadata.minute = dt.minute
+    spadata.second = dt.second
+
+'''
+Function to compute the (azimuth, altitude) position of the sun using NREL SPA.
+:param spadata: spa_data object with site info and date
+:note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
+:return: A single (azimuth, altitude) tuple of solar position.
+'''
+def computeSunPosition(spadata):
+    spa.spa_calculate(spadata)
+    altitude = 90 - spadata.zenith # this application uses altitude (90 - zenith)
+    return (spadata.azimuth, altitude)
+
+'''
+Function to compute the (azimuth, altitude) points above horizon for each hour of the day using NREL SPA.
+:param spadata: spa_data object with site info and date
+:note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
+:return: A list of (azimuth, altitude, datetime) tuples with solar position and timestamp
+'''
+def computeSunPath(spadata):
+    sunpath = []
+    spadata2 = deepcopySPAData(spadata)
+    spadata2.function = spa.SPA_ZA
+    spadata2.minute = 0
+    spadata2.second = 0
+    # for each hour of the day, compute a sunpath point
+    for i in range(0, 24):
+        spadata2.hour = i
+        spa.spa_calculate(spadata2)
+        altitude = 90 - spadata2.zenith # this application uses altitude (90 - zenith)
+        # we only care about altitude when sun is visible (not on other side of Earth)
+        if (altitude >= 0 and altitude <= 90):
+            dt = datetime(spadata2.year, spadata2.month, spadata2.day, spadata2.hour, spadata2.minute, int(spadata2.second))
+            sunpath.append((spadata2.azimuth, altitude, dt))
+    return sunpath
+
+'''
+Function to load a solar position (sunpath) file exported from NREL's SPA calculator online.
 :param filepath: Path to file with SPA data
 :param isDir: If filepath specified is a directory, then filename is assumed to be 'spa.csv'
 :note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
 :note: File format should be a CSV with the following columns:
        Date, Time, Topocentric zenith angle, Topocentric azimuth angle (eastward from N)
-:return: A list of (azimuth, altitude, datetime) tuples of solar position and timestamp
+:return: A list of (azimuth, altitude, datetime) tuples with solar position and timestamp
 '''
 def loadSunPath(filepath, isDir=True):
     if (isDir):
         filepath = os.path.join(filepath, 'spa.csv') # assumes this filename if dir specified
     if (not os.path.exists(filepath)):
         return []
-
-    # we will swap the order of (zenith, azimuth) to be consistent with rest of program (azimuth, altitude)
-    # altitude (90 - zenith)
-
     sunpath = []
     with open(filepath, 'r') as f:
         reader = csv.reader(f, delimiter=',')
@@ -215,6 +367,8 @@ def loadSunPath(filepath, isDir=True):
                 dt = datetime.strptime(dts, "%m/%d/%Y %H:%M:%S")
             except ValueError:
                 continue
+            # swap the order of (zenith, azimuth) to (azimuth, zenith) for consistency throughout application
+            # this application uses altitude (90 - zenith)
             point = (float(row[3]), 90-float(row[2]), dt)
             # we only care about altitude when sun is visible (not on other side of Earth)
             if (point[1] >=0 and point[1] <= 90):

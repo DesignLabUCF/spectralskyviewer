@@ -39,27 +39,6 @@ import utility_data
 from utility_data import PixelWeighting
 import spa
 
-data = spa.spa_data()
-data.year          = 2003
-data.month         = 10
-data.day           = 17
-data.hour          = 12
-data.minute        = 30
-data.second        = 30
-data.time_zone     = -7.0
-data.delta_ut1     = 0
-data.delta_t       = 67
-data.longitude     = -105.1786
-data.latitude      = 39.742476
-data.elevation     = 1830.14
-data.pressure      = 820
-data.temperature   = 11
-data.slope         = 30
-data.azm_rotation  = -10
-data.atmos_refract = 0.5667
-data.function      = spa.SPA_ZA
-result = spa.spa_calculate(data)
-
 class ViewFisheye(QWidget):
     # sampling pattern: 81 samples (azimuth, altitude)
     SamplingPattern = (
@@ -177,11 +156,13 @@ class ViewFisheye(QWidget):
         self.coordsMouse = (0, 0)
         self.viewCenter = (0, 0)
         self.dragSelectRect = QRect(0, 0, 0, 0)
-        self.sunPathPoints = []       # [azimuth (theta), altitude (90-zenith)(phi), datetime]
-        self.compassTicks = []        # [x1, y1, x2, y2, x1lbl, y1lbl, angle]
-        self.sampleBoundsVisible = [] # bounds [x,y,w,h] of all samples on the photo rendered on screen (scaled)
-        self.samplePointsInFile = []  # points (x,y) of all samples in the photo on file
-        self.samplesSelected = []     # indices of selected samples
+        self.sunPosition = (0, 0)       # (azimuth (theta), altitude (phi)(90-zenith))
+        self.sunPositionVisible = (0,0) # point (x,y) of sun location rendered on screen (scaled)
+        self.sunPathPoints = []         # [(azimuth (theta), altitude (phi)(90-zenith), datetime)]
+        self.compassTicks = []          # [[x1, y1, x2, y2, x1lbl, y1lbl, angle]]
+        self.sampleBoundsVisible = []   # bounds [x,y,w,h] of all samples on the photo rendered on screen (scaled)
+        self.samplePointsInFile = []    # points (x,y) of all samples in the photo on file
+        self.samplesSelected = []       # indices of selected samples
         self.pixelRegion = 1
         self.pixelWeighting = PixelWeighting.Mean
 
@@ -267,6 +248,9 @@ class ViewFisheye(QWidget):
 
     def setSunPath(self, sunpath):
         self.sunPathPoints = sunpath
+
+    def setSunPosition(self, pos):
+        self.sunPosition = pos
 
     def resetRotation(self, angles=0):
         self.myPhotoRotation = angles
@@ -554,7 +538,8 @@ class ViewFisheye(QWidget):
             ly1 = math.sin(rads) * (self.myPhotoRadius - labelOffset) + self.viewCenter[1] - fontSize
             self.compassTicks.append([cx1, cy1, cx2, cy2, lx1, ly1, angle]) # x1, y1, x2, y2, x1lbl, y1lbl, angle
 
-        # compute sun path
+        # compute sun path screen points
+        # v = 0.7159*u - 0.0048*math.pow(u, 2) - 0.032*math.pow(u, 3) + 0.0021*math.pow(u, 4)
         self.pathSun = QPainterPath()
         if (len(self.sunPathPoints) > 0):
             t, p, dt = self.sunPathPoints[0]
@@ -570,6 +555,14 @@ class ViewFisheye(QWidget):
                 x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
                 y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
                 self.pathSun.lineTo(x, y)
+
+        # compute sun position screen point
+        t, p = self.sunPosition
+        t, p = utility_angles.FisheyeAngleWarp(t, p, inRadians=False)
+        u, v = utility_angles.GetUVFromAngle(t, p, inRadians=False)
+        x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
+        y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
+        self.sunPositionVisible = (x, y)
 
         # compute new mask
         self.mask = QPixmap(self.width(), self.height()).toImage()
@@ -657,11 +650,14 @@ class ViewFisheye(QWidget):
                 # draw sun path
                 if (self.enableSunPath):
                     painter.setPen(self.penSun)
+                    sunradius = self.myPhotoRadius*0.1
+                    painter.drawEllipse(self.sunPositionVisible[0]-sunradius/2, self.sunPositionVisible[1]-sunradius/2, sunradius, sunradius)
                     painter.drawPath(self.pathSun)
                     for i in range(0, self.pathSun.elementCount()):
                         e = self.pathSun.elementAt(i)
                         destRect.moveTo(e.x, e.y + 5)
-                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.sunPathPoints[i][2].hour))
+                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft,
+                                         str(self.sunPathPoints[i][2].hour))
 
                 # draw compass
                 if (self.enableCompass):
