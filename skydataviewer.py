@@ -716,6 +716,7 @@ class SkyDataViewer(QMainWindow):
         pixweight = PixelWeighting(xoptions["PixelWeighting"])
         points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
         pixels = utility_data.collectPixels(points, pixels=self.wgtFisheye.myPhotoPixels, region=pixregion, weighting=pixweight)
+        sunpos = utility_data.computeSunPosition(self.spaData)
 
         # create file if not exists
         if (not os.path.exists(xoptions["Filename"])):
@@ -756,6 +757,14 @@ class SkyDataViewer(QMainWindow):
                     elif (attr == "Time"):
                         file.write(str(self.capture.time()))
                         file.write(delimiter)
+                    # export sun azimuth
+                    elif (attr == "SunAzimuth"):
+                        file.write('{0:07.04f}'.format(sunpos[0]))
+                        file.write(delimiter)
+                    # export sun altitude
+                    elif (attr == "SunAltitude"):
+                        file.write('{0:07.04f}'.format(sunpos[1]))
+                        file.write(delimiter)
                     # export exposure time
                     elif (attr == "Exposure"):
                         file.write(str(SkyDataViewer.Exposures[self.exposure]))
@@ -764,13 +773,13 @@ class SkyDataViewer(QMainWindow):
                     elif (attr == "SamplePatternIndex"):
                         file.write(str(sIdx))
                         file.write(delimiter)
-                    # export azimuth
-                    elif (attr == "Azimuth"):
+                    # export sample azimuth
+                    elif (attr == "SampleAzimuth"):
                         angle = ViewFisheye.SamplingPattern[sIdx]
-                        file.write('{0:06.02f}'.format(angle[0]))
+                        file.write('{0:07.04f}'.format(angle[0]))
                         file.write(delimiter)
-                    # export altitude
-                    elif (attr == "Altitude"):
+                    # export sample altitude
+                    elif (attr == "SampleAltitude"):
                         angle = ViewFisheye.SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(angle[1]))
                         file.write(delimiter)

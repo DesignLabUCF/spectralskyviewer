@@ -41,14 +41,16 @@ class DialogExport(QDialog):
         ("Header",              "Header Row"),
         ("Date",                "Date of Capture"),
         ("Time",                "Time of Capture"),
-        ("Exposure",            "Exposure Time (s)"),
+        ("SunAzimuth",          "Sun Azimuth (East from North)"),
+        ("SunAltitude",         "Sun Altitude (90 - Zenith)"),
+        ("Exposure",            "Photo Exposure Time (s)"),
         ("SamplePatternIndex",  "Sample Pattern Index"),
-        ("Azimuth",             "Azimuth (East from North)"),
-        ("Altitude",            "Altitude (90 - Zenith)"),
+        ("SampleAzimuth",       "Sample Azimuth (East from North)"),
+        ("SampleAltitude",      "Sample Altitude (90 - Zenith)"),
         ("PixelRGB",            "Sample Pixel RGB Channels"),
-        ("PixelRegion",         "Region of Pixels Used Per Sample"),
-        ("PixelWeighting",      "Pixel Weighting Used Per Sample"),
-        ("Radiance",            "Radiance (W/m²/sr) Per Wavelength (350-2500nm)"),
+        ("PixelRegion",         "Sample Pixel Kernel Size (n x n)"),
+        ("PixelWeighting",      "Sample Pixel Weighting Algorithm"),
+        ("Radiance",            "Sample Radiance (W/m²/sr) Per Wavelength (350-2500nm)"),
     ]
 
     # default export options
@@ -57,7 +59,7 @@ class DialogExport(QDialog):
         "Delimiter": ",",
         "PixelRegion": utility_data.PixelRegionMin,
         "PixelWeighting": PixelWeighting.Mean.value,
-        "Attributes": [0, 1, 2, 5, 6, 7, 10]
+        "Attributes": [0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12]
     }
 
     @staticmethod
