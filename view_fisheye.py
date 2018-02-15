@@ -303,22 +303,6 @@ class ViewFisheye(QWidget):
         self.repaint()
         self.parent.graphSamples(self.samplesSelected)
 
-    def mousePressEvent(self, event):
-        # nothing to do if no photo loaded
-        if (self.myPhoto.isNull()):
-            return
-        # we only care about a left click for point and drag selection
-        # right click is for context menu - handled elsewhere
-        # middle click is for rotation - handled elsewhere
-        if (event.buttons() != Qt.LeftButton):
-            return
-
-        # start logging drag selection (whether user drags or not)
-        self.dragSelectRect.setX(event.x())
-        self.dragSelectRect.setY(event.y())
-        self.dragSelectRect.setWidth(0)
-        self.dragSelectRect.setHeight(0)
-
     def mouseMoveEvent(self, event):
         # nothing to do if no photo loaded
         if (self.myPhoto.isNull()):
@@ -331,7 +315,7 @@ class ViewFisheye(QWidget):
             self.dragSelectRect.setHeight(event.y() - self.dragSelectRect.y())
 
         # detect middle mouse button drag for image rotation
-        if (event.buttons() == Qt.MidButton):
+        elif (event.buttons() == Qt.MidButton):
             old = (self.coordsMouse[0] - self.viewCenter[0], self.coordsMouse[1] - self.viewCenter[1])
             new = (event.x() - self.viewCenter[0], event.y() - self.viewCenter[1])
             # clockwise drag decreases rotation
@@ -349,6 +333,22 @@ class ViewFisheye(QWidget):
         # lastly, cache mouse coordinates and update
         self.coordsMouse = (event.x(), event.y())
         self.repaint()
+
+    def mousePressEvent(self, event):
+        # nothing to do if no photo loaded
+        if (self.myPhoto.isNull()):
+            return
+        # we only care about a left click for point and drag selection
+        # right click is for context menu - handled elsewhere
+        # middle click is for rotation - handled elsewhere
+        if (event.buttons() != Qt.LeftButton):
+            return
+
+        # start logging drag selection (whether user drags or not)
+        self.dragSelectRect.setX(event.x())
+        self.dragSelectRect.setY(event.y())
+        self.dragSelectRect.setWidth(0)
+        self.dragSelectRect.setHeight(0)
 
     def mouseReleaseEvent(self, event):
         # nothing to do if no photo loaded
@@ -387,6 +387,13 @@ class ViewFisheye(QWidget):
             self.repaint()
             if (self.samplesSelected != prevSelected):
                 self.parent.graphSamples(self.samplesSelected)
+
+    def wheelEvent(self, event):
+        # nothing to do if no photo loaded
+        if (self.myPhoto.isNull()):
+            return
+
+        self.parent.timeChangeWheelEvent(event)
 
     def leaveEvent(self, event):
         self.coordsMouse = (-1, -1)

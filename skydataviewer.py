@@ -663,6 +663,9 @@ class SkyDataViewer(QMainWindow):
         # graph ASD data
         self.graphSamples(self.wgtFisheye.samplesSelected)
 
+    def timeChangeWheelEvent(self, event):
+        self.sldTime.event(event)
+
     def exposureSelected(self, index):
         index -= 1 # -1 because combobox first element is not a valid value
         self.exposure = index
