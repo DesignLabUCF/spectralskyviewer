@@ -517,6 +517,32 @@ def ASDOrganizeFiles(args):
         for f in filesToMove:
             shutil.move(f[0], f[1])
 
+'''
+Function to create an .asd.rad.txt file filled with a specified literal value. 
+:note: This is only useful if the .asd.rad.txt file couldn't be generated properly (e.g. .asd file is corrupt, etc.)   
+'''
+def ASDFillFile(args):
+    print("Creating new ASD file in:\n" + args.directory)
+    # ensure directory exists
+    if (not os.path.exists(args.directory)):
+        return
+
+    # generate filename for new file
+    root, ext = "fake", ".asd.rad.txt"
+    filename = os.path.join(args.directory, root + ext)
+    counter = 1
+    while (os.path.exists(filename)):
+        filename = os.path.join(args.directory, root + str(counter) + ext)
+        counter += 1
+
+    print("Creating new ASD file:\n" + filename)
+    if (not args.readonly):
+        with open(filename, "w") as file:
+            file.write("Wavelength\t0000-00-00___00.00.00_-_00_000.00_00.0000_.asd.rad\n")
+            for wavelength in range(350, 2501):
+                file.write(str(wavelength) + "\t " + str(args.asdfill) + " \n")
+            file.close()
+
 #---------------------------------------------------------------------
 
 def main():
@@ -539,6 +565,8 @@ def main():
     # arguments specific to HDR
     parser.add_argument('-hc', '--hdrcounter', dest='hdrcounter', type=int, help='rename HDR photos starting from counter')
     parser.add_argument('-hr', '--hdrrotate', dest='hdrrotate', type=int, help='rotate HDR photos by some +/- degrees')
+    # arguments specific to ASD
+    parser.add_argument('-af', '--asdfill', dest='asdfill', type=float, help='fill a new .asd.rad.txt file w/ literal')
     args = parser.parse_args()
 
     # file required as parameter
@@ -569,6 +597,8 @@ def main():
             ASDRenameFiles(args)
         elif (args.organize):
             ASDOrganizeFiles(args)
+        elif (args.asdfill):
+            ASDFillFile(args)
 
 
 if __name__ == "__main__":
