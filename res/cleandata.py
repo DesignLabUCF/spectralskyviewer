@@ -155,6 +155,14 @@ def OffsetCaptureTimes(args):
         print("No capture time directories found.")
         return
 
+    # prevent collisions between directories with the same name
+    # sort directories ascending when timeoffset is negative
+    if args.timeoffset < 0:
+        timeDirs.sort()
+    # sort directories descending when timeoffset is positive
+    elif args.timeoffset > 0:
+        timeDirs.sort(reverse=True)
+
     # for each timestamp directory
     for dir in timeDirs:
         oldname = os.path.basename(dir)
@@ -522,7 +530,7 @@ Function to create an .asd.rad.txt file filled with a specified literal value.
 :note: This is only useful if the .asd.rad.txt file couldn't be generated properly (e.g. .asd file is corrupt, etc.)   
 '''
 def ASDFillFile(args):
-    print("Creating new ASD file in:\n" + args.directory)
+    #print("Creating new ASD file in:\n" + args.directory)
     # ensure directory exists
     if (not os.path.exists(args.directory)):
         return
@@ -561,7 +569,7 @@ def main():
     parser.add_argument('-d', '--renamedirs', dest='renamedirs', action='store_true', help='cleanup dir names', default=False)
     parser.add_argument('-f', '--renamefiles', dest='renamefiles', action='store_true', help='cleanup file names', default=False)
     parser.add_argument('-o', '--organize', dest='organize', action='store_true', help='organize files into dirs by capture interval', default=False)
-    parser.add_argument('-n', '--interval', dest='interval', type=int, help='time interval between captures')
+    parser.add_argument('-n', '--interval', dest='interval', type=int, help='time interval (in minutes) between captures')
     # arguments specific to HDR
     parser.add_argument('-hc', '--hdrcounter', dest='hdrcounter', type=int, help='rename HDR photos starting from counter')
     parser.add_argument('-hr', '--hdrrotate', dest='hdrrotate', type=int, help='rotate HDR photos by some +/- degrees')
