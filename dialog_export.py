@@ -29,35 +29,16 @@ import os
 from PyQt5.QtGui import QIcon, QStandardItem, QStandardItemModel
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
-import utility_data
-from utility_data import PixelWeighting
+from common import *
 
 
 class DialogExport(QDialog):
-
-    # export attributes
-    ExportAttributes = [
-        # column name           description
-        ("Header",              "Header Row"),
-        ("Date",                "Date of Capture"),
-        ("Time",                "Time of Capture"),
-        ("SunAzimuth",          "Sun Azimuth (East from North)"),
-        ("SunAltitude",         "Sun Altitude (90 - Zenith)"),
-        ("Exposure",            "Photo Exposure Time (s)"),
-        ("SamplePatternIndex",  "Sample Pattern Index"),
-        ("SampleAzimuth",       "Sample Azimuth (East from North)"),
-        ("SampleAltitude",      "Sample Altitude (90 - Zenith)"),
-        ("PixelRGB",            "Sample Pixel RGB Channels"),
-        ("PixelRegion",         "Sample Pixel Kernel Size (n x n)"),
-        ("PixelWeighting",      "Sample Pixel Weighting Algorithm"),
-        ("Radiance",            "Sample Radiance (W/m²/sr) Per Wavelength (350-2500nm)"),
-    ]
 
     # default export options
     ExportOptions = {
         "Filename": "",
         "Delimiter": ",",
-        "PixelRegion": utility_data.PixelRegionMin,
+        "PixelRegion": PixelRegionMin,
         "PixelWeighting": PixelWeighting.Mean.value,
         "Attributes": [0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12]
     }
@@ -73,7 +54,7 @@ class DialogExport(QDialog):
 
     @staticmethod
     def attributeFromIndex(index):
-        return DialogExport.ExportAttributes[index][0]
+        return ExportAttributes[index][0]
 
     def __init__(self, options=None):
         super().__init__(None, Qt.WindowSystemMenuHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
@@ -148,7 +129,7 @@ class DialogExport(QDialog):
         self.cbxPixelRegion = QComboBox()
         self.cbxPixelRegion.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         #self.cbxPixelRegion.currentIndexChanged.connect(self.pixelRegionEntered)
-        self.cbxPixelRegion.addItems([str(x) for x in range(utility_data.PixelRegionMin,utility_data.PixelRegionMax+1,2)])
+        self.cbxPixelRegion.addItems([str(x) for x in range(PixelRegionMin, PixelRegionMax+1,2)])
         boxPixelRegion = QHBoxLayout()
         boxPixelRegion.addWidget(self.cbxPixelRegion)
         grpPixelRegion = QGroupBox("(n x n) Pixel Region:", self)
@@ -170,8 +151,8 @@ class DialogExport(QDialog):
         # attributes
         self.lstAttributes = QListView()
         model = QStandardItemModel()
-        for i in range(0, len(DialogExport.ExportAttributes)):
-            item = QStandardItem(DialogExport.ExportAttributes[i][1])
+        for i in range(0, len(ExportAttributes)):
+            item = QStandardItem(ExportAttributes[i][1])
             item.setCheckable(True)
             if (i in self.exportOptions["Attributes"]):
                 item.setCheckState(Qt.Checked)

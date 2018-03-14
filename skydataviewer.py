@@ -33,29 +33,16 @@ from PyQt5.QtCore import QCoreApplication, Qt, QDir
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import *
 from PyQt5.QtWidgets import qApp, QGraphicsPixmapItem
-import numpy as np
 import pyqtgraph as pg
+from common import *
 import spa
 import utility
 import utility_data
-from utility_data import PixelWeighting
 from view_fisheye import ViewFisheye
 from dialog_export import DialogExport
 
 
 class SkyDataViewer(QMainWindow):
-    # exposure times of the HDR data (in seconds)
-    Exposures = (
-        0.000125,
-        0.001000,
-        0.008000,
-        0.066000,
-        0.033000,
-        0.250000,
-        1.000000,
-        2.000000,
-        4.000000,
-    )
 
     # ASD graph settings
     XAxisMin = 0
@@ -187,20 +174,6 @@ class SkyDataViewer(QMainWindow):
         self.actUVGrid.setChecked(self.settings["ShowUVGrid"])
         self.actUVGrid.setStatusTip('Toggle display of UV grid')
         self.actUVGrid.triggered.connect(self.toggleUVGrid)
-
-        # sky sample menu actions
-        self.actExportSelected = QAction(QIcon(), '&Export Selected', self)
-        self.actExportSelected.setShortcut('Ctrl+E')
-        self.actExportSelected.setStatusTip('Export selected samples')
-        self.actExportSelected.setEnabled(False)
-        self.actExportSelected.triggered.connect(lambda: self.exportSamples('selected'))
-        self.actSelectAll = QAction(QIcon(), 'Select &All', self)
-        self.actSelectAll.setShortcut('Ctrl+A')
-        self.actSelectAll.setStatusTip('Select all samples')
-        self.actSelectAll.triggered.connect(lambda: self.selectSamples('all'))
-        self.actClearAll = QAction(QIcon(), '&Clear All', self)
-        self.actClearAll.setStatusTip('Clear selected samples')
-        self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
         self.actPixel1 = QAction(QIcon(), '1 Pixel', self)
         self.actPixel1.setStatusTip('Use a single pixel as region.')
         self.actPixel1.triggered.connect(lambda: self.togglePixelRegion(self.actPixel1))
@@ -234,9 +207,25 @@ class SkyDataViewer(QMainWindow):
         elif (pixWeight == PixelWeighting.Gaussian):
             self.actPixelGaussian.setChecked(True)
 
+        # sky sample menu actions
         self.actExportSetup = QAction(QIcon(), 'Setup Export &File', self)
         self.actExportSetup.setStatusTip('Setup export file')
         self.actExportSetup.triggered.connect(self.setupExportFile)
+        self.actExportSelected = QAction(QIcon(), '&Export Selected', self)
+        self.actExportSelected.setShortcut('Ctrl+E')
+        self.actExportSelected.setStatusTip('Export selected samples')
+        self.actExportSelected.setEnabled(False)
+        self.actExportSelected.triggered.connect(lambda: self.exportSamples('selected'))
+        self.actSelectAll = QAction(QIcon(), 'Select &All', self)
+        self.actSelectAll.setShortcut('Ctrl+A')
+        self.actSelectAll.setStatusTip('Select all samples')
+        self.actSelectAll.triggered.connect(lambda: self.selectSamples('all'))
+        self.actClearAll = QAction(QIcon(), '&Clear All', self)
+        self.actClearAll.setStatusTip('Clear selected samples')
+        self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
+        self.actSampleConverter = QAction(QIcon(), 'Sample &Converter', self)
+        self.actSampleConverter.setStatusTip('Re-export samples with different properties')
+        self.actSampleConverter.triggered.connect(self.convertSamples)
 
         # help menu actions
         actAbout = QAction(QIcon(), '&About', self)
@@ -260,11 +249,6 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actSunPath)
         menu.addAction(self.actSamples)
         menu.addAction(self.actUVGrid)
-        menu = menubar.addMenu('&Samples')
-        menu.addAction(self.actExportSelected)
-        menu.addSeparator()
-        menu.addAction(self.actSelectAll)
-        menu.addAction(self.actClearAll)
         menu.addSeparator()
         submenu = menu.addMenu('Pixel Region')
         submenu.addAction(self.actPixel1)
@@ -274,8 +258,14 @@ class SkyDataViewer(QMainWindow):
         submenu.addAction(self.actPixelMean)
         submenu.addAction(self.actPixelMedian)
         submenu.addAction(self.actPixelGaussian)
-        menu.addSeparator()
+        menu = menubar.addMenu('&Samples')
         menu.addAction(self.actExportSetup)
+        menu.addAction(self.actExportSelected)
+        menu.addSeparator()
+        menu.addAction(self.actSelectAll)
+        menu.addAction(self.actClearAll)
+        menu.addSeparator()
+        menu.addAction(self.actSampleConverter)
 
         menu = menubar.addMenu('&Help')
         menu.addAction(actAbout)
@@ -423,7 +413,7 @@ class SkyDataViewer(QMainWindow):
         self.cbxTime.addItem("-time-")
         self.cbxExposure.clear()
         self.cbxExposure.addItem("-exposure-")
-        self.cbxExposure.addItems([str(x) for x in SkyDataViewer.Exposures])
+        self.cbxExposure.addItems([str(x) for x in Exposures])
         self.exposure = -1
         self.sldTime.setRange(0, 0)
         self.tblEXIF.clearContents()
@@ -584,7 +574,7 @@ class SkyDataViewer(QMainWindow):
         captureStr = str(self.capture.date()) + " " + os.path.basename(self.captureTimeHDRDirs[index])
         self.capture = datetime.strptime(captureStr, "%Y-%m-%d %H.%M.%S")
         # print("date: " + str(self.capture), widget)
-        self.statusBar().showMessage("Capture: " + str(self.capture) + ", Exposure: " + str(SkyDataViewer.Exposures[self.exposure]) + "s")
+        self.statusBar().showMessage("Capture: " + str(self.capture) + ", Exposure: " + str(Exposures[self.exposure]) + "s")
 
         # extract EXIF data from photo
         exif = utility_data.imageEXIF(photos[self.exposure])
@@ -768,31 +758,23 @@ class SkyDataViewer(QMainWindow):
                     elif (attr == "SunAltitude"):
                         file.write('{0:07.04f}'.format(sunpos[1]))
                         file.write(delimiter)
-                    # export exposure time
-                    elif (attr == "Exposure"):
-                        file.write(str(SkyDataViewer.Exposures[self.exposure]))
-                        file.write(delimiter)
                     # export index
                     elif (attr == "SamplePatternIndex"):
                         file.write(str(sIdx))
                         file.write(delimiter)
                     # export sample azimuth
                     elif (attr == "SampleAzimuth"):
-                        angle = ViewFisheye.SamplingPattern[sIdx]
+                        angle = SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(angle[0]))
                         file.write(delimiter)
                     # export sample altitude
                     elif (attr == "SampleAltitude"):
-                        angle = ViewFisheye.SamplingPattern[sIdx]
+                        angle = SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(angle[1]))
                         file.write(delimiter)
-                    # export pixel
-                    elif (attr == "PixelRGB"):
-                        file.write(str(pixels[i][0])) # red
-                        file.write(delimiter)
-                        file.write(str(pixels[i][1])) # green
-                        file.write(delimiter)
-                        file.write(str(pixels[i][2])) # blue
+                    # export exposure time
+                    elif (attr == "Exposure"):
+                        file.write(str(Exposures[self.exposure]))
                         file.write(delimiter)
                     # export pixel neighborhood
                     elif (attr == "PixelRegion"):
@@ -801,6 +783,14 @@ class SkyDataViewer(QMainWindow):
                     # export pixel weighting method
                     elif (attr == "PixelWeighting"):
                         file.write(str(xoptions["PixelWeighting"]))
+                        file.write(delimiter)
+                    # export pixel
+                    elif (attr == "PixelRGB"):
+                        file.write(str(pixels[i][0])) # red
+                        file.write(delimiter)
+                        file.write(str(pixels[i][1])) # green
+                        file.write(delimiter)
+                        file.write(str(pixels[i][2])) # blue
                         file.write(delimiter)
                     # export solar radiance spectrum
                     elif (attr == "Radiance"):
@@ -814,6 +804,9 @@ class SkyDataViewer(QMainWindow):
                 file.write("\n")
 
         self.log("Exported " + str(len(self.wgtFisheye.samplesSelected)) + " sample(s)")
+
+    def convertSamples(self):
+        pass
 
     def setupExportFile(self):
         dialog = DialogExport(self.settings["ExportOptions"])

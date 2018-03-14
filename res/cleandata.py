@@ -33,94 +33,9 @@ from datetime import datetime, timedelta
 from PIL import Image
 # we need our utilities
 sys.path.insert(0, '../')
+from common import *
 import utility
 import utility_data
-
-
-# skydome sampling pattern: 81 samples (theta, phi)
-SkydomeSamplingPattern = [
-    [000.00, 12.1151],
-    [011.25, 12.1151],
-    [022.50, 12.1151],
-    [033.75, 12.1151],
-    [045.00, 12.1151],
-    [056.25, 12.1151],
-    [067.50, 12.1151],
-    [078.75, 12.1151],
-    [090.00, 12.1151],
-    [101.25, 12.1151],
-    [112.50, 12.1151],
-    [123.75, 12.1151],
-    [135.00, 12.1151],
-    [146.25, 12.1151],
-    [157.50, 12.1151],
-    [168.75, 12.1151],
-    [180.00, 12.1151],
-    [191.25, 12.1151],
-    [202.50, 12.1151],
-    [213.75, 12.1151],
-    [225.00, 12.1151],
-    [236.25, 12.1151],
-    [247.50, 12.1151],
-    [258.75, 12.1151],
-    [270.00, 12.1151],
-    [281.25, 12.1151],
-    [292.50, 12.1151],
-    [303.75, 12.1151],
-    [315.00, 12.1151],
-    [326.25, 12.1151],
-    [337.50, 12.1151],
-    [348.75, 12.1151],
-    [345.00, 33.7490],
-    [330.00, 33.7490],
-    [315.00, 33.7490],
-    [300.00, 33.7490],
-    [285.00, 33.7490],
-    [270.00, 33.7490],
-    [255.00, 33.7490],
-    [240.00, 33.7490],
-    [225.00, 33.7490],
-    [210.00, 33.7490],
-    [195.00, 33.7490],
-    [180.00, 33.7490],
-    [165.00, 33.7490],
-    [150.00, 33.7490],
-    [135.00, 33.7490],
-    [120.00, 33.7490],
-    [105.00, 33.7490],
-    [090.00, 33.7490],
-    [075.00, 33.7490],
-    [060.00, 33.7490],
-    [045.00, 33.7490],
-    [030.00, 33.7490],
-    [015.00, 33.7490],
-    [000.00, 33.7490],
-    [000.00, 53.3665],
-    [022.50, 53.3665],
-    [045.00, 53.3665],
-    [067.50, 53.3665],
-    [090.00, 53.3665],
-    [112.50, 53.3665],
-    [135.00, 53.3665],
-    [157.50, 53.3665],
-    [180.00, 53.3665],
-    [202.50, 53.3665],
-    [225.00, 53.3665],
-    [247.50, 53.3665],
-    [270.00, 53.3665],
-    [292.50, 53.3665],
-    [315.00, 53.3665],
-    [337.50, 53.3665],
-    [315.00, 71.9187],
-    [270.00, 71.9187],
-    [225.00, 71.9187],
-    [180.00, 71.9187],
-    [135.00, 71.9187],
-    [090.00, 71.9187],
-    [045.00, 71.9187],
-    [000.00, 71.9187],
-    [000.00, 90.0000],
-]
 
 
 '''
@@ -419,14 +334,14 @@ def ASDRenameFiles(args):
         asdFiles.sort(key=utility.naturalSortKey)
 
         # for the number of files in the sampling pattern
-        for idx in range(0, len(SkydomeSamplingPattern)):
+        for idx in range(0, len(SamplingPattern)):
             if (idx >= len(asdFiles)):
-                print("ASD file #" + str(idx+1) + " is beyond the capture pattern location count (" + str(len(SkydomeSamplingPattern)) + ")")
+                print("ASD file #" + str(idx+1) + " is beyond the capture pattern location count (" + str(len(SamplingPattern)) + ")")
                 break
 
             # rename to format: ##_TTT.TT_PP.PPPP_.asd
             oldName = os.path.basename(asdFiles[idx])
-            newName = '{0:02d}_{1:06.02f}_{2:07.04f}_.asd'.format(idx, SkydomeSamplingPattern[idx][0], SkydomeSamplingPattern[idx][1])
+            newName = '{0:02d}_{1:06.02f}_{2:07.04f}_.asd'.format(idx, SamplingPattern[idx][0], SamplingPattern[idx][1])
             print("Rename: " + oldName + " to " + newName)
             if (not args.readonly):
                 os.rename(asdFiles[idx], os.path.join(dir, newName))
@@ -489,8 +404,8 @@ def ASDOrganizeFiles(args):
 
         # we've encountered next capture interval
         if ((next - last).total_seconds() / 60.0 >= threshold):
-            if (filesPerCapture < len(SkydomeSamplingPattern)): # warning, last folder was not complete
-                print("ASD file count (" + str(filesPerCapture) + ") for last capture folder was less than capture pattern location count (" + str(len(SkydomeSamplingPattern)) + ")")
+            if (filesPerCapture < len(SamplingPattern)): # warning, last folder was not complete
+                print("ASD file count (" + str(filesPerCapture) + ") for last capture folder was less than capture pattern location count (" + str(len(SamplingPattern)) + ")")
             captureIntervals.append(next)
             captureFolder = os.path.join(args.directory, str(next.time()).replace(':', '.'))
             print(captureFolder)
@@ -499,8 +414,8 @@ def ASDOrganizeFiles(args):
 
         # check to see if we've tried to move more files than there are in a capture pattern
         filesPerCapture += 1
-        if (filesPerCapture > len(SkydomeSamplingPattern)):
-            print("ASD file #" + str(filesPerCapture) + " is beyond the capture pattern location count (" + str(len(SkydomeSamplingPattern)) + ")")
+        if (filesPerCapture > len(SamplingPattern)):
+            print("ASD file #" + str(filesPerCapture) + " is beyond the capture pattern location count (" + str(len(SamplingPattern)) + ")")
             return
 
         # put file into folder

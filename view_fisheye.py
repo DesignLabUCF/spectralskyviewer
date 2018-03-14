@@ -34,99 +34,13 @@ from PyQt5.QtCore import Qt, QRect, QPoint, QPointF
 from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QIcon, QColor
 from PyQt5.QtWidgets import QWidget, QStyle, QAction, QMenu
 import numpy as np
+from common import *
 import utility
 import utility_angles
 import utility_data
-from utility_data import PixelWeighting
-import spa
+
 
 class ViewFisheye(QWidget):
-    # sampling pattern: 81 samples (azimuth, altitude)
-    SamplingPattern = (
-        (000.00, 12.1151),
-        (011.25, 12.1151),
-        (022.50, 12.1151),
-        (033.75, 12.1151),
-        (045.00, 12.1151),
-        (056.25, 12.1151),
-        (067.50, 12.1151),
-        (078.75, 12.1151),
-        (090.00, 12.1151),
-        (101.25, 12.1151),
-        (112.50, 12.1151),
-        (123.75, 12.1151),
-        (135.00, 12.1151),
-        (146.25, 12.1151),
-        (157.50, 12.1151),
-        (168.75, 12.1151),
-        (180.00, 12.1151),
-        (191.25, 12.1151),
-        (202.50, 12.1151),
-        (213.75, 12.1151),
-        (225.00, 12.1151),
-        (236.25, 12.1151),
-        (247.50, 12.1151),
-        (258.75, 12.1151),
-        (270.00, 12.1151),
-        (281.25, 12.1151),
-        (292.50, 12.1151),
-        (303.75, 12.1151),
-        (315.00, 12.1151),
-        (326.25, 12.1151),
-        (337.50, 12.1151),
-        (348.75, 12.1151),
-        (345.00, 33.7490),
-        (330.00, 33.7490),
-        (315.00, 33.7490),
-        (300.00, 33.7490),
-        (285.00, 33.7490),
-        (270.00, 33.7490),
-        (255.00, 33.7490),
-        (240.00, 33.7490),
-        (225.00, 33.7490),
-        (210.00, 33.7490),
-        (195.00, 33.7490),
-        (180.00, 33.7490),
-        (165.00, 33.7490),
-        (150.00, 33.7490),
-        (135.00, 33.7490),
-        (120.00, 33.7490),
-        (105.00, 33.7490),
-        (090.00, 33.7490),
-        (075.00, 33.7490),
-        (060.00, 33.7490),
-        (045.00, 33.7490),
-        (030.00, 33.7490),
-        (015.00, 33.7490),
-        (000.00, 33.7490),
-        (000.00, 53.3665),
-        (022.50, 53.3665),
-        (045.00, 53.3665),
-        (067.50, 53.3665),
-        (090.00, 53.3665),
-        (112.50, 53.3665),
-        (135.00, 53.3665),
-        (157.50, 53.3665),
-        (180.00, 53.3665),
-        (202.50, 53.3665),
-        (225.00, 53.3665),
-        (247.50, 53.3665),
-        (270.00, 53.3665),
-        (292.50, 53.3665),
-        (315.00, 53.3665),
-        (337.50, 53.3665),
-        (315.00, 71.9187),
-        (270.00, 71.9187),
-        (225.00, 71.9187),
-        (180.00, 71.9187),
-        (135.00, 71.9187),
-        (090.00, 71.9187),
-        (045.00, 71.9187),
-        (000.00, 71.9187),
-        (000.00, 90.0000),
-    )
-    # convert to radians
-    # ViewFisheye.SamplingPattern = [(math.radians(s[0]), math.radians(s[1])) for s in ViewFisheye.SamplingPattern]
 
     # sample selection
     SelectionType = Enum('SelectType', 'Exact Closest Rect')
@@ -184,14 +98,14 @@ class ViewFisheye(QWidget):
         # init
         self.setMouseTracking(True)
         color = QColor(255, 255, 255)
-        for t,p in ViewFisheye.SamplingPattern:
+        for t,p in SamplingPattern:
             self.sampleBoundsVisible.append(QRect(0, 0, 0, 0)) # these will need to be recomputed as photo scales
             self.samplePointsInFile.append((0, 0))             # these only need to be computed once per photo
             color.setHsv(t, int(utility.normalize(p, 0, 90)*127+128), 255)
             self.penSelected.append(QPen(color, 3, Qt.SolidLine))
 
     def getSamplePatternRGB(self, index):
-        if (index < 0 or index >= len(ViewFisheye.SamplingPattern)):
+        if (index < 0 or index >= len(SamplingPattern)):
             return (0,0,0)
         color = self.penSelected[index].color()
         return (color.red(), color.green(), color.blue())
@@ -214,8 +128,8 @@ class ViewFisheye(QWidget):
             center = (int(self.myPhotoSrcRect.width() / 2), int(self.myPhotoSrcRect.height()/2))
             radius = self.myPhotoSrcRect.height() / 2
             diameter = radius * 2
-            for i in range(0, len(ViewFisheye.SamplingPattern)):
-                u, v = utility_angles.FisheyeAngleWarp(ViewFisheye.SamplingPattern[i][0], ViewFisheye.SamplingPattern[i][1], inRadians=False)
+            for i in range(0, len(SamplingPattern)):
+                u, v = utility_angles.FisheyeAngleWarp(SamplingPattern[i][0], SamplingPattern[i][1], inRadians=False)
                 u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
                 x = (center[0] - radius) + (u * diameter)
                 y = (center[1] - radius) + (v * diameter)
@@ -276,8 +190,8 @@ class ViewFisheye(QWidget):
         self.enableSamples = b
 
     def setPixelRegion(self, r):
-        if (r < utility_data.PixelRegionMin):
-            self.pixelRegion = utility_data.PixelRegionMin
+        if (r < PixelRegionMin):
+            self.pixelRegion = PixelRegionMin
         else:
             self.pixelRegion = r
 
@@ -491,7 +405,7 @@ class ViewFisheye(QWidget):
             self.myPhotoDestRect = QRect(0, 0, self.width(), self.height())
             self.viewCenter = (self.width() / 2, self.height() / 2)
             self.myPhotoRadius = 0
-            for i in range(0, len(ViewFisheye.SamplingPattern)):
+            for i in range(0, len(SamplingPattern)):
                 self.sampleBoundsVisible[i].setRect(self.viewCenter[0], self.viewCenter[1], 0, 0)
             return
 
@@ -524,8 +438,8 @@ class ViewFisheye(QWidget):
         sampleDiameter = sampleRadius * 2
         ViewFisheye.SelectionRectMin = sampleDiameter # minimum selection rect is based on this
         u, v = 0, 0
-        for i in range(0, len(ViewFisheye.SamplingPattern)):
-            u, v = utility_angles.FisheyeAngleWarp(ViewFisheye.SamplingPattern[i][0], ViewFisheye.SamplingPattern[i][1], inRadians=False)
+        for i in range(0, len(SamplingPattern)):
+            u, v = utility_angles.FisheyeAngleWarp(SamplingPattern[i][0], SamplingPattern[i][1], inRadians=False)
             u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
             u = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
             v = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)

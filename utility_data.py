@@ -28,19 +28,14 @@
 import math
 import os
 import csv
-import copy
 from datetime import datetime
-from enum import Enum
 import numpy as np
 from PIL import Image
+from common import *
 import exifread
 import spa
 
 
-HDRRawExts = ['.cr2', '.raw', '.dng']
-PixelRegionMin = 1
-PixelRegionMax = 99
-PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')
 GaussianKernels = {}
 
 # for row in range(0, kernel.shape[0]):
