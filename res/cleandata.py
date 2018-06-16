@@ -49,6 +49,75 @@ def ListSubDirectories(args):
         print(dir)
 
 '''
+'''
+def CorrelateCaptures(args):
+    print("Finding HDR/ASD capture times w/in " + str(args.correlatecaptures) + "s in:\n" + args.directory)
+    # ensure directory exists
+    if (not os.path.exists(args.directory)):
+        return
+
+    # grab all capture DATE directories
+    dateDirs = utility.findFiles(args.directory, mode=2)
+    if (len(dateDirs) <= 0):
+        print("No directories found at all.")
+        return
+    dateDirs[:] = [dir for dir in dateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
+    if (len(dateDirs) <= 0):
+        print("No capture date directories found.")
+        return
+
+    # iterate through all capture dates and find all HDR and ASD captures
+    hdrCaptures = []
+    asdCaptures = []
+    correlatedCaptures = []
+    for datedir in dateDirs:
+        #print(datedir)
+
+        # grab all capture HDR captures
+        hdrDir = os.path.join(datedir, "HDR")
+        hdrCaptures = utility.findFiles(hdrDir, mode=2)
+        if (len(hdrCaptures) <= 0):
+            print("No HDR directories found at all.")
+            return
+        hdrCaptures = [(datetime.strptime(os.path.basename(datedir) + " " + os.path.basename(dir), '%Y-%m-%d %H.%M.%S'), dir) for dir in hdrCaptures if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
+        if (len(hdrCaptures) <= 0):
+            print("No HDR captures found.")
+            return
+        #for capture in hdrCaptures:
+        #    print(capture[0], capture[1])
+
+        # grab all capture ASD captures
+        asdDir = os.path.join(datedir, "ASD")
+        asdCaptures = utility.findFiles(asdDir, mode=2)
+        if (len(asdCaptures) <= 0):
+            print("No ASD directories found at all.")
+            return
+        asdCaptures = [(datetime.strptime(os.path.basename(datedir) + " " + os.path.basename(dir), '%Y-%m-%d %H.%M.%S'), dir) for dir in asdCaptures if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
+        if (len(asdCaptures) <= 0):
+            print("No ASD captures found.")
+            return
+        #for capture in asdCaptures:
+        #    print(capture[0], capture[1])
+
+        # correlate HDR to ASD captures
+        for i in range(0, len(hdrCaptures)):
+            for j in range(0, len(asdCaptures)):
+                diff = abs((hdrCaptures[i][0] - asdCaptures[j][0]).total_seconds())
+                #print(hdrCaptures[i][0], asdCaptures[j][0], diff)
+                if (diff <= args.correlatecaptures):
+                    correlatedCaptures.append((hdrCaptures[i][0], hdrCaptures[i][1], asdCaptures[j][0], asdCaptures[j][1]))
+
+    print("Found " + str(len(correlatedCaptures)) + " captures w/in " + str(args.correlatecaptures) + "s")
+    prev = None
+    for capture in correlatedCaptures:
+        if prev != capture[0].date():
+            print(capture[1])
+            print(capture[3])
+            prev = capture[0].date()
+        print("HDR:", capture[0], "ASD:", capture[2])
+    print("Found " + str(len(correlatedCaptures)) + " captures w/in " + str(args.correlatecaptures) + "s")
+
+'''
 Function that offsets capture directories (times of day) by a specific amount.
 This is used to correct/account for time shift errors in the photo EXIF data (like daylight savings).
 :param args: ArgumentParser arguments parsed at program startup
@@ -470,14 +539,15 @@ def ASDFillFile(args):
 
 def main():
     # handle command line args
-    parser = argparse.ArgumentParser(description='Script with tools to help reorganize a directory of sky data.', formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description='Script with tools to help clean and reorganize a directory of sky data. WARNING! Please use the -r (--readonly) option first before making any changes to your data!', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_help = True
     parser.add_argument('directory', help='a directory to operate on')
     # general arguments
     parser.add_argument('-r', '--readonly', dest='readonly', action='store_true', help='read only mode (no writes)', default=False)
     parser.add_argument('-l', '--listdirs', dest='listdirs', action='store_true', help='list sub dirs of directory', default=False)
     parser.add_argument('-t', '--timeoffset', dest='timeoffset', type=int, help='offset capture dirs by this number of hours +/-')
-    # specifies HDR or ASD operations
+    parser.add_argument('-cc', '--correlate', dest='correlatecaptures', type=int, help='find HDR captures w/in #s of ASD captures')
+    # specifies HDR or ASD specific operations
     parser.add_argument('-hdr', '--hdr', dest='hdr', action='store_true', help='HDR mode - working w/ HDR photos')
     parser.add_argument('-asd', '--asd', dest='asd', action='store_true', help='ASD mode - working w/ ASD files')
     # arguments used by both HDR and ASD files/folders
@@ -502,6 +572,8 @@ def main():
         ListSubDirectories(args)
     elif (args.timeoffset):
         OffsetCaptureTimes(args)
+    elif (args.correlatecaptures):
+        CorrelateCaptures(args)
     elif (args.hdr):
         if (args.renamedirs):
             HDRRenameDirs(args)
