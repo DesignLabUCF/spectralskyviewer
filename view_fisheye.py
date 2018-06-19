@@ -80,6 +80,7 @@ class ViewFisheye(QWidget):
         self.samplesSelected = []       # indices of selected samples
         self.pixelRegion = 1
         self.pixelWeighting = PixelWeighting.Mean
+        self.skyCover = SkyCover.UNK
 
         # members - preloaded graphics
         self.painter = QPainter()
@@ -200,6 +201,9 @@ class ViewFisheye(QWidget):
             self.pixelWeighting = PixelWeighting.Mean
         else:
             self.pixelWeighting = w
+
+    def setSkycover(self, sc):
+        self.skyCover = sc
 
     def selectSamples(self, message="none"):
         # nothing to do if no photo loaded
@@ -623,17 +627,14 @@ class ViewFisheye(QWidget):
                     painter.setPen(self.penSelectRect)
                     painter.drawRect(self.dragSelectRect)
 
-                # draw filename
+                # draw timestamp
                 painter.setPen(self.penText)
                 painter.setFont(self.fontFixed)
                 destRect.setCoords(10, 10, self.width() / 2, 50)
-                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, os.path.basename(self.myPhotoPath))
-                # draw timestamp
-                destRect.moveTo(10, 25)
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTime))
-                # draw dimensions
-                destRect.moveTo(10, 40)
-                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoSrcRect.width()) + " x " + str(self.myPhotoSrcRect.height()))
+                # draw sky cover assessment
+                destRect.moveTo(10, 25)
+                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "Sky: " + self.skyCover.name + "/" + SkyCoverDesc[self.skyCover])
                 # draw photo rotation
                 if (self.myPhotoRotation != 0):
                     destRect.moveTo(10, self.height()-25)

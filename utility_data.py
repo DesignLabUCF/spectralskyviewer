@@ -249,6 +249,56 @@ def loadSPASiteData(filepath, isDir=True):
     return data
 
 '''
+Function to load a file with data with capture dates+times and sky cover assessment at those times.
+:param filepath: Path to file with sky cover data
+:param isDir: If filepath specified is a directory, then filename is assumed to be 'sky.csv'
+:note: File format should be a CSV with the following columns: 
+:return: A list of (datetime, datetime, skycover) for each capture timespan accounted for. 
+'''
+def loadSkyCoverData(filepath, isDir=True):
+    if (isDir):
+        filepath = os.path.join(filepath, 'sky.csv') # assumes this filename if dir specified
+    if (not os.path.exists(filepath)):
+        return []
+
+    # (datetime, datetime, skycover)
+    skycover = []
+    dtfmtstr = "%m/%d/%Y %H:%M"
+
+    # overwrite with values read from spa site info
+    with open(filepath, 'r') as f:
+        reader = csv.reader(f, delimiter=',')
+        next(reader, None)  # ignore header
+        for row in reader:
+            if (len(row) < 4):
+                continue
+            try:
+                skycover.append((
+                    datetime.strptime(row[0] + " " + row[1], dtfmtstr),
+                    datetime.strptime(row[0] + " " + row[2], dtfmtstr),
+                    SkyCoverFromStr[row[3]]
+                ))
+            except ValueError or IndexError:
+                continue
+
+    return skycover
+
+'''
+Function to find the first instance found of sky cover assessment of a particular capture time.
+:param capture: Capture (datetime) timestamp.
+:param skycovers: List of SkyCover conditions.
+:return: A sky cover. SkyCover.UNK is returned if none found. 
+'''
+def findCaptureSkyCover(capture, skycovers):
+    capture = capture.replace(second=0)
+    sky = SkyCover.UNK
+    for sc in skycovers:
+        if (capture >= sc[0] and capture <= sc[1]):
+            sky = sc[2]
+            break
+    return sky
+
+'''
 Function to deep copy a spa_data object. This function is useful because SWIG didn't create pickling code for deep copy.
 :param src: source spa_data object
 :note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/

@@ -87,6 +87,7 @@ class SkyDataViewer(QMainWindow):
         self.captureTimeASDFiles = [] # length should be equal to sampling pattern length
         self.exposure = 0
         self.spaData = spa.spa_data()
+        self.skyData = []
 
         # load settings
         self.settings = dict(SkyDataViewer.Settings)  # this must be first!
@@ -479,6 +480,7 @@ class SkyDataViewer(QMainWindow):
 
         # load site info for SPA calculations
         self.spaData = utility_data.loadSPASiteData(self.settings["DataDirectory"])
+        self.skyData = utility_data.loadSkyCoverData(self.settings["DataDirectory"])
 
     def dateSelected(self, index):
         if (index < 0 or index >= self.cbxDate.count()):
@@ -607,6 +609,7 @@ class SkyDataViewer(QMainWindow):
         sunpos = utility_data.computeSunPosition(self.spaData)
         self.wgtFisheye.setSunPosition(sunpos)
         self.wgtFisheye.setPhoto(photos[self.exposure], exif=exif)
+        self.wgtFisheye.setSkycover(utility_data.findCaptureSkyCover(self.capture, self.skyData))
         self.wgtFisheye.repaint()
 
         # find ASD data path
@@ -711,6 +714,7 @@ class SkyDataViewer(QMainWindow):
         points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
         pixels = utility_data.collectPixels(points, pixels=self.wgtFisheye.myPhotoPixels, region=pixregion, weighting=pixweight)
         sunpos = utility_data.computeSunPosition(self.spaData)
+        skycover = utility_data.findCaptureSkyCover(self.capture, self.skyData)
 
         # create file if not exists
         if (not os.path.exists(xoptions["Filename"])):
@@ -719,7 +723,7 @@ class SkyDataViewer(QMainWindow):
                 os.makedirs(os.path.dirname(xoptions["Filename"]))
             # write header
             with open(xoptions["Filename"], "w") as file:
-                for i in range(1, len(xoptions["Attributes"])):
+                for i in range(0, len(xoptions["Attributes"])):
                     attr = DialogExport.attributeFromIndex(xoptions["Attributes"][i])
                     if (attr == "PixelRGB"):
                         file.write("Red" + delimiter + "Green" + delimiter + "Blue" + delimiter)
@@ -758,6 +762,10 @@ class SkyDataViewer(QMainWindow):
                     elif (attr == "SunAltitude"):
                         file.write('{0:07.04f}'.format(sunpos[1]))
                         file.write(delimiter)
+                    # export sky cover
+                    elif (attr == "SkyCover"):
+                        file.write(str(skycover.value))
+                        file.write(delimiter)
                     # export index
                     elif (attr == "SamplePatternIndex"):
                         file.write(str(sIdx))
@@ -778,11 +786,11 @@ class SkyDataViewer(QMainWindow):
                         file.write(delimiter)
                     # export pixel neighborhood
                     elif (attr == "PixelRegion"):
-                        file.write(str(xoptions["PixelRegion"]))
+                        file.write(str(pixregion))
                         file.write(delimiter)
                     # export pixel weighting method
                     elif (attr == "PixelWeighting"):
-                        file.write(str(xoptions["PixelWeighting"]))
+                        file.write(str(pixweight.value))
                         file.write(delimiter)
                     # export pixel
                     elif (attr == "PixelRGB"):

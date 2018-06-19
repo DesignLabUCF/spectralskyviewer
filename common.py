@@ -29,7 +29,7 @@ from enum import Enum
 
 
 # default sampling pattern: 81 samples (azimuth, altitude)
-SamplingPattern = (
+SamplingPattern = [
     (000.00, 12.1151),
     (011.25, 12.1151),
     (022.50, 12.1151),
@@ -111,12 +111,12 @@ SamplingPattern = (
     (045.00, 71.9187),
     (000.00, 71.9187),
     (000.00, 90.0000),
-)
+]
 # convert to radians
 # SamplingPattern = [(math.radians(s[0]), math.radians(s[1])) for s in SamplingPattern]
 
 # exposure times of the HDR data (in seconds)
-Exposures = (
+Exposures = [
     0.000125,
     0.001000,
     0.008000,
@@ -126,7 +126,12 @@ Exposures = (
     1.000000,
     2.000000,
     4.000000,
-)
+]
+
+# sky cover categories
+SkyCover = Enum('SkyCover', 'UNK CLR SCT OVC')
+SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "Scattered", SkyCover.OVC: "Overcast"}
+SkyCoverFromStr = {"UNK": SkyCover.UNK, "CLR": SkyCover.CLR, "SCT": SkyCover.SCT, "OVC": SkyCover.OVC}
 
 # export attributes
 ExportAttributes = [
@@ -136,6 +141,7 @@ ExportAttributes = [
     ("Time",                "Time of Capture"),
     ("SunAzimuth",          "Sun Azimuth (East from North)"),
     ("SunAltitude",         "Sun Altitude (90 - Zenith)"),
+    ("SkyCover",            "Sky Cover Assessment"),
     ("SamplePatternIndex",  "Sample Pattern Index"),
     ("SampleAzimuth",       "Sample Azimuth (East from North)"),
     ("SampleAltitude",      "Sample Altitude (90 - Zenith)"),
