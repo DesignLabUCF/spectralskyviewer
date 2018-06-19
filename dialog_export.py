@@ -151,8 +151,16 @@ class DialogExport(QDialog):
         # attributes
         self.lstAttributes = QListView()
         model = QStandardItemModel()
-        for i in range(0, len(ExportAttributes)):
+        # header
+        item = QStandardItem(ExportAttributes[0][1])
+        item.setCheckable(True)
+        item.setCheckState(True)
+        item.setEnabled(False)
+        model.appendRow(item)
+        # optional attributes
+        for i in range(1, len(ExportAttributes)):
             item = QStandardItem(ExportAttributes[i][1])
+            item.setEditable(False)
             item.setCheckable(True)
             if (i in self.exportOptions["Attributes"]):
                 item.setCheckState(Qt.Checked)

@@ -40,6 +40,7 @@ import utility
 import utility_data
 from view_fisheye import ViewFisheye
 from dialog_export import DialogExport
+#from dialog_converter import DialogConverter
 
 
 class SkyDataViewer(QMainWindow):
@@ -223,9 +224,9 @@ class SkyDataViewer(QMainWindow):
         self.actClearAll = QAction(QIcon(), '&Clear All', self)
         self.actClearAll.setStatusTip('Clear selected samples')
         self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
-        self.actSampleConverter = QAction(QIcon(), 'Sample &Converter', self)
-        self.actSampleConverter.setStatusTip('Re-export samples with different properties')
-        self.actSampleConverter.triggered.connect(self.convertSamples)
+        #self.actSampleConverter = QAction(QIcon(), 'Sample &Converter', self)
+        #self.actSampleConverter.setStatusTip('Re-export samples with different properties')
+        #self.actSampleConverter.triggered.connect(self.convertSamples)
 
         # help menu actions
         actAbout = QAction(QIcon(), '&About', self)
@@ -265,7 +266,7 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actSelectAll)
         menu.addAction(self.actClearAll)
         menu.addSeparator()
-        menu.addAction(self.actSampleConverter)
+        #menu.addAction(self.actSampleConverter)
 
         menu = menubar.addMenu('&Help')
         menu.addAction(actAbout)
@@ -647,7 +648,7 @@ class SkyDataViewer(QMainWindow):
             self.log("Error: No ASD .txt files found for: " + str(asdTime))
             return
         if (len(self.captureTimeASDFiles) < 81):
-            self.log("Error: Number of ASD files is " + str(len(self.captureTimeASDFiles)) + ". Sample pattern should have " + str(len(ViewFisheye.SamplingPattern)))
+            self.log("Error: Number of ASD files is " + str(len(self.captureTimeASDFiles)) + ". Sample pattern should have " + str(len(SamplingPattern)))
             return
 
         # graph ASD data
@@ -716,21 +717,20 @@ class SkyDataViewer(QMainWindow):
             # create dirs if not exists
             if (not os.path.exists(os.path.dirname(xoptions["Filename"]))):
                 os.makedirs(os.path.dirname(xoptions["Filename"]))
-            # write header if user desires
+            # write header
             with open(xoptions["Filename"], "w") as file:
-                if (0 in xoptions["Attributes"]):  # header
-                    for i in range(1, len(xoptions["Attributes"])):
-                        attr = DialogExport.attributeFromIndex(xoptions["Attributes"][i])
-                        if (attr == "PixelRGB"):
-                            file.write("Red" + delimiter + "Green" + delimiter + "Blue" + delimiter)
-                        elif (attr == "Radiance"):
-                            for w in range(350, 2500):
-                                file.write(str(w) + delimiter)
-                            file.write(str(2500))
-                        else:
-                            file.write(attr)
-                            file.write(delimiter)
-                    file.write("\n")
+                for i in range(1, len(xoptions["Attributes"])):
+                    attr = DialogExport.attributeFromIndex(xoptions["Attributes"][i])
+                    if (attr == "PixelRGB"):
+                        file.write("Red" + delimiter + "Green" + delimiter + "Blue" + delimiter)
+                    elif (attr == "Radiance"):
+                        for w in range(350, 2500):
+                            file.write(str(w) + delimiter)
+                        file.write(str(2500))
+                    else:
+                        file.write(attr)
+                        file.write(delimiter)
+                file.write("\n")
 
         # append export to existing file
         with open(xoptions["Filename"], "a") as file:
@@ -805,8 +805,15 @@ class SkyDataViewer(QMainWindow):
 
         self.log("Exported " + str(len(self.wgtFisheye.samplesSelected)) + " sample(s)")
 
-    def convertSamples(self):
-        pass
+    # def convertSamples(self):
+    #     dialog = DialogConverter()
+    #     code = dialog.exec()
+    #     if (code != QDialog.Accepted):
+    #         return
+    #
+    #     self.log("Converting... ")
+    #
+    #     self.log("Converted " + str(1) + " sample(s)")
 
     def setupExportFile(self):
         dialog = DialogExport(self.settings["ExportOptions"])

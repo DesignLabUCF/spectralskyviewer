@@ -143,7 +143,7 @@ ExportAttributes = [
     ("PixelRegion",         "Sample Pixel Kernel Size (n x n)"),
     ("PixelWeighting",      "Sample Pixel Weighting Algorithm"),
     ("PixelRGB",            "Sample Pixel RGB Channels"),
-    ("Radiance",            "Sample Radiance (W/m²/sr) Per Wavelength (350-2500nm)"),
+    ("Radiance",            "Sample Radiance (W/m²/sr) per Wavelength (350-2500nm)"),
 ]
 
 # pixel region and weighting settings
