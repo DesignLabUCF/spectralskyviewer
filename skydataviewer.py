@@ -186,6 +186,10 @@ class SkyDataViewer(QMainWindow):
         self.actSelectAll.setShortcut('Ctrl+A')
         self.actSelectAll.setStatusTip('Select all samples')
         self.actSelectAll.triggered.connect(lambda: self.selectSamples('all'))
+        self.actSelectInv = QAction(QIcon(), 'Select &Inverse', self)
+        self.actSelectInv.setShortcut('Ctrl+I')
+        self.actSelectInv.setStatusTip('Invert current selected samples')
+        self.actSelectInv.triggered.connect(lambda: self.selectSamples('inverse'))
         self.actClearAll = QAction(QIcon(), '&Clear All', self)
         self.actClearAll.setStatusTip('Clear selected samples')
         self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
@@ -232,6 +236,7 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actExportSelected)
         menu.addSeparator()
         menu.addAction(self.actSelectAll)
+        menu.addAction(self.actSelectInv)
         menu.addAction(self.actClearAll)
         menu.addSeparator()
         menu.addAction(self.actAvoidSun)
@@ -816,7 +821,9 @@ class SkyDataViewer(QMainWindow):
             menuCtx.addAction(self.actUVGrid)
             menuCtx.addSeparator()
             menuCtx.addAction(self.actSelectAll)
+            menuCtx.addAction(self.actSelectInv)
             menuCtx.addAction(self.actClearAll)
+            menuCtx.addAction(self.actAvoidSun)
             menuCtx.addAction(self.actExportSelected)
             menuCtx.exec_(widget.mapToGlobal(event.pos()))
 
@@ -891,12 +898,12 @@ class SkyDataViewer(QMainWindow):
     def toggleAvoidSun(self):
         angle = 0
         ok = True
-        angle, ok = QInputDialog.getInt(self, "Circumsolar Avoidance", "Angle around sun:", 20, 0, 90, 1, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
-        if ok and angle >= 0 and angle <= 90:
+        angle, ok = QInputDialog.getInt(self, "Circumsolar Avoidance", "Angle around sun:", 20, 0, 180, 1, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+        if ok and angle >= 0 and angle <= 180:
             AppSettings["AvoidSunAngle"] = angle
             #self.wgtFisheye.repaint()
         else:
-            QMessageBox.warning(self, "Input Validation", "Circumsolar angle must be 0-90°.", QMessageBox.Ok)
+            QMessageBox.warning(self, "Input Validation", "Circumsolar angle must be 0-180°.", QMessageBox.Ok)
 
     def center(self):
         frame = self.frameGeometry()

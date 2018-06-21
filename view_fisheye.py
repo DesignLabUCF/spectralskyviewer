@@ -172,22 +172,22 @@ class ViewFisheye(QWidget):
         if (self.myPhoto.isNull()):
             return
 
-        # first clear selection
-        self.samplesSelected.clear()
-
-        # init
-        sunAvoid = AppSettings["AvoidSunAngle"]
-        sunAvoidRads = math.radians(AppSettings["AvoidSunAngle"])
-        sunPosRads = (math.radians(self.sunPosition[0]), math.radians(self.sunPosition[1]))
-
+        # handle selection message
         if (message == "none"):
-            pass
+            self.samplesSelected.clear()
         elif (message == "all"):
-            #self.samplesSelected.clear()
-            for i in range(0, len(self.sampleBoundsVisible)):
-                if (sunAvoid > 0 and utility_angles.CentralAngle(sunPosRads, SamplingPatternRads[i]) <= sunAvoidRads):
-                    continue
-                self.samplesSelected.append(i)
+            self.samplesSelected[:] = [i for i in range(0, len(SamplingPattern))]
+        elif (message == "inverse"):
+            allidx = set([i for i in range(0, len(SamplingPattern))])
+            selidx = set(self.samplesSelected)
+            self.samplesSelected[:] = list(allidx - selidx)
+
+        # remove samples in circumsolar avoidance region if necessary
+        sunAvoid = AppSettings["AvoidSunAngle"]
+        if (sunAvoid > 0):
+            sunAvoidRads = math.radians(AppSettings["AvoidSunAngle"])
+            sunPosRads = (math.radians(self.sunPosition[0]), math.radians(self.sunPosition[1]))
+            self.samplesSelected[:] = [idx for idx in self.samplesSelected if utility_angles.CentralAngle(sunPosRads, SamplingPatternRads[idx]) > sunAvoidRads]
 
         # update
         self.repaint()
