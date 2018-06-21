@@ -83,8 +83,6 @@ class SkyDataViewer(QMainWindow):
             self.statusBar().show()
         else:
             self.statusBar().hide()
-        self.wgtFisheye.setPixelRegion(AppSettings["PixelRegion"])
-        self.wgtFisheye.setPixelWeighting(PixelWeighting(AppSettings["PixelWeighting"]))
 
         # startup
         self.loadData()
@@ -191,6 +189,9 @@ class SkyDataViewer(QMainWindow):
         self.actClearAll = QAction(QIcon(), '&Clear All', self)
         self.actClearAll.setStatusTip('Clear selected samples')
         self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
+        self.actAvoidSun = QAction(QIcon(), 'Avoid Circumsolar', self)
+        self.actAvoidSun.setStatusTip('Deselect samples around sun within a specified angle.')
+        self.actAvoidSun.triggered.connect(self.toggleAvoidSun)
         #self.actSampleConverter = QAction(QIcon(), 'Sample &Converter', self)
         #self.actSampleConverter.setStatusTip('Re-export samples with different properties')
         #self.actSampleConverter.triggered.connect(self.convertSamples)
@@ -233,6 +234,7 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actSelectAll)
         menu.addAction(self.actClearAll)
         menu.addSeparator()
+        menu.addAction(self.actAvoidSun)
         #menu.addAction(self.actSampleConverter)
 
         menu = menubar.addMenu('&Help')
@@ -308,7 +310,6 @@ class SkyDataViewer(QMainWindow):
 
         # render pane
         self.wgtFisheye = ViewFisheye(self)
-        self.wgtFisheye.showHUD(self.actHUD.isChecked())
 
         # info view
         self.tblEXIF = QTableWidget()
@@ -386,12 +387,6 @@ class SkyDataViewer(QMainWindow):
         self.sldTime.setRange(0, 0)
         self.tblEXIF.clearContents()
         self.wgtFisheye.setPhoto(None)
-        self.wgtFisheye.showMask(AppSettings["ShowMask"])
-        self.wgtFisheye.showHUD(AppSettings["ShowHUD"])
-        self.wgtFisheye.showCompass(AppSettings["ShowCompass"])
-        self.wgtFisheye.showSunPath(AppSettings["ShowSunPath"])
-        self.wgtFisheye.showSamples(AppSettings["ShowSamples"])
-        self.wgtFisheye.showUVGrid(AppSettings["ShowUVGrid"])
         self.wgtFisheye.repaint()
         self.wgtGraph.clear()
         self.resetGraph()
@@ -841,11 +836,11 @@ class SkyDataViewer(QMainWindow):
             #self.centralWidget().layout().setContentsMargins(10,10,10,10)
 
     def toggleMask(self, state):
-        self.wgtFisheye.showMask(state)
+        AppSettings["ShowMask"] = state
         self.wgtFisheye.repaint()
 
     def toggleHUD(self, state):
-        self.wgtFisheye.showHUD(state)
+        AppSettings["ShowHUD"] = state
         self.wgtFisheye.repaint()
         self.actUVGrid.setEnabled(state)
         self.actCompass.setEnabled(state)
@@ -853,44 +848,55 @@ class SkyDataViewer(QMainWindow):
         self.actSamples.setEnabled(state)
 
     def toggleUVGrid(self, state):
-        self.wgtFisheye.showUVGrid(state)
+        AppSettings["ShowUVGrid"] = state
         self.wgtFisheye.repaint()
 
     def toggleCompass(self, state):
-        self.wgtFisheye.showCompass(state)
+        AppSettings["ShowCompass"] = state
         self.wgtFisheye.repaint()
 
     def toggleSunPath(self, state):
-        self.wgtFisheye.showSunPath(state)
+        AppSettings["ShowSunPath"] = state
         self.wgtFisheye.repaint()
 
     def toggleSamples(self, state):
-        self.wgtFisheye.showSamples(state)
+        AppSettings["ShowSamples"] = state
         self.wgtFisheye.repaint()
 
     def togglePixelRegion(self, action):
-        region = utility_data.PixelRegionMin # n for (n x n) pixel region
+        region = PixelRegionMin # n for (n x n) pixel region
         ok = True
 
         if (action == self.actPixel1):
             region = 1
         elif (action == self.actPixelnxn):
-            region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, utility_data.PixelRegionMin, utility_data.PixelRegionMax, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+            region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, PixelRegionMin, PixelRegionMax, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
         elif (action == self.actPixel1deg):
             region = 9
 
         if ok and region >= utility_data.PixelRegionMin and region % 2 == 1:
-            self.wgtFisheye.setPixelRegion(region)
+            AppSettings["PixelRegion"] = region
+            #self.wgtFisheye.repaint()
         else:
             QMessageBox.warning(self, "Input Validation", "Pixel Region must be an odd positive number.", QMessageBox.Ok)
 
     def togglePixelWeighting(self, action):
         if (action == self.actPixelMean):
-            self.wgtFisheye.setPixelWeighting(PixelWeighting.Mean)
+            AppSettings["PixelWeighting"] = PixelWeighting.Mean.value
         elif (action == self.actPixelMedian):
-            self.wgtFisheye.setPixelWeighting(PixelWeighting.Median)
+            AppSettings["PixelWeighting"] = PixelWeighting.Median.value
         elif (action == self.actPixelGaussian):
-            self.wgtFisheye.setPixelWeighting(PixelWeighting.Gaussian)
+            AppSettings["PixelWeighting"] = PixelWeighting.Gaussian.value
+
+    def toggleAvoidSun(self):
+        angle = 0
+        ok = True
+        angle, ok = QInputDialog.getInt(self, "Circumsolar Avoidance", "Angle around sun:", 20, 0, 90, 1, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+        if ok and angle >= 0 and angle <= 90:
+            AppSettings["AvoidSunAngle"] = angle
+            #self.wgtFisheye.repaint()
+        else:
+            QMessageBox.warning(self, "Input Validation", "Circumsolar angle must be 0-90°.", QMessageBox.Ok)
 
     def center(self):
         frame = self.frameGeometry()
@@ -918,14 +924,12 @@ class SkyDataViewer(QMainWindow):
         AppSettings["VertSplitBottom"] = bottom
         AppSettings["ShowEXIF"] = self.actEXIF.isChecked()
         AppSettings["ShowStatusBar"] = self.actStatusBar.isChecked()
-        AppSettings["ShowMask"] = self.actMask.isChecked()
-        AppSettings["ShowHUD"] = self.actHUD.isChecked()
-        AppSettings["ShowCompass"] = self.actCompass.isChecked()
-        AppSettings["ShowSunPath"] = self.actSunPath.isChecked()
-        AppSettings["ShowSamples"] = self.actSamples.isChecked()
-        AppSettings["ShowUVGrid"] = self.actUVGrid.isChecked()
-        AppSettings["PixelRegion"] = self.wgtFisheye.pixelRegion
-        AppSettings["PixelWeighting"] = self.wgtFisheye.pixelWeighting.value
+        # AppSettings["ShowMask"] = self.actMask.isChecked()
+        # AppSettings["ShowHUD"] = self.actHUD.isChecked()
+        # AppSettings["ShowCompass"] = self.actCompass.isChecked()
+        # AppSettings["ShowSunPath"] = self.actSunPath.isChecked()
+        # AppSettings["ShowSamples"] = self.actSamples.isChecked()
+        # AppSettings["ShowUVGrid"] = self.actUVGrid.isChecked()
 
         # dump settings to file
         with open(AppSettings["Filename"], 'w') as file:

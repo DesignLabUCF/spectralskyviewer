@@ -26,6 +26,7 @@
 # @summary: Common constants and variables used across the program.
 # ====================================================================
 from enum import Enum
+import math
 
 
 # default sampling pattern: 81 samples (azimuth, altitude)
@@ -113,7 +114,7 @@ SamplingPattern = [
     (000.00, 90.0000),
 ]
 # convert to radians
-# SamplingPattern = [(math.radians(s[0]), math.radians(s[1])) for s in SamplingPattern]
+SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in SamplingPattern]
 
 # exposure times of the HDR data (in seconds)
 Exposures = [
@@ -189,6 +190,7 @@ DefAppSettings = {
     "ShowStatusBar": True,
     "PixelRegion": 1,
     "PixelWeighting": PixelWeighting.Mean.value,
+    "AvoidSunAngle": 0,
 }
 DefAppSettings.update({"ExportOptions": dict(DefExportOptions)})
 

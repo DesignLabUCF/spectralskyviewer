@@ -61,12 +61,6 @@ class ViewFisheye(QWidget):
         self.myPhotoDestRect = QRect()
         self.myPhotoRadius = 0
         self.myPhotoRotation = 0
-        self.enableMask = True
-        self.enableHUD = True
-        self.enableUVGrid = False
-        self.enableCompass = False
-        self.enableSunPath = False
-        self.enableSamples = False
         self.rawAvailable = False
         self.coordsMouse = (0, 0)
         self.viewCenter = (0, 0)
@@ -78,8 +72,6 @@ class ViewFisheye(QWidget):
         self.sampleBoundsVisible = []   # bounds QRect(x,y,w,h) of all samples on the photo rendered on screen (scaled)
         self.samplePointsInFile = []    # points (x,y) of all samples in the photo on file
         self.samplesSelected = []       # indices of selected samples
-        self.pixelRegion = 1
-        self.pixelWeighting = PixelWeighting.Mean
         self.skyCover = SkyCover.UNK
 
         # members - preloaded graphics
@@ -169,41 +161,11 @@ class ViewFisheye(QWidget):
     def setSunPosition(self, pos):
         self.sunPosition = pos
 
-    def resetRotation(self, angles=0):
-        self.myPhotoRotation = angles
-
-    def showMask(self, b):
-        self.enableMask = b
-
-    def showHUD(self, b):
-        self.enableHUD = b
-
-    def showUVGrid(self, b):
-        self.enableUVGrid = b
-
-    def showCompass(self, b):
-        self.enableCompass = b
-
-    def showSunPath(self, b):
-        self.enableSunPath = b
-
-    def showSamples(self, b):
-        self.enableSamples = b
-
-    def setPixelRegion(self, r):
-        if (r < PixelRegionMin):
-            self.pixelRegion = PixelRegionMin
-        else:
-            self.pixelRegion = r
-
-    def setPixelWeighting(self, w):
-        if (w not in PixelWeighting):
-            self.pixelWeighting = PixelWeighting.Mean
-        else:
-            self.pixelWeighting = w
-
     def setSkycover(self, sc):
         self.skyCover = sc
+
+    def resetRotation(self, angles=0):
+        self.myPhotoRotation = angles
 
     def selectSamples(self, message="none"):
         # nothing to do if no photo loaded
@@ -213,10 +175,18 @@ class ViewFisheye(QWidget):
         # first clear selection
         self.samplesSelected.clear()
 
-        # if (message == "none"):
-        if (message == "all"):
-            self.samplesSelected.clear()
+        # init
+        sunAvoid = AppSettings["AvoidSunAngle"]
+        sunAvoidRads = math.radians(AppSettings["AvoidSunAngle"])
+        sunPosRads = (math.radians(self.sunPosition[0]), math.radians(self.sunPosition[1]))
+
+        if (message == "none"):
+            pass
+        elif (message == "all"):
+            #self.samplesSelected.clear()
             for i in range(0, len(self.sampleBoundsVisible)):
+                if (sunAvoid > 0 and utility_angles.CentralAngle(sunPosRads, SamplingPatternRads[i]) <= sunAvoidRads):
+                    continue
                 self.samplesSelected.append(i)
 
         # update
@@ -341,7 +311,7 @@ class ViewFisheye(QWidget):
         if (mode == ViewFisheye.SelectionMode.Select):
             self.samplesSelected = []
 
-        # these are the sample we will be adding or removing
+        # these are the samples we will be adding or removing
         sampleAdjustments = []
 
         # which single sample did user select by point
@@ -384,6 +354,13 @@ class ViewFisheye(QWidget):
                 py = self.sampleBoundsVisible[i].center().y()
                 if (px >= x1 and px <= x2 and py >= y1 and py <= y2):
                     sampleAdjustments.append(i)
+
+        # remove samples in circumsolar avoidance region
+        sunAvoid = AppSettings["AvoidSunAngle"]
+        if (sunAvoid > 0):
+            sunAvoidRads = math.radians(AppSettings["AvoidSunAngle"])
+            sunPosRads = (math.radians(self.sunPosition[0]), math.radians(self.sunPosition[1]))
+            sampleAdjustments[:] = [idx for idx in sampleAdjustments if utility_angles.CentralAngle(sunPosRads, SamplingPatternRads[idx]) > sunAvoidRads]
 
         # no changes to be made
         if (len(sampleAdjustments) <= 0):
@@ -502,7 +479,7 @@ class ViewFisheye(QWidget):
         painter.begin(self)
 
         # background
-        if (not self.enableMask):
+        if (not AppSettings["ShowMask"]):
             self.brushBG.setColor(Qt.darkGray)
             self.brushBG.setStyle(Qt.Dense1Pattern)
             painter.setBackground(Qt.gray)
@@ -532,7 +509,7 @@ class ViewFisheye(QWidget):
             diameter = self.myPhotoRadius * 2
 
             # mask
-            if (self.enableMask):
+            if (AppSettings["ShowMask"]):
                 maskPainter = QPainter()
                 maskPainter.begin(self.mask)
                 maskPainter.setBrush(QBrush(Qt.magenta, Qt.SolidPattern))
@@ -543,14 +520,14 @@ class ViewFisheye(QWidget):
                 painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
 
             # HUD
-            if (self.enableHUD):
+            if (AppSettings["ShowHUD"]):
                 painter.setBackgroundMode(Qt.TransparentMode)
                 #painter.setBackground(Qt.black)
                 painter.setBrush(Qt.NoBrush)
                 painter.setFont(self.fontScaled)
 
                 # draw UV grid
-                if (self.enableUVGrid):
+                if (AppSettings["ShowUVGrid"]):
                     painter.setPen(self.penText)
                     # box
                     painter.drawLine(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius,
@@ -575,9 +552,9 @@ class ViewFisheye(QWidget):
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
 
                 # draw sun path
-                if (self.enableSunPath):
+                if (AppSettings["ShowSunPath"]):
                     painter.setPen(self.penSun)
-                    sunradius = self.myPhotoRadius*0.1
+                    sunradius = self.myPhotoRadius * 0.1
                     painter.drawEllipse(self.sunPositionVisible[0]-sunradius/2, self.sunPositionVisible[1]-sunradius/2, sunradius, sunradius)
                     painter.drawPath(self.pathSun)
                     for i in range(0, self.pathSun.elementCount()):
@@ -587,7 +564,7 @@ class ViewFisheye(QWidget):
                                          str(self.sunPathPoints[i][2].hour))
 
                 # draw compass
-                if (self.enableCompass):
+                if (AppSettings["ShowCompass"]):
                     painter.setPen(self.penText)
                     # ticks
                     for tick in self.compassTicks:
@@ -607,7 +584,7 @@ class ViewFisheye(QWidget):
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "N")
 
                 # draw sampling pattern
-                if (self.enableSamples):
+                if (AppSettings["ShowSamples"]):
                     painter.setPen(self.penText)
                     for i, r in enumerate(self.sampleBoundsVisible):
                         painter.drawEllipse(r)
@@ -634,7 +611,7 @@ class ViewFisheye(QWidget):
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTime))
                 # draw sky cover assessment
                 destRect.moveTo(10, 25)
-                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "Sky: " + self.skyCover.name + "/" + SkyCoverDesc[self.skyCover])
+                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, self.skyCover.name + "/" + SkyCoverDesc[self.skyCover])
                 # draw photo rotation
                 if (self.myPhotoRotation != 0):
                     destRect.moveTo(10, self.height()-25)
@@ -679,11 +656,12 @@ class ViewFisheye(QWidget):
                     distance = math.sqrt((coordsUC[0] * coordsUC[0]) + (coordsUC[1] * coordsUC[1]))
 
                 # pixels colors
-                colorsRegion = np.zeros((self.pixelRegion, self.pixelRegion, 4))
+                pixreg = AppSettings["PixelRegion"]
+                colorsRegion = np.zeros((pixreg, pixreg, 4))
                 colorFinal = colorsRegion[0,0] # RGBA of pixel under mouse of photo on disk
                 # colorFinal = self.myPhoto.pixelColor(coordsXY[0], coordsXY[1])
                 if (distance <= 1.0):
-                    halfdim = int(self.pixelRegion / 2)
+                    halfdim = int(pixreg / 2)
                     rstart = coordsXY[1] - halfdim
                     rstop = coordsXY[1]+halfdim+1
                     cstart = coordsXY[0]-halfdim
@@ -693,8 +671,8 @@ class ViewFisheye(QWidget):
                         colorsRegion = self.myPhotoPixels[rstart:rstop, cstart:cstop]
                         colorFinal = colorsRegion[halfdim, halfdim]
                         # pixel color weighting
-                        if self.pixelRegion > 1:
-                            colorFinal = utility_data.collectPixels([coordsXY], pixels=self.myPhotoPixels, region=self.pixelRegion, weighting=self.pixelWeighting)[0]
+                        if pixreg > 1:
+                            colorFinal = utility_data.collectPixels([coordsXY], pixels=self.myPhotoPixels, region=pixreg, weighting=PixelWeighting(AppSettings["PixelWeighting"]))[0]
 
                 # text strings for information we want to display on HUD
                 textxy = "-1, -1 xy"
@@ -738,12 +716,13 @@ class ViewFisheye(QWidget):
                 pixelsWeightedY = self.height() - 10 - ViewFisheye.SelectedPixelBox
 
                 # draw cursor visual indicators - fills (if cursor is within fisheye radius)
+                pixreg = AppSettings["PixelRegion"]
                 if (distance <= 1.0):
                     painter.setPen(Qt.NoPen)
                     # pixel region
-                    pixdim = ViewFisheye.SelectedPixelBox / self.pixelRegion
-                    for row in range(0, self.pixelRegion):
-                        for col in range(0, self.pixelRegion):
+                    pixdim = ViewFisheye.SelectedPixelBox / pixreg
+                    for row in range(0, pixreg):
+                        for col in range(0, pixreg):
                             color = colorsRegion[row, col]
                             color = QColor(color[0], color[1], color[2])
                             painter.setBrush(QBrush(color, Qt.SolidPattern))

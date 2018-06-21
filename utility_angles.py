@@ -23,6 +23,17 @@ from datetime import time, timedelta, datetime
 EARTH_MEAN_RADIUS = 6371.01 # In km
 ASTRONOMICAL_UNIT = 149597890 # In km
 
+
+def CentralAngle(a, b, inRadians=True):
+    """ Take in a pair of polar coordintes and return the corresponding central angle between them.
+        Note that a and b are tuples of (azimuth, altitude) or in other words (longitude, latitude).
+    """
+    if not inRadians:
+        a = (math.radians(a[0]), math.radians(a[1]))
+        b = (math.radians(b[0]), math.radians(b[1]))
+    # https://en.wikipedia.org/wiki/Great-circle_distance#Formulas
+    return math.acos( math.sin(a[1]) * math.sin(b[1]) + math.cos(a[1]) * math.cos(b[1]) * math.cos( abs(a[0]-b[0]) ) )
+
 def FisheyeAngleWarp(theta, phi, inRadians=True):
     """ Take in a pair of angles and return the corresponding angles on the 
           fisheye image taking into account the position of North, etc.
