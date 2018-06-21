@@ -133,6 +133,14 @@ SkyCover = Enum('SkyCover', 'UNK CLR SCT OVC')
 SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "Scattered", SkyCover.OVC: "Overcast"}
 SkyCoverFromStr = {"UNK": SkyCover.UNK, "CLR": SkyCover.CLR, "SCT": SkyCover.SCT, "OVC": SkyCover.OVC}
 
+# pixel region and weighting settings
+PixelRegionMin = 1
+PixelRegionMax = 99
+PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')
+
+# types of RAW data
+HDRRawExts = ['.cr2', '.raw', '.dng']
+
 # export attributes
 ExportAttributes = [
     # column name           description
@@ -152,10 +160,37 @@ ExportAttributes = [
     ("Radiance",            "Sample Radiance (W/m²/sr) per Wavelength (350-2500nm)"),
 ]
 
-# pixel region and weighting settings
-PixelRegionMin = 1
-PixelRegionMax = 99
-PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')
+# default export options
+DefExportOptions = {
+    "Filename": "",
+    "Delimiter": ",",
+    "PixelRegion": PixelRegionMin,
+    "PixelWeighting": PixelWeighting.Mean.value,
+    "Attributes": [0, 1, 2, 3, 4, 6, 7, 8, 12, 13]
+}
 
-# types of RAW data
-HDRRawExts = ['.cr2', '.raw', '.dng']
+# default application settings
+DefAppSettings = {
+    "Filename": "res\\settings.json",
+    "DataDirectory": "",
+    "WindowWidth": 1024,
+    "WindowHeight": 768,
+    "HorizSplitLeft": -1,
+    "HorizSplitRight": -1,
+    "VertSplitTop": -1,
+    "VertSplitBottom": -1,
+    "ShowMask": True,
+    "ShowHUD": True,
+    "ShowCompass": False,
+    "ShowSunPath": False,
+    "ShowSamples": False,
+    "ShowUVGrid": False,
+    "ShowEXIF": True,
+    "ShowStatusBar": True,
+    "PixelRegion": 1,
+    "PixelWeighting": PixelWeighting.Mean.value,
+}
+DefAppSettings.update({"ExportOptions": dict(DefExportOptions)})
+
+# application settings
+AppSettings = dict(DefAppSettings)

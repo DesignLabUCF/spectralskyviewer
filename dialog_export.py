@@ -34,20 +34,11 @@ from common import *
 
 class DialogExport(QDialog):
 
-    # default export options
-    ExportOptions = {
-        "Filename": "",
-        "Delimiter": ",",
-        "PixelRegion": PixelRegionMin,
-        "PixelWeighting": PixelWeighting.Mean.value,
-        "Attributes": [0, 1, 2, 3, 4, 6, 7, 8, 12, 13]
-    }
-
     @staticmethod
     def validateOptions(options):
         # must have all available options defined
         # ok to have extras, but must have the at least the default set
-        for key in DialogExport.ExportOptions:
+        for key in DefExportOptions:
             if (key not in options):
                 return False
         return True
@@ -63,7 +54,7 @@ class DialogExport(QDialog):
         if (options != None and DialogExport.validateOptions(options)):
             self.exportOptions = dict(options)
         else:
-            self.exportOptions = dict(DialogExport.ExportOptions)
+            self.exportOptions = dict(DefExportOptions)
 
         # init
         self.initWidgets()
