@@ -191,6 +191,7 @@ DefAppSettings = {
     "PixelRegion": 1,
     "PixelWeighting": PixelWeighting.Mean.value,
     "AvoidSunAngle": 0,
+    "GraphResolution": 5,
 }
 DefAppSettings.update({"ExportOptions": dict(DefExportOptions)})
 

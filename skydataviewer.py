@@ -161,6 +161,9 @@ class SkyDataViewer(QMainWindow):
         self.actPixelGaussian.setCheckable(True)
         self.actPixelGaussian.setStatusTip('Apply Gaussian weighting to pixels.')
         self.actPixelGaussian.triggered.connect(lambda: self.togglePixelWeighting(self.actPixelGaussian))
+        self.actGraphRes = QAction(QIcon(), 'Graph Resolution', self)
+        self.actGraphRes.setStatusTip('Specify radiance graph resolution.')
+        self.actGraphRes.triggered.connect(self.toggleGraphResolution)
         pixWeightGroup = QActionGroup(self)
         pixWeightGroup.addAction(self.actPixelMean)
         pixWeightGroup.addAction(self.actPixelMedian)
@@ -231,6 +234,8 @@ class SkyDataViewer(QMainWindow):
         submenu.addAction(self.actPixelMean)
         submenu.addAction(self.actPixelMedian)
         submenu.addAction(self.actPixelGaussian)
+        menu.addSeparator()
+        menu.addAction(self.actGraphRes)
         menu = menubar.addMenu('&Samples')
         menu.addAction(self.actExportSetup)
         menu.addAction(self.actExportSelected)
@@ -656,7 +661,9 @@ class SkyDataViewer(QMainWindow):
         for i in indices:
             if (i >= len(self.captureTimeASDFiles)):
                 break
-            xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[i])
+            xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[i], AppSettings["GraphResolution"])
+            #xs = xs[::AppSettings["GraphResolution"]]
+            #ys = ys[::AppSettings["GraphResolution"]]
             self.wgtGraph.plot(y=ys, x=xs, pen=self.wgtFisheye.getSamplePatternRGB(i)) # pen=(i, len(indices))
             #self.wgtGraph.addItem() # add a label/icon to graph with number of samples available
 
@@ -819,6 +826,7 @@ class SkyDataViewer(QMainWindow):
             menuCtx.addAction(self.actSunPath)
             menuCtx.addAction(self.actSamples)
             menuCtx.addAction(self.actUVGrid)
+            menuCtx.addAction(self.actGraphRes)
             menuCtx.addSeparator()
             menuCtx.addAction(self.actSelectAll)
             menuCtx.addAction(self.actSelectInv)
@@ -894,6 +902,17 @@ class SkyDataViewer(QMainWindow):
             AppSettings["PixelWeighting"] = PixelWeighting.Median.value
         elif (action == self.actPixelGaussian):
             AppSettings["PixelWeighting"] = PixelWeighting.Gaussian.value
+
+    def toggleGraphResolution(self):
+        resolution = 0
+        ok = True
+        resolution, ok = QInputDialog.getInt(self, "Radiance Graph Resolution", "Plot every (nm):", 1, 1, 50, 1,
+                                        Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+        if ok and resolution > 0 and resolution <= 50:
+            AppSettings["GraphResolution"] = resolution
+            self.graphSamples(self.wgtFisheye.samplesSelected)
+        else:
+            QMessageBox.warning(self, "Input Validation", "Radiance graph resolution must be 1-50(nm).", QMessageBox.Ok)
 
     def toggleAvoidSun(self):
         angle = 0

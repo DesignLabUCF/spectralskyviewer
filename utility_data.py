@@ -28,6 +28,7 @@
 import math
 import os
 import csv
+import itertools
 from datetime import datetime
 import numpy as np
 from PIL import Image
@@ -361,6 +362,7 @@ Function to compute the (azimuth, altitude) position of the sun using NREL SPA.
 def computeSunPosition(spadata):
     spa.spa_calculate(spadata)
     altitude = 90 - spadata.zenith # this application uses altitude (90 - zenith)
+    #altitude = spadata.zenith
     return (spadata.azimuth, altitude)
 
 '''
@@ -380,8 +382,10 @@ def computeSunPath(spadata):
         spadata2.hour = i
         spa.spa_calculate(spadata2)
         altitude = 90 - spadata2.zenith # this application uses altitude (90 - zenith)
+        #altitude = spadata.zenith
         # we only care about altitude when sun is visible (not on other side of Earth)
         if (altitude >= 0 and altitude <= 90):
+        #if (altitude <= 90):
             dt = datetime(spadata2.year, spadata2.month, spadata2.day, spadata2.hour, spadata2.minute, int(spadata2.second))
             sunpath.append((spadata2.azimuth, altitude, dt))
     return sunpath
@@ -423,13 +427,21 @@ def loadSunPath(filepath, isDir=True):
 '''
 Function to load a ViewSpecPro spectroradiometer ASD file.
 :param filepath: Path to TXT file with ASD data
+:param step: Indicates which rows of the file to load
 :note: File format should be a TXT with the following data per line: Wavelength, Reading
 :note: The TXT files were converted from ViewSpecPro's software in the order .asd to .asd.rad to .asd.rad.txt .
        That may not be a requirement for ASD data of future projects.
 :return: 2 lists, Xs (wavelengths) and Ys (irradiance)        
 '''
-def loadASDFile(filepath):
+def loadASDFile(filepath, step=1):
     if (not os.path.exists(filepath)):
         return [], []
-    xdata, ydata = np.loadtxt(filepath, skiprows=1, unpack=True)
+    xdata = []
+    ydata = []
+    with open(filepath) as f:
+        iter = itertools.islice(f, 0, None, step)
+        data = np.genfromtxt(iter, skip_header=1)
+        xdata = data[:,0]
+        ydata = data[:,1]
+        #xdata, ydata = np.loadtxt(filepath, skiprows=1, unpack=True)
     return xdata, ydata
