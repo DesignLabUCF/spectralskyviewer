@@ -37,6 +37,7 @@ def CentralAngle(a, b, inRadians=True):
 def FisheyeAngleWarp(theta, phi, inRadians=True):
     """ Take in a pair of angles and return the corresponding angles on the 
           fisheye image taking into account the position of North, etc.
+        Note phi is assumed to be altitude (not zenith)!!
     """
     if inRadians:
         phi = phi * 180.0 / math.pi
@@ -44,6 +45,9 @@ def FisheyeAngleWarp(theta, phi, inRadians=True):
 
     # Theta is azimuth, with north being directly down. 
     theta = 360 - ((theta + 270) % 360)
+
+    # This assumes phi is altitude, and then converts it to zenith
+    # sampling pattern coordinates used in this application were recorded in altitude
     phi = 90 - phi
 
     if inRadians:
@@ -67,6 +71,7 @@ def GetAngleFromUV(x, y):
 def GetUVFromAngle(theta, phi, inRadians=True):
     """ Get the UV coordinates for a pair of angles representing position
           on a fisheye hemisphere image.
+        Note phi is assumed to be zenith here (not altitude)!!
     """
     if not inRadians:
         phi = phi * math.pi / 180.0

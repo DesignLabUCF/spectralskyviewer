@@ -792,7 +792,7 @@ class SkyDataViewer(QMainWindow):
                 # next sample
                 file.write("\n")
 
-        self.log("Exported " + str(len(self.wgtFisheye.samplesSelected)) + " sample(s)")
+        self.log("Exported " + str(len(self.wgtFisheye.samplesSelected)) + " sample(s) of capture " + str(self.capture))
 
     # def convertSamples(self):
     #     dialog = DialogConverter()
