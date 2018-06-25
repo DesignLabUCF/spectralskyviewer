@@ -23,7 +23,7 @@
 # ====================================================================
 # @author: Joe Del Rocco
 # @since: 10/18/2017
-# @summary: Script with tools to help reorganize a directory of sky data.
+# @summary: Script to clean/organize a sky data directory.
 # ====================================================================
 import sys
 import os
@@ -539,7 +539,7 @@ def ASDFillFile(args):
 
 def main():
     # handle command line args
-    parser = argparse.ArgumentParser(description='Script with tools to help clean and reorganize a directory of sky data. WARNING! Please use the -r (--readonly) option first before making any changes to your data!', formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description='Script to clean / reorganize a sky data directory. WARNING! Use -r (--readonly) flag first to preview changes to your data!', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_help = True
     parser.add_argument('directory', help='a directory to operate on')
     # general arguments
