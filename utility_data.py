@@ -32,23 +32,17 @@ import itertools
 from datetime import datetime
 import numpy as np
 from PIL import Image
-from common import *
 import exifread
 import spa
+import common
 
 
 GaussianKernels = {}
 
-# for row in range(0, kernel.shape[0]):
-#     for col in range(0, kernel.shape[1]):
-#         print("%.4f " % round(kernel[row, col, 0], 4), end='')
-#     print()
-# print(np.sum(kernel))
-# for row in range(0, utility_data.KernelGauss5x5SD1.shape[0]):
-#     for col in range(0, utility_data.KernelGauss5x5SD1.shape[1]):
-#         print("%.4f " % round(utility_data.KernelGauss5x5SD1[row, col, 0], 4), end='')
-#     print()
-# print(np.sum(utility_data.KernelGauss5x5SD1)
+
+# - EXIF ----------------------------------------------------------------------
+# - EXIF ----------------------------------------------------------------------
+# - EXIF ----------------------------------------------------------------------
 
 '''
 Function to extract the "DateTimeOriginal" EXIF value of an image.
@@ -84,6 +78,22 @@ def imageEXIF(filepath):
         data = exifread.process_file(f, details=False)
     return data
 
+# - pixels --------------------------------------------------------------------
+# - pixels --------------------------------------------------------------------
+# - pixels --------------------------------------------------------------------
+
+# debugging
+# for row in range(0, kernel.shape[0]):
+#     for col in range(0, kernel.shape[1]):
+#         print("%.4f " % round(kernel[row, col, 0], 4), end='')
+#     print()
+# print(np.sum(kernel))
+# for row in range(0, utility_data.KernelGauss5x5SD1.shape[0]):
+#     for col in range(0, utility_data.KernelGauss5x5SD1.shape[1]):
+#         print("%.4f " % round(utility_data.KernelGauss5x5SD1[row, col, 0], 4), end='')
+#     print()
+# print(np.sum(utility_data.KernelGauss5x5SD1)
+
 '''
 Function to retrieve the pixels of specific coordinates of an image.
 :param coords: A list of (x, y) points to lookup in the image file.
@@ -95,7 +105,7 @@ Function to retrieve the pixels of specific coordinates of an image.
 :note: Coordinates MUST be within image bounds or this function will throw an exception!
 :note: Alpha component may or may not be included, depending on image format.
 '''
-def collectPixels(coords, file='', pixels=None, region=1, weighting=PixelWeighting.Mean):
+def collectPixels(coords, file='', pixels=None, region=1, weighting=common.PixelWeighting.Mean):
     if pixels is None:
         if not os.path.exists(file) or not coords:
             return []
@@ -109,11 +119,11 @@ def collectPixels(coords, file='', pixels=None, region=1, weighting=PixelWeighti
         if region <= 1:
             result = [pixels[int(c[1]), int(c[0])] for c in coords]
         else:
-            if weighting == PixelWeighting.Mean:
+            if weighting == common.PixelWeighting.Mean:
                 result = [pixelWeightedMean(pixels, c, region) for c in coords]
-            elif weighting == PixelWeighting.Median:
+            elif weighting == common.PixelWeighting.Median:
                 result = [pixelWeightedMedian(pixels, c, region) for c in coords]
-            elif weighting == PixelWeighting.Gaussian:
+            elif weighting == common.PixelWeighting.Gaussian:
                 result = [pixelWeightedGaussian(pixels, c, GaussianKernels[region]) for c in coords]
     return result
 
@@ -133,7 +143,7 @@ def gaussianKernel(width):
     # normalize
     kernel = kernel / total
     return kernel
-GaussianKernels = {w:gaussianKernel(w) for w in range(PixelRegionMin+2, PixelRegionMax+1, 2)}
+GaussianKernels = {w:gaussianKernel(w) for w in range(common.PixelRegionMin+2, common.PixelRegionMax+1, 2)}
 
 def pixelWeightedMean(pixels, coord, dim):
     radius = int(dim / 2)
@@ -176,12 +186,133 @@ def isHDRRawAvailable(hdrImgPath):
     if (not os.path.exists(hdrImgPath)):
         return False
     pathSplit = os.path.splitext(hdrImgPath.lower())
-    for ext in HDRRawExts:
+    for ext in common.HDRRawExts:
         if (pathSplit[1] == ext):
             return True
         elif (os.path.exists(pathSplit[0] + ext)):
             return True
     return False
+
+# - ASD -----------------------------------------------------------------------
+# - ASD -----------------------------------------------------------------------
+# - ASD -----------------------------------------------------------------------
+
+'''
+Function to load a ViewSpecPro spectroradiometer ASD file.
+:param filepath: Path to TXT file with ASD data
+:param step: Indicates which rows of the file to load
+:note: File format should be a TXT with the following data per line: Wavelength, Reading
+:note: The TXT files were converted from ViewSpecPro's software in the order .asd to .asd.rad to .asd.rad.txt .
+       That may not be a requirement for ASD data of future projects.
+:return: 2 lists, Xs (wavelengths) and Ys (irradiance)        
+'''
+def loadASDFile(filepath, step=1):
+    if (not os.path.exists(filepath)):
+        return [], []
+    xdata = []
+    ydata = []
+    with open(filepath) as f:
+        iter = itertools.islice(f, 0, None, step)
+        data = np.genfromtxt(iter, skip_header=1)
+        xdata = data[:,0]
+        ydata = data[:,1]
+        #xdata, ydata = np.loadtxt(filepath, skiprows=1, unpack=True)
+    return xdata, ydata
+
+# - sky cover -----------------------------------------------------------------
+# - sky cover -----------------------------------------------------------------
+# - sky cover -----------------------------------------------------------------
+
+'''
+Function to load a file with data with capture dates+times and sky cover assessment at those times.
+:param filepath: Path to file with sky cover data
+:param isDir: If filepath specified is a directory, then filename is assumed to be 'skycover.csv'
+:note: File format should be a CSV with the following columns: Date, TimeStart, TimeEnd, Sky.
+:return: A list of (datetime, datetime, skycover) for each capture timespan accounted for. 
+'''
+def loadSkyCoverData(filepath, isDir=True):
+    if (isDir):
+        filepath = os.path.join(filepath, 'skycover.csv') # assumes this filename if dir specified
+    if (not os.path.exists(filepath)):
+        return []
+
+    # (datetime, datetime, skycover)
+    skycover = []
+    dtfmtstr = "%m/%d/%Y %H:%M"
+
+    # loop through each row of the file
+    with open(filepath, 'r') as f:
+        reader = csv.reader(f, delimiter=',')
+        next(reader, None)  # ignore header
+        for row in reader:
+            if (len(row) < 4):
+                continue
+            try:
+                skycover.append((
+                    datetime.strptime(row[0] + " " + row[1], dtfmtstr),
+                    datetime.strptime(row[0] + " " + row[2], dtfmtstr),
+                    common.SkyCoverFromStr[row[3]]
+                ))
+            except ValueError or IndexError:
+                continue
+
+    return skycover
+
+'''
+Function to find the first instance found of sky cover assessment of a particular capture time.
+:param capture: Capture (datetime) timestamp.
+:param skycovers: List of SkyCover conditions.
+:return: A sky cover. SkyCover.UNK is returned if none found. 
+'''
+def findCaptureSkyCover(capture, skycovers):
+    capture = capture.replace(second=0)
+    sky = common.SkyCover.UNK
+    for sc in skycovers:
+        if (capture >= sc[0] and capture <= sc[1]):
+            sky = sc[2]
+            break
+    return sky
+
+# - sampling ------------------------------------------------------------------
+# - sampling ------------------------------------------------------------------
+# - sampling ------------------------------------------------------------------
+
+'''
+Function to load a file with a sky sampling pattern.
+:param filepath: Path to file
+:param isDir: If filepath specified is a directory, then filename is assumed to be 'sampling.csv'
+:note: File format should be a CSV with the following columns: azimuth, altitude.
+:return: A list of (azimuth, altitude) coordinates in degrees. And a list in radians.
+'''
+def loadSamplingPattern(filepath, isDir=True):
+    if (isDir):
+        filepath = os.path.join(filepath, 'sampling.csv') # assumes this filename if dir specified
+    if (not os.path.exists(filepath)):
+        return [], []
+
+    # (azimuth, altitude)
+    patternDegs = []
+    patternRads = []
+
+    # loop through each row of the file
+    with open(filepath, 'r') as f:
+        reader = csv.reader(f, delimiter=',')
+        next(reader, None)  # ignore header
+        for row in reader:
+            if (len(row) < 2):
+                continue
+            try:
+                patternDegs.append((float(row[0]), float(row[1])))
+            except ValueError or IndexError:
+                continue
+
+    patternRads = [(math.radians(s[0]), math.radians(s[1])) for s in patternDegs]
+
+    return patternDegs, patternRads
+
+# - SPA -----------------------------------------------------------------------
+# - SPA -----------------------------------------------------------------------
+# - SPA -----------------------------------------------------------------------
 
 '''
 Function to load a file with data used for NREL SPA's algorithm.
@@ -248,56 +379,6 @@ def loadSPASiteData(filepath, isDir=True):
                 data.atmos_refract = float(row[1])
 
     return data
-
-'''
-Function to load a file with data with capture dates+times and sky cover assessment at those times.
-:param filepath: Path to file with sky cover data
-:param isDir: If filepath specified is a directory, then filename is assumed to be 'sky.csv'
-:note: File format should be a CSV with the following columns: 
-:return: A list of (datetime, datetime, skycover) for each capture timespan accounted for. 
-'''
-def loadSkyCoverData(filepath, isDir=True):
-    if (isDir):
-        filepath = os.path.join(filepath, 'sky.csv') # assumes this filename if dir specified
-    if (not os.path.exists(filepath)):
-        return []
-
-    # (datetime, datetime, skycover)
-    skycover = []
-    dtfmtstr = "%m/%d/%Y %H:%M"
-
-    # overwrite with values read from spa site info
-    with open(filepath, 'r') as f:
-        reader = csv.reader(f, delimiter=',')
-        next(reader, None)  # ignore header
-        for row in reader:
-            if (len(row) < 4):
-                continue
-            try:
-                skycover.append((
-                    datetime.strptime(row[0] + " " + row[1], dtfmtstr),
-                    datetime.strptime(row[0] + " " + row[2], dtfmtstr),
-                    SkyCoverFromStr[row[3]]
-                ))
-            except ValueError or IndexError:
-                continue
-
-    return skycover
-
-'''
-Function to find the first instance found of sky cover assessment of a particular capture time.
-:param capture: Capture (datetime) timestamp.
-:param skycovers: List of SkyCover conditions.
-:return: A sky cover. SkyCover.UNK is returned if none found. 
-'''
-def findCaptureSkyCover(capture, skycovers):
-    capture = capture.replace(second=0)
-    sky = SkyCover.UNK
-    for sc in skycovers:
-        if (capture >= sc[0] and capture <= sc[1]):
-            sky = sc[2]
-            break
-    return sky
 
 '''
 Function to deep copy a spa_data object. This function is useful because SWIG didn't create pickling code for deep copy.
@@ -423,25 +504,3 @@ def loadSunPath(filepath, isDir=True):
             if (point[1] >=0 and point[1] <= 90):
                 sunpath.append(point)
     return sunpath
-
-'''
-Function to load a ViewSpecPro spectroradiometer ASD file.
-:param filepath: Path to TXT file with ASD data
-:param step: Indicates which rows of the file to load
-:note: File format should be a TXT with the following data per line: Wavelength, Reading
-:note: The TXT files were converted from ViewSpecPro's software in the order .asd to .asd.rad to .asd.rad.txt .
-       That may not be a requirement for ASD data of future projects.
-:return: 2 lists, Xs (wavelengths) and Ys (irradiance)        
-'''
-def loadASDFile(filepath, step=1):
-    if (not os.path.exists(filepath)):
-        return [], []
-    xdata = []
-    ydata = []
-    with open(filepath) as f:
-        iter = itertools.islice(f, 0, None, step)
-        data = np.genfromtxt(iter, skip_header=1)
-        xdata = data[:,0]
-        ydata = data[:,1]
-        #xdata, ydata = np.loadtxt(filepath, skiprows=1, unpack=True)
-    return xdata, ydata

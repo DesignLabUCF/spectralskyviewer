@@ -34,7 +34,7 @@ from PyQt5.QtCore import Qt, QRect, QPoint, QPointF
 from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QIcon, QColor
 from PyQt5.QtWidgets import QWidget, QStyle, QAction, QMenu
 import numpy as np
-from common import *
+import common
 import utility
 import utility_angles
 import utility_data
@@ -72,7 +72,7 @@ class ViewFisheye(QWidget):
         self.sampleBoundsVisible = []   # bounds QRect(x,y,w,h) of all samples on the photo rendered on screen (scaled)
         self.samplePointsInFile = []    # points (x,y) of all samples in the photo on file
         self.samplesSelected = []       # indices of selected samples
-        self.skyCover = SkyCover.UNK
+        self.skyCover = common.SkyCover.UNK
 
         # members - preloaded graphics
         self.painter = QPainter()
@@ -91,14 +91,14 @@ class ViewFisheye(QWidget):
         # init
         self.setMouseTracking(True)
         color = QColor(255, 255, 255)
-        for t,p in SamplingPattern:
+        for t,p in common.SamplingPattern:
             self.sampleBoundsVisible.append(QRect(0, 0, 0, 0)) # these will need to be recomputed as photo scales
             self.samplePointsInFile.append((0, 0))             # these only need to be computed once per photo
             color.setHsv(t, int(utility.normalize(p, 0, 90)*127+128), 255)
             self.penSelected.append(QPen(color, 3, Qt.SolidLine))
 
     def getSamplePatternRGB(self, index):
-        if (index < 0 or index >= len(SamplingPattern)):
+        if (index < 0 or index >= len(common.SamplingPattern)):
             return (0,0,0)
         color = self.penSelected[index].color()
         return (color.red(), color.green(), color.blue())
@@ -121,8 +121,8 @@ class ViewFisheye(QWidget):
             center = (int(self.myPhotoSrcRect.width() / 2), int(self.myPhotoSrcRect.height()/2))
             radius = self.myPhotoSrcRect.height() / 2
             diameter = radius * 2
-            for i in range(0, len(SamplingPattern)):
-                u, v = utility_angles.FisheyeAngleWarp(SamplingPattern[i][0], SamplingPattern[i][1], inRadians=False)
+            for i in range(0, len(common.SamplingPattern)):
+                u, v = utility_angles.FisheyeAngleWarp(common.SamplingPattern[i][0], common.SamplingPattern[i][1], inRadians=False)
                 u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
                 x = (center[0] - radius) + (u * diameter)
                 y = (center[1] - radius) + (v * diameter)
@@ -176,18 +176,18 @@ class ViewFisheye(QWidget):
         if (message == "none"):
             self.samplesSelected.clear()
         elif (message == "all"):
-            self.samplesSelected[:] = [i for i in range(0, len(SamplingPattern))]
+            self.samplesSelected[:] = [i for i in range(0, len(common.SamplingPattern))]
         elif (message == "inverse"):
-            allidx = set([i for i in range(0, len(SamplingPattern))])
+            allidx = set([i for i in range(0, len(common.SamplingPattern))])
             selidx = set(self.samplesSelected)
             self.samplesSelected[:] = list(allidx - selidx)
 
         # remove samples in circumsolar avoidance region if necessary
-        sunAvoid = AppSettings["AvoidSunAngle"]
+        sunAvoid = common.AppSettings["AvoidSunAngle"]
         if (sunAvoid > 0):
-            sunAvoidRads = math.radians(AppSettings["AvoidSunAngle"])
+            sunAvoidRads = math.radians(common.AppSettings["AvoidSunAngle"])
             sunPosRads = (math.radians(self.sunPosition[0]), math.radians(self.sunPosition[1]))
-            self.samplesSelected[:] = [idx for idx in self.samplesSelected if utility_angles.CentralAngle(sunPosRads, SamplingPatternRads[idx]) > sunAvoidRads]
+            self.samplesSelected[:] = [idx for idx in self.samplesSelected if utility_angles.CentralAngle(sunPosRads, common.SamplingPatternRads[idx]) > sunAvoidRads]
 
         # update
         self.repaint()
@@ -356,11 +356,11 @@ class ViewFisheye(QWidget):
                     sampleAdjustments.append(i)
 
         # remove samples in circumsolar avoidance region
-        sunAvoid = AppSettings["AvoidSunAngle"]
+        sunAvoid = common.AppSettings["AvoidSunAngle"]
         if (sunAvoid > 0):
-            sunAvoidRads = math.radians(AppSettings["AvoidSunAngle"])
+            sunAvoidRads = math.radians(common.AppSettings["AvoidSunAngle"])
             sunPosRads = (math.radians(self.sunPosition[0]), math.radians(self.sunPosition[1]))
-            sampleAdjustments[:] = [idx for idx in sampleAdjustments if utility_angles.CentralAngle(sunPosRads, SamplingPatternRads[idx]) > sunAvoidRads]
+            sampleAdjustments[:] = [idx for idx in sampleAdjustments if utility_angles.CentralAngle(sunPosRads, common.SamplingPatternRads[idx]) > sunAvoidRads]
 
         # no changes to be made
         if (len(sampleAdjustments) <= 0):
@@ -386,7 +386,7 @@ class ViewFisheye(QWidget):
             self.myPhotoDestRect = QRect(0, 0, self.width(), self.height())
             self.viewCenter = (self.width() / 2, self.height() / 2)
             self.myPhotoRadius = 0
-            for i in range(0, len(SamplingPattern)):
+            for i in range(0, len(common.SamplingPattern)):
                 self.sampleBoundsVisible[i].setRect(self.viewCenter[0], self.viewCenter[1], 0, 0)
             return
 
@@ -419,8 +419,8 @@ class ViewFisheye(QWidget):
         sampleDiameter = sampleRadius * 2
         ViewFisheye.SelectionRectMin = sampleDiameter # minimum selection rect is based on this
         u, v = 0, 0
-        for i in range(0, len(SamplingPattern)):
-            u, v = utility_angles.FisheyeAngleWarp(SamplingPattern[i][0], SamplingPattern[i][1], inRadians=False)
+        for i in range(0, len(common.SamplingPattern)):
+            u, v = utility_angles.FisheyeAngleWarp(common.SamplingPattern[i][0], common.SamplingPattern[i][1], inRadians=False)
             u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
             u = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
             v = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
@@ -463,6 +463,7 @@ class ViewFisheye(QWidget):
         # compute sun position screen point
         t, p = self.sunPosition
         t, p = utility_angles.FisheyeAngleWarp(t, p, inRadians=False)
+        #p = math.degrees(8 * math.sin(math.radians(p)))
         u, v = utility_angles.GetUVFromAngle(t, p, inRadians=False)
         x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
         y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
@@ -479,7 +480,7 @@ class ViewFisheye(QWidget):
         painter.begin(self)
 
         # background
-        if (not AppSettings["ShowMask"]):
+        if (not common.AppSettings["ShowMask"]):
             self.brushBG.setColor(Qt.darkGray)
             self.brushBG.setStyle(Qt.Dense1Pattern)
             painter.setBackground(Qt.gray)
@@ -509,7 +510,7 @@ class ViewFisheye(QWidget):
             diameter = self.myPhotoRadius * 2
 
             # mask
-            if (AppSettings["ShowMask"]):
+            if (common.AppSettings["ShowMask"]):
                 maskPainter = QPainter()
                 maskPainter.begin(self.mask)
                 maskPainter.setBrush(QBrush(Qt.magenta, Qt.SolidPattern))
@@ -520,14 +521,14 @@ class ViewFisheye(QWidget):
                 painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
 
             # HUD
-            if (AppSettings["ShowHUD"]):
+            if (common.AppSettings["ShowHUD"]):
                 painter.setBackgroundMode(Qt.TransparentMode)
                 #painter.setBackground(Qt.black)
                 painter.setBrush(Qt.NoBrush)
                 painter.setFont(self.fontScaled)
 
                 # draw UV grid
-                if (AppSettings["ShowUVGrid"]):
+                if (common.AppSettings["ShowUVGrid"]):
                     painter.setPen(self.penText)
                     # box
                     painter.drawLine(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius,
@@ -552,7 +553,7 @@ class ViewFisheye(QWidget):
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
 
                 # draw sun path
-                if (AppSettings["ShowSunPath"]):
+                if (common.AppSettings["ShowSunPath"]):
                     painter.setPen(self.penSun)
                     sunradius = self.myPhotoRadius * 0.1
                     painter.drawEllipse(self.sunPositionVisible[0]-sunradius/2, self.sunPositionVisible[1]-sunradius/2, sunradius, sunradius)
@@ -564,7 +565,7 @@ class ViewFisheye(QWidget):
                                          str(self.sunPathPoints[i][2].hour))
 
                 # draw compass
-                if (AppSettings["ShowCompass"]):
+                if (common.AppSettings["ShowCompass"]):
                     painter.setPen(self.penText)
                     # ticks
                     for tick in self.compassTicks:
@@ -584,7 +585,7 @@ class ViewFisheye(QWidget):
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "N")
 
                 # draw sampling pattern
-                if (AppSettings["ShowSamples"]):
+                if (common.AppSettings["ShowSamples"]):
                     painter.setPen(self.penText)
                     for i, r in enumerate(self.sampleBoundsVisible):
                         painter.drawEllipse(r)
@@ -611,7 +612,7 @@ class ViewFisheye(QWidget):
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTime))
                 # draw sky cover assessment
                 destRect.moveTo(10, 25)
-                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, self.skyCover.name + "/" + SkyCoverDesc[self.skyCover])
+                painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, self.skyCover.name + "/" + common.SkyCoverDesc[self.skyCover])
                 # draw photo rotation
                 if (self.myPhotoRotation != 0):
                     destRect.moveTo(10, self.height()-25)
@@ -656,7 +657,7 @@ class ViewFisheye(QWidget):
                     distance = math.sqrt((coordsUC[0] * coordsUC[0]) + (coordsUC[1] * coordsUC[1]))
 
                 # pixels colors
-                pixreg = AppSettings["PixelRegion"]
+                pixreg = common.AppSettings["PixelRegion"]
                 colorsRegion = np.zeros((pixreg, pixreg, 4))
                 colorFinal = colorsRegion[0,0] # RGBA of pixel under mouse of photo on disk
                 # colorFinal = self.myPhoto.pixelColor(coordsXY[0], coordsXY[1])
@@ -672,7 +673,7 @@ class ViewFisheye(QWidget):
                         colorFinal = colorsRegion[halfdim, halfdim]
                         # pixel color weighting
                         if pixreg > 1:
-                            colorFinal = utility_data.collectPixels([coordsXY], pixels=self.myPhotoPixels, region=pixreg, weighting=PixelWeighting(AppSettings["PixelWeighting"]))[0]
+                            colorFinal = utility_data.collectPixels([coordsXY], pixels=self.myPhotoPixels, region=pixreg, weighting=common.PixelWeighting(common.AppSettings["PixelWeighting"]))[0]
 
                 # text strings for information we want to display on HUD
                 textxy = "-1, -1 xy"
@@ -716,7 +717,7 @@ class ViewFisheye(QWidget):
                 pixelsWeightedY = self.height() - 10 - ViewFisheye.SelectedPixelBox
 
                 # draw cursor visual indicators - fills (if cursor is within fisheye radius)
-                pixreg = AppSettings["PixelRegion"]
+                pixreg = common.AppSettings["PixelRegion"]
                 if (distance <= 1.0):
                     painter.setPen(Qt.NoPen)
                     # pixel region

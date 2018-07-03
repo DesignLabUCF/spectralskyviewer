@@ -29,7 +29,7 @@ import os
 from PyQt5.QtGui import QIcon, QStandardItem, QStandardItemModel
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
-from common import *
+import common
 
 
 class DialogExport(QDialog):
@@ -38,14 +38,14 @@ class DialogExport(QDialog):
     def validateOptions(options):
         # must have all available options defined
         # ok to have extras, but must have the at least the default set
-        for key in DefExportOptions:
+        for key in common.DefExportOptions:
             if (key not in options):
                 return False
         return True
 
     @staticmethod
     def attributeFromIndex(index):
-        return ExportAttributes[index][0]
+        return common.ExportAttributes[index][0]
 
     def __init__(self, options=None):
         super().__init__(None, Qt.WindowSystemMenuHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
@@ -54,7 +54,7 @@ class DialogExport(QDialog):
         if (options != None and DialogExport.validateOptions(options)):
             self.exportOptions = dict(options)
         else:
-            self.exportOptions = dict(DefExportOptions)
+            self.exportOptions = dict(common.DefExportOptions)
 
         # init
         self.initWidgets()
@@ -69,12 +69,12 @@ class DialogExport(QDialog):
         for i in range(0, self.cbxPixelRegion.count()):
             if int(self.cbxPixelRegion.itemText(i)) == self.exportOptions["PixelRegion"]:
                 self.cbxPixelRegion.setCurrentIndex(i)
-        pw = PixelWeighting(self.exportOptions["PixelWeighting"])
-        if (pw == PixelWeighting.Mean):
+        pw = common.PixelWeighting(self.exportOptions["PixelWeighting"])
+        if (pw == common.PixelWeighting.Mean):
             self.radPixelMean.setChecked(True)
-        elif (pw == PixelWeighting.Median):
+        elif (pw == common.PixelWeighting.Median):
             self.radPixelMedian.setChecked(True)
-        elif (pw == PixelWeighting.Gaussian):
+        elif (pw == common.PixelWeighting.Gaussian):
             self.radPixelGaussian.setChecked(True)
 
     def initWidgets(self):
@@ -120,7 +120,7 @@ class DialogExport(QDialog):
         self.cbxPixelRegion = QComboBox()
         self.cbxPixelRegion.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         #self.cbxPixelRegion.currentIndexChanged.connect(self.pixelRegionEntered)
-        self.cbxPixelRegion.addItems([str(x) for x in range(PixelRegionMin, PixelRegionMax+1,2)])
+        self.cbxPixelRegion.addItems([str(x) for x in range(common.PixelRegionMin, common.PixelRegionMax+1,2)])
         boxPixelRegion = QHBoxLayout()
         boxPixelRegion.addWidget(self.cbxPixelRegion)
         grpPixelRegion = QGroupBox("(n x n) Pixel Region:", self)
@@ -143,14 +143,14 @@ class DialogExport(QDialog):
         self.lstAttributes = QListView()
         model = QStandardItemModel()
         # header
-        item = QStandardItem(ExportAttributes[0][1])
+        item = QStandardItem(common.ExportAttributes[0][1])
         item.setCheckable(True)
         item.setCheckState(True)
         item.setEnabled(False)
         model.appendRow(item)
         # optional attributes
-        for i in range(1, len(ExportAttributes)):
-            item = QStandardItem(ExportAttributes[i][1])
+        for i in range(1, len(common.ExportAttributes)):
+            item = QStandardItem(common.ExportAttributes[i][1])
             item.setEditable(False)
             item.setCheckable(True)
             if (i in self.exportOptions["Attributes"]):
@@ -220,9 +220,9 @@ class DialogExport(QDialog):
         self.exportOptions["PixelRegion"] = int(self.cbxPixelRegion.currentText())
 
         # save pixel weighting
-        if (self.radPixelMean.isChecked()):       self.exportOptions["PixelWeighting"] = PixelWeighting.Mean.value
-        elif (self.radPixelMedian.isChecked()):   self.exportOptions["PixelWeighting"] = PixelWeighting.Median.value
-        elif (self.radPixelGaussian.isChecked()): self.exportOptions["PixelWeighting"] = PixelWeighting.Gaussian.value
+        if (self.radPixelMean.isChecked()):       self.exportOptions["PixelWeighting"] = common.PixelWeighting.Mean.value
+        elif (self.radPixelMedian.isChecked()):   self.exportOptions["PixelWeighting"] = common.PixelWeighting.Median.value
+        elif (self.radPixelGaussian.isChecked()): self.exportOptions["PixelWeighting"] = common.PixelWeighting.Gaussian.value
 
         # save selected attributes
         attributes = []

@@ -29,18 +29,17 @@ import sys
 import os
 import json
 from datetime import datetime
-from PyQt5.QtCore import QCoreApplication, Qt, QDir
+from PyQt5.QtCore import Qt, QDir
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import *
-from PyQt5.QtWidgets import qApp, QGraphicsPixmapItem
 import pyqtgraph as pg
-from common import *
+import common
 import spa
 import utility
 import utility_data
 from view_fisheye import ViewFisheye
 from dialog_export import DialogExport
-#from dialog_converter import DialogConverter
+from dialog_converter import DialogConverter
 
 
 class SkyDataViewer(QMainWindow):
@@ -57,17 +56,20 @@ class SkyDataViewer(QMainWindow):
         self.skyData = []
 
         # load settings
-        if (os.path.exists(AppSettings["Filename"])):
+        if (os.path.exists(common.AppSettings["Filename"])):
             loaded = []
-            with open(AppSettings["Filename"], 'r') as file:
+            with open(common.AppSettings["Filename"], 'r') as file:
                 loaded = json.load(file)
             for key in loaded:
-                if (key in AppSettings):
-                    AppSettings.update({key: loaded[key]})
+                if (key in common.AppSettings):
+                    common.AppSettings.update({key: loaded[key]})
         # validate settings
-        AppSettings["ExportOptions"]["Attributes"].sort()
-        if (len(AppSettings["DataDirectory"]) > 0 and not os.path.exists(AppSettings["DataDirectory"])):
-            AppSettings["DataDirectory"] = ""
+                common.AppSettings["ExportOptions"]["Attributes"].sort()
+        if (len(common.AppSettings["DataDirectory"]) > 0 and not os.path.exists(common.AppSettings["DataDirectory"])):
+            common.AppSettings["DataDirectory"] = ""
+
+        # load sampling pattern
+        common.SamplingPattern, common.SamplingPatternRads = utility_data.loadSamplingPattern(common.AppSettings["DataDirectory"])
 
         # init
         QToolTip.setFont(QFont('SansSerif', 8))
@@ -75,11 +77,11 @@ class SkyDataViewer(QMainWindow):
         self.initMenu()
         self.initWidgets()
         # self.setGeometry(0, 0, 1024, 768)
-        self.resize(AppSettings["WindowWidth"], AppSettings["WindowHeight"])
+        self.resize(common.AppSettings["WindowWidth"], common.AppSettings["WindowHeight"])
         self.setWindowTitle("Sky Data Viewer")
         self.setWindowIcon(QIcon('res/icon.png'))
         self.statusBar().showMessage('Ready')
-        if (AppSettings["ShowStatusBar"]):
+        if (common.AppSettings["ShowStatusBar"]):
             self.statusBar().show()
         else:
             self.statusBar().hide()
@@ -102,42 +104,42 @@ class SkyDataViewer(QMainWindow):
         self.actEXIF = QAction(QIcon(), 'Show E&XIF', self)
         self.actEXIF = QAction(QIcon(), 'Show E&XIF', self)
         self.actEXIF.setCheckable(True)
-        self.actEXIF.setChecked(AppSettings["ShowEXIF"])
+        self.actEXIF.setChecked(common.AppSettings["ShowEXIF"])
         self.actEXIF.setStatusTip('Toggle display of EXIF panel')
         self.actEXIF.triggered.connect(self.toggleEXIFPanel)
         self.actStatusBar = QAction(QIcon(), 'Show Status &Bar', self)
         self.actStatusBar.setCheckable(True)
-        self.actStatusBar.setChecked(AppSettings["ShowStatusBar"])
+        self.actStatusBar.setChecked(common.AppSettings["ShowStatusBar"])
         self.actStatusBar.setStatusTip('Toggle display of status bar')
         self.actStatusBar.triggered.connect(self.toggleStatusBar)
         self.actMask = QAction(QIcon(), 'Show &Mask', self)
         self.actMask.setCheckable(True)
-        self.actMask.setChecked(AppSettings["ShowMask"])
+        self.actMask.setChecked(common.AppSettings["ShowMask"])
         self.actMask.setStatusTip('Toggle display of fisheye mask')
         self.actMask.triggered.connect(self.toggleMask)
         self.actHUD = QAction(QIcon(), 'Show &HUD', self)
         self.actHUD.setCheckable(True)
-        self.actHUD.setChecked(AppSettings["ShowHUD"])
+        self.actHUD.setChecked(common.AppSettings["ShowHUD"])
         self.actHUD.setStatusTip('Toggle display of HUD')
         self.actHUD.triggered.connect(self.toggleHUD)
         self.actCompass = QAction(QIcon(), 'Show &Compass', self)
         self.actCompass.setCheckable(True)
-        self.actCompass.setChecked(AppSettings["ShowCompass"])
+        self.actCompass.setChecked(common.AppSettings["ShowCompass"])
         self.actCompass.setStatusTip('Toggle display of compass')
         self.actCompass.triggered.connect(self.toggleCompass)
         self.actSunPath = QAction(QIcon(), 'Show Su&n Path', self)
         self.actSunPath.setCheckable(True)
-        self.actSunPath.setChecked(AppSettings["ShowSunPath"])
+        self.actSunPath.setChecked(common.AppSettings["ShowSunPath"])
         self.actSunPath.setStatusTip('Toggle display of sun path')
         self.actSunPath.triggered.connect(self.toggleSunPath)
         self.actSamples = QAction(QIcon(), 'Show &Samples', self)
         self.actSamples.setCheckable(True)
-        self.actSamples.setChecked(AppSettings["ShowSamples"])
+        self.actSamples.setChecked(common.AppSettings["ShowSamples"])
         self.actSamples.setStatusTip('Toggle display of sampling pattern')
         self.actSamples.triggered.connect(self.toggleSamples)
         self.actUVGrid = QAction(QIcon(), 'Show &UVGrid', self)
         self.actUVGrid.setCheckable(True)
-        self.actUVGrid.setChecked(AppSettings["ShowUVGrid"])
+        self.actUVGrid.setChecked(common.AppSettings["ShowUVGrid"])
         self.actUVGrid.setStatusTip('Toggle display of UV grid')
         self.actUVGrid.triggered.connect(self.toggleUVGrid)
         self.actPixel1 = QAction(QIcon(), '1 Pixel', self)
@@ -168,12 +170,12 @@ class SkyDataViewer(QMainWindow):
         pixWeightGroup.addAction(self.actPixelMean)
         pixWeightGroup.addAction(self.actPixelMedian)
         pixWeightGroup.addAction(self.actPixelGaussian)
-        pixWeight = PixelWeighting(AppSettings["PixelWeighting"])
-        if (pixWeight == PixelWeighting.Mean):
+        pixWeight = common.PixelWeighting(common.AppSettings["PixelWeighting"])
+        if (pixWeight == common.PixelWeighting.Mean):
             self.actPixelMean.setChecked(True)
-        elif (pixWeight == PixelWeighting.Median):
+        elif (pixWeight == common.PixelWeighting.Median):
             self.actPixelMedian.setChecked(True)
-        elif (pixWeight == PixelWeighting.Gaussian):
+        elif (pixWeight == common.PixelWeighting.Gaussian):
             self.actPixelGaussian.setChecked(True)
 
         # sky sample menu actions
@@ -199,9 +201,9 @@ class SkyDataViewer(QMainWindow):
         self.actAvoidSun = QAction(QIcon(), 'Avoid Circumsolar', self)
         self.actAvoidSun.setStatusTip('Deselect samples around sun within a specified angle.')
         self.actAvoidSun.triggered.connect(self.toggleAvoidSun)
-        #self.actSampleConverter = QAction(QIcon(), 'Sample &Converter', self)
-        #self.actSampleConverter.setStatusTip('Re-export samples with different properties')
-        #self.actSampleConverter.triggered.connect(self.convertSamples)
+        self.actSampleConverter = QAction(QIcon(), 'Sample &Converter', self)
+        self.actSampleConverter.setStatusTip('Re-export samples with different properties')
+        self.actSampleConverter.triggered.connect(self.convertSamples)
 
         # help menu actions
         actAbout = QAction(QIcon(), '&About', self)
@@ -343,8 +345,8 @@ class SkyDataViewer(QMainWindow):
         self.splitHoriz = QSplitter(Qt.Horizontal)
         self.splitHoriz.addWidget(self.wgtFisheye)
         self.splitHoriz.addWidget(pnlEXIF)
-        self.splitHoriz.setSizes([AppSettings["HorizSplitLeft"] if AppSettings["HorizSplitLeft"] >= 0 else AppSettings["WindowWidth"] * 0.75,
-                                  AppSettings["HorizSplitRight"] if AppSettings["HorizSplitRight"] >= 0 else AppSettings["WindowWidth"] * 0.25])
+        self.splitHoriz.setSizes([common.AppSettings["HorizSplitLeft"] if common.AppSettings["HorizSplitLeft"] >= 0 else common.AppSettings["WindowWidth"] * 0.75,
+                                  common.AppSettings["HorizSplitRight"] if common.AppSettings["HorizSplitRight"] >= 0 else common.AppSettings["WindowWidth"] * 0.25])
 
         # upper panel
         boxUpperHalf = QHBoxLayout()
@@ -369,8 +371,8 @@ class SkyDataViewer(QMainWindow):
         self.splitVert = QSplitter(Qt.Vertical)
         self.splitVert.addWidget(pnlUpperHalf)
         self.splitVert.addWidget(self.wgtGraph)
-        self.splitVert.setSizes([AppSettings["VertSplitTop"] if AppSettings["VertSplitTop"] >= 0 else AppSettings["WindowHeight"] * 0.75,
-                                 AppSettings["VertSplitBottom"] if AppSettings["VertSplitBottom"] >= 0 else AppSettings["WindowHeight"] * 0.25])
+        self.splitVert.setSizes([common.AppSettings["VertSplitTop"] if common.AppSettings["VertSplitTop"] >= 0 else common.AppSettings["WindowHeight"] * 0.75,
+                                 common.AppSettings["VertSplitBottom"] if common.AppSettings["VertSplitBottom"] >= 0 else common.AppSettings["WindowHeight"] * 0.25])
 
         # attach high level panels and vertical splitter to layout of window
         gridMain = QGridLayout()
@@ -392,7 +394,7 @@ class SkyDataViewer(QMainWindow):
         self.cbxTime.addItem("-time-")
         self.cbxExposure.clear()
         self.cbxExposure.addItem("-exposure-")
-        self.cbxExposure.addItems([str(x) for x in Exposures])
+        self.cbxExposure.addItems([str(x) for x in common.Exposures])
         self.exposure = -1
         self.sldTime.setRange(0, 0)
         self.tblEXIF.clearContents()
@@ -404,7 +406,7 @@ class SkyDataViewer(QMainWindow):
     def resetDay(self):
         self.captureTimeHDRDirs = []
         self.captureTimeASDFiles = []
-        self.lblData.setText(AppSettings["DataDirectory"])
+        self.lblData.setText(common.AppSettings["DataDirectory"])
         self.cbxTime.clear()
         self.cbxTime.addItem("-time-")
         self.sldTime.setRange(0, 0)
@@ -437,29 +439,29 @@ class SkyDataViewer(QMainWindow):
         #self.wgtGraph.setAspectLocked(True, None)
 
     def browseForData(self):
-        directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', AppSettings["DataDirectory"])
+        directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', common.AppSettings["DataDirectory"])
         directory = QDir.toNativeSeparators(directory)
-        if (directory is not None and len(directory) > 0 and directory != AppSettings["DataDirectory"]):
-            AppSettings["DataDirectory"] = directory
+        if (directory is not None and len(directory) > 0 and directory != common.AppSettings["DataDirectory"]):
+            common.AppSettings["DataDirectory"] = directory
             self.loadData()
 
     def loadData(self):
-        if (len(AppSettings["DataDirectory"]) <= 0 or not os.path.exists(AppSettings["DataDirectory"])):
+        if (len(common.AppSettings["DataDirectory"]) <= 0 or not os.path.exists(common.AppSettings["DataDirectory"])):
             return
 
         # GUI
         self.resetAll()
 
         # find capture dates
-        captureDateDirs = utility.findFiles(AppSettings["DataDirectory"], mode=2)
+        captureDateDirs = utility.findFiles(common.AppSettings["DataDirectory"], mode=2)
         captureDateDirs[:] = [dir for dir in captureDateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
         captureDates = [os.path.basename(dir) for dir in captureDateDirs]
         if (len(captureDates) > 0):
             self.cbxDate.addItems(captureDates)
 
         # load site info for SPA calculations
-        self.spaData = utility_data.loadSPASiteData(AppSettings["DataDirectory"])
-        self.skyData = utility_data.loadSkyCoverData(AppSettings["DataDirectory"])
+        self.spaData = utility_data.loadSPASiteData(common.AppSettings["DataDirectory"])
+        self.skyData = utility_data.loadSkyCoverData(common.AppSettings["DataDirectory"])
 
     def dateSelected(self, index):
         if (index < 0 or index >= self.cbxDate.count()):
@@ -469,7 +471,7 @@ class SkyDataViewer(QMainWindow):
         self.resetDay()
 
         # find HDR data path
-        pathDate = os.path.join(AppSettings["DataDirectory"], self.cbxDate.itemText(index))
+        pathDate = os.path.join(common.AppSettings["DataDirectory"], self.cbxDate.itemText(index))
         if not os.path.exists(pathDate):
             return
         pathHDR = os.path.join(pathDate, "HDR")
@@ -556,7 +558,7 @@ class SkyDataViewer(QMainWindow):
         captureStr = str(self.capture.date()) + " " + os.path.basename(self.captureTimeHDRDirs[index])
         self.capture = datetime.strptime(captureStr, "%Y-%m-%d %H.%M.%S")
         # print("date: " + str(self.capture), widget)
-        self.statusBar().showMessage("Capture: " + str(self.capture) + ", Exposure: " + str(Exposures[self.exposure]) + "s")
+        self.statusBar().showMessage("Capture: " + str(self.capture) + ", Exposure: " + str(common.Exposures[self.exposure]) + "s")
 
         # extract EXIF data from photo
         exif = utility_data.imageEXIF(photos[self.exposure])
@@ -592,7 +594,7 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.repaint()
 
         # find ASD data path
-        pathDate = os.path.join(AppSettings["DataDirectory"], str(self.capture.date()))
+        pathDate = os.path.join(common.AppSettings["DataDirectory"], str(self.capture.date()))
         if not os.path.exists(pathDate):
             return
         pathASD = os.path.join(pathDate, "ASD")
@@ -629,8 +631,8 @@ class SkyDataViewer(QMainWindow):
         if (len(self.captureTimeASDFiles) <= 0):
             self.log("Error: No ASD .txt files found for: " + str(asdTime))
             return
-        if (len(self.captureTimeASDFiles) < 81):
-            self.log("Error: Number of ASD files is " + str(len(self.captureTimeASDFiles)) + ". Sample pattern should have " + str(len(SamplingPattern)))
+        if (len(self.captureTimeASDFiles) < len(common.SamplingPattern)):
+            self.log("Error: Found only " + str(len(self.captureTimeASDFiles)) + " ASD files. Sample pattern should have " + str(len(common.SamplingPattern)))
             return
 
         # graph ASD data
@@ -661,9 +663,9 @@ class SkyDataViewer(QMainWindow):
         for i in indices:
             if (i >= len(self.captureTimeASDFiles)):
                 break
-            xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[i], AppSettings["GraphResolution"])
-            #xs = xs[::AppSettings["GraphResolution"]]
-            #ys = ys[::AppSettings["GraphResolution"]]
+            xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[i], common.AppSettings["GraphResolution"])
+            #xs = xs[::common.AppSettings["GraphResolution"]]
+            #ys = ys[::common.AppSettings["GraphResolution"]]
             self.wgtGraph.plot(y=ys, x=xs, pen=self.wgtFisheye.getSamplePatternRGB(i)) # pen=(i, len(indices))
             #self.wgtGraph.addItem() # add a label/icon to graph with number of samples available
 
@@ -671,7 +673,7 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.selectSamples(message)
 
     def exportSamples(self, message):
-        xoptions = AppSettings["ExportOptions"]
+        xoptions = common.AppSettings["ExportOptions"]
 
         # we shouldn't be here if export file hasn't been configured
         if (len(xoptions["Filename"]) <= 0):
@@ -691,7 +693,7 @@ class SkyDataViewer(QMainWindow):
         # init / pre-compute
         delimiter = xoptions["Delimiter"]
         pixregion = xoptions["PixelRegion"]
-        pixweight = PixelWeighting(xoptions["PixelWeighting"])
+        pixweight = common.PixelWeighting(xoptions["PixelWeighting"])
         points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
         pixels = utility_data.collectPixels(points, pixels=self.wgtFisheye.myPhotoPixels, region=pixregion, weighting=pixweight)
         sunpos = utility_data.computeSunPosition(self.spaData)
@@ -753,17 +755,17 @@ class SkyDataViewer(QMainWindow):
                         file.write(delimiter)
                     # export sample azimuth
                     elif (attr == "SampleAzimuth"):
-                        angle = SamplingPattern[sIdx]
+                        angle = common.SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(angle[0]))
                         file.write(delimiter)
                     # export sample altitude
                     elif (attr == "SampleAltitude"):
-                        angle = SamplingPattern[sIdx]
+                        angle = common.SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(angle[1]))
                         file.write(delimiter)
                     # export exposure time
                     elif (attr == "Exposure"):
-                        file.write(str(Exposures[self.exposure]))
+                        file.write(str(common.Exposures[self.exposure]))
                         file.write(delimiter)
                     # export pixel neighborhood
                     elif (attr == "PixelRegion"):
@@ -794,24 +796,24 @@ class SkyDataViewer(QMainWindow):
 
         self.log("Exported " + str(len(self.wgtFisheye.samplesSelected)) + " sample(s) of capture " + str(self.capture))
 
-    # def convertSamples(self):
-    #     dialog = DialogConverter()
-    #     code = dialog.exec()
-    #     if (code != QDialog.Accepted):
-    #         return
-    #
-    #     self.log("Converting... ")
-    #
-    #     self.log("Converted " + str(1) + " sample(s)")
+    def convertSamples(self):
+        dialog = DialogConverter()
+        code = dialog.exec()
+        if (code != QDialog.Accepted):
+            return
+
+        self.log("Converting... ")
+
+        self.log("Converted " + str(1) + " sample(s)")
 
     def setupExportFile(self):
-        dialog = DialogExport(AppSettings["ExportOptions"])
+        dialog = DialogExport(common.AppSettings["ExportOptions"])
         code = dialog.exec()
         if (code != QDialog.Accepted):
             return
 
         # save the export options in app settings
-        AppSettings.update({"ExportOptions": dialog.exportOptions})
+        common.AppSettings.update({"ExportOptions": dialog.exportOptions})
 
         # now that export options are configured, enable export commands
         self.actExportSelected.setEnabled(True)
@@ -851,11 +853,11 @@ class SkyDataViewer(QMainWindow):
             #self.centralWidget().layout().setContentsMargins(10,10,10,10)
 
     def toggleMask(self, state):
-        AppSettings["ShowMask"] = state
+        common.AppSettings["ShowMask"] = state
         self.wgtFisheye.repaint()
 
     def toggleHUD(self, state):
-        AppSettings["ShowHUD"] = state
+        common.AppSettings["ShowHUD"] = state
         self.wgtFisheye.repaint()
         self.actUVGrid.setEnabled(state)
         self.actCompass.setEnabled(state)
@@ -863,53 +865,52 @@ class SkyDataViewer(QMainWindow):
         self.actSamples.setEnabled(state)
 
     def toggleUVGrid(self, state):
-        AppSettings["ShowUVGrid"] = state
+        common.AppSettings["ShowUVGrid"] = state
         self.wgtFisheye.repaint()
 
     def toggleCompass(self, state):
-        AppSettings["ShowCompass"] = state
+        common.AppSettings["ShowCompass"] = state
         self.wgtFisheye.repaint()
 
     def toggleSunPath(self, state):
-        AppSettings["ShowSunPath"] = state
+        common.AppSettings["ShowSunPath"] = state
         self.wgtFisheye.repaint()
 
     def toggleSamples(self, state):
-        AppSettings["ShowSamples"] = state
+        common.AppSettings["ShowSamples"] = state
         self.wgtFisheye.repaint()
 
     def togglePixelRegion(self, action):
-        region = PixelRegionMin # n for (n x n) pixel region
+        region = common.PixelRegionMin # n for (n x n) pixel region
         ok = True
 
         if (action == self.actPixel1):
             region = 1
         elif (action == self.actPixelnxn):
-            region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, PixelRegionMin, PixelRegionMax, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+            region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, common.PixelRegionMin, common.PixelRegionMax, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
         elif (action == self.actPixel1deg):
             region = 9
 
         if ok and region >= utility_data.PixelRegionMin and region % 2 == 1:
-            AppSettings["PixelRegion"] = region
+            common.AppSettings["PixelRegion"] = region
             #self.wgtFisheye.repaint()
         else:
             QMessageBox.warning(self, "Input Validation", "Pixel Region must be an odd positive number.", QMessageBox.Ok)
 
     def togglePixelWeighting(self, action):
         if (action == self.actPixelMean):
-            AppSettings["PixelWeighting"] = PixelWeighting.Mean.value
+            common.AppSettings["PixelWeighting"] = common.PixelWeighting.Mean.value
         elif (action == self.actPixelMedian):
-            AppSettings["PixelWeighting"] = PixelWeighting.Median.value
+            common.AppSettings["PixelWeighting"] = common.PixelWeighting.Median.value
         elif (action == self.actPixelGaussian):
-            AppSettings["PixelWeighting"] = PixelWeighting.Gaussian.value
+            common.AppSettings["PixelWeighting"] = common.PixelWeighting.Gaussian.value
 
     def toggleGraphResolution(self):
         resolution = 0
         ok = True
-        resolution, ok = QInputDialog.getInt(self, "Radiance Graph Resolution", "Plot every (nm):", 1, 1, 50, 1,
-                                        Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+        resolution, ok = QInputDialog.getInt(self, "Radiance Graph Resolution", "Plot every (nm):", 1, 1, 50, 1, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
         if ok and resolution > 0 and resolution <= 50:
-            AppSettings["GraphResolution"] = resolution
+            common.AppSettings["GraphResolution"] = resolution
             self.graphSamples(self.wgtFisheye.samplesSelected)
         else:
             QMessageBox.warning(self, "Input Validation", "Radiance graph resolution must be 1-50(nm).", QMessageBox.Ok)
@@ -919,7 +920,7 @@ class SkyDataViewer(QMainWindow):
         ok = True
         angle, ok = QInputDialog.getInt(self, "Circumsolar Avoidance", "Angle around sun:", 20, 0, 180, 1, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
         if ok and angle >= 0 and angle <= 180:
-            AppSettings["AvoidSunAngle"] = angle
+            common.AppSettings["AvoidSunAngle"] = angle
             #self.wgtFisheye.repaint()
         else:
             QMessageBox.warning(self, "Input Validation", "Circumsolar angle must be 0-180°.", QMessageBox.Ok)
@@ -940,26 +941,26 @@ class SkyDataViewer(QMainWindow):
         event.accept()
 
         # cache settings
-        AppSettings["WindowWidth"] = self.width()
-        AppSettings["WindowHeight"] = self.height()
+        common.AppSettings["WindowWidth"] = self.width()
+        common.AppSettings["WindowHeight"] = self.height()
         left, right = self.splitHoriz.sizes()
-        AppSettings["HorizSplitLeft"] = left
-        AppSettings["HorizSplitRight"] = right
+        common.AppSettings["HorizSplitLeft"] = left
+        common.AppSettings["HorizSplitRight"] = right
         top, bottom = self.splitVert.sizes()
-        AppSettings["VertSplitTop"] = top
-        AppSettings["VertSplitBottom"] = bottom
-        AppSettings["ShowEXIF"] = self.actEXIF.isChecked()
-        AppSettings["ShowStatusBar"] = self.actStatusBar.isChecked()
-        # AppSettings["ShowMask"] = self.actMask.isChecked()
-        # AppSettings["ShowHUD"] = self.actHUD.isChecked()
-        # AppSettings["ShowCompass"] = self.actCompass.isChecked()
-        # AppSettings["ShowSunPath"] = self.actSunPath.isChecked()
-        # AppSettings["ShowSamples"] = self.actSamples.isChecked()
-        # AppSettings["ShowUVGrid"] = self.actUVGrid.isChecked()
+        common.AppSettings["VertSplitTop"] = top
+        common.AppSettings["VertSplitBottom"] = bottom
+        common.AppSettings["ShowEXIF"] = self.actEXIF.isChecked()
+        common.AppSettings["ShowStatusBar"] = self.actStatusBar.isChecked()
+        # common.AppSettings["ShowMask"] = self.actMask.isChecked()
+        # common.AppSettings["ShowHUD"] = self.actHUD.isChecked()
+        # common.AppSettings["ShowCompass"] = self.actCompass.isChecked()
+        # common.AppSettings["ShowSunPath"] = self.actSunPath.isChecked()
+        # common.AppSettings["ShowSamples"] = self.actSamples.isChecked()
+        # common.AppSettings["ShowUVGrid"] = self.actUVGrid.isChecked()
 
         # dump settings to file
-        with open(AppSettings["Filename"], 'w') as file:
-            json.dump(AppSettings, file, indent=4)
+        with open(common.AppSettings["Filename"], 'w') as file:
+            json.dump(common.AppSettings, file, indent=4)
 
     def log(self, message):
         self.statusBar().showMessage(message)
