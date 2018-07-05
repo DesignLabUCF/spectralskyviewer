@@ -23,7 +23,7 @@
 # ====================================================================
 # @author: Joe Del Rocco
 # @since: 10/18/2017
-# @summary: Script to clean/organize a sky data directory.
+# @summary: Script to clean/organize a directory of sky data for use with SkyDataViewer.
 # ====================================================================
 import sys
 import os
