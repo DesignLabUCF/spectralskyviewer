@@ -28,6 +28,7 @@
 import sys
 import os
 import json
+import csv
 from datetime import datetime
 from PyQt5.QtCore import Qt, QDir
 from PyQt5.QtGui import QIcon, QFont
@@ -241,13 +242,14 @@ class SkyDataViewer(QMainWindow):
         menu = menubar.addMenu('&Samples')
         menu.addAction(self.actExportSetup)
         menu.addAction(self.actExportSelected)
+        menu.addAction(self.actSampleConverter)
         menu.addSeparator()
         menu.addAction(self.actSelectAll)
         menu.addAction(self.actSelectInv)
         menu.addAction(self.actClearAll)
         menu.addSeparator()
         menu.addAction(self.actAvoidSun)
-        #menu.addAction(self.actSampleConverter)
+
 
         menu = menubar.addMenu('&Help')
         menu.addAction(actAbout)
@@ -691,6 +693,7 @@ class SkyDataViewer(QMainWindow):
         self.log("Exporting... ")
 
         # init / pre-compute
+        sampleidx = 0
         delimiter = xoptions["Delimiter"]
         pixregion = xoptions["PixelRegion"]
         pixweight = common.PixelWeighting(xoptions["PixelWeighting"])
@@ -718,6 +721,12 @@ class SkyDataViewer(QMainWindow):
                         file.write(attr)
                         file.write(delimiter)
                 file.write("\n")
+        # otherwise count existing samples
+        else:
+            with open(xoptions["Filename"], 'r') as file:
+                reader = csv.reader(file, delimiter=',')
+                next(reader, None) # skip header
+                sampleidx = sum(1 for row in reader)
 
         # append export to existing file
         with open(xoptions["Filename"], "a") as file:
@@ -726,19 +735,23 @@ class SkyDataViewer(QMainWindow):
             for i in range(0, len(self.wgtFisheye.samplesSelected)):
                 sIdx = self.wgtFisheye.samplesSelected[i]
 
-                # export each attribute per sample
+                # export each required attribute
+                # ID
+                file.write(str(sampleidx))
+                file.write(delimiter)
+                # date
+                file.write(str(self.capture.date()))
+                file.write(delimiter)
+                # time
+                file.write(str(self.capture.time()))
+                file.write(delimiter)
+
+                # export each optional attribute
                 for aIdx in xoptions["Attributes"]:
                     attr = DialogExport.attributeFromIndex(aIdx)
-                    # export date
-                    if (attr == "Date"):
-                        file.write(str(self.capture.date()))
-                        file.write(delimiter)
-                    # export time
-                    elif (attr == "Time"):
-                        file.write(str(self.capture.time()))
-                        file.write(delimiter)
+
                     # export sun azimuth
-                    elif (attr == "SunAzimuth"):
+                    if (attr == "SunAzimuth"):
                         file.write('{0:07.04f}'.format(sunpos[0]))
                         file.write(delimiter)
                     # export sun altitude
@@ -763,10 +776,6 @@ class SkyDataViewer(QMainWindow):
                         angle = common.SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(angle[1]))
                         file.write(delimiter)
-                    # export exposure time
-                    elif (attr == "Exposure"):
-                        file.write(str(common.Exposures[self.exposure]))
-                        file.write(delimiter)
                     # export pixel neighborhood
                     elif (attr == "PixelRegion"):
                         file.write(str(pixregion))
@@ -774,6 +783,10 @@ class SkyDataViewer(QMainWindow):
                     # export pixel weighting method
                     elif (attr == "PixelWeighting"):
                         file.write(str(pixweight.value))
+                        file.write(delimiter)
+                    # export exposure time
+                    elif (attr == "Exposure"):
+                        file.write(str(common.Exposures[self.exposure]))
                         file.write(delimiter)
                     # export pixel
                     elif (attr == "PixelRGB"):
@@ -793,6 +806,7 @@ class SkyDataViewer(QMainWindow):
 
                 # next sample
                 file.write("\n")
+                sampleidx += 1
 
         self.log("Exported " + str(len(self.wgtFisheye.samplesSelected)) + " sample(s) of capture " + str(self.capture))
 

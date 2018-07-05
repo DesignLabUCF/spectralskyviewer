@@ -61,18 +61,20 @@ HDRRawExts = ['.cr2', '.raw', '.dng']
 # export attributes
 ExportAttributes = [
     # column name           description
-    ("Header",              "Header Row"),
+    # required ----------------------------------------------------------------------
+    ("Index",               "Sample ID"),
     ("Date",                "Date of Capture"),
     ("Time",                "Time of Capture"),
+    # optional ----------------------------------------------------------------------
     ("SunAzimuth",          "Sun Azimuth (East from North)"),
     ("SunAltitude",         "Sun Altitude (90 - Zenith)"),
     ("SkyCover",            "Sky Cover Assessment"),
     ("SamplePatternIndex",  "Sample Pattern Index"),
     ("SampleAzimuth",       "Sample Azimuth (East from North)"),
     ("SampleAltitude",      "Sample Altitude (90 - Zenith)"),
-    ("Exposure",            "Photo Exposure Time (s)"),
     ("PixelRegion",         "Sample Pixel Kernel Size (n x n)"),
     ("PixelWeighting",      "Sample Pixel Weighting Algorithm"),
+    ("Exposure",            "Photo Exposure Time (s)"),
     ("PixelRGB",            "Sample Pixel RGB Channels"),
     ("Radiance",            "Sample Radiance (W/m²/sr) per Wavelength (350-2500nm)"),
 ]

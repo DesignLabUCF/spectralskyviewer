@@ -142,18 +142,17 @@ class DialogExport(QDialog):
         # attributes
         self.lstAttributes = QListView()
         model = QStandardItemModel()
-        # header
-        item = QStandardItem(common.ExportAttributes[0][1])
-        item.setCheckable(True)
-        item.setCheckState(True)
-        item.setEnabled(False)
-        model.appendRow(item)
         # optional attributes
-        for i in range(1, len(common.ExportAttributes)):
+        for i in range(0, len(common.ExportAttributes)):
             item = QStandardItem(common.ExportAttributes[i][1])
             item.setEditable(False)
             item.setCheckable(True)
-            if (i in self.exportOptions["Attributes"]):
+            # id, date, time - are required
+            if (i >= 0 and i <= 2):
+                item.setCheckState(Qt.Checked)
+                item.setEnabled(False)
+            # everything else is optional
+            elif (i in self.exportOptions["Attributes"]):
                 item.setCheckState(Qt.Checked)
             model.appendRow(item)
         self.lstAttributes.setModel(model)
@@ -228,7 +227,7 @@ class DialogExport(QDialog):
         attributes = []
         for i in range(0, self.lstAttributes.model().rowCount()):
             item = self.lstAttributes.model().item(i)
-            if (item.checkState() == Qt.Checked):
+            if (item.checkState() != Qt.Unchecked):
                 attributes.append(i)
         self.exportOptions.update({"Attributes": attributes})
 
