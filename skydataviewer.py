@@ -748,7 +748,7 @@ class SkyDataViewer(QMainWindow):
 
                 # export each optional attribute
                 for aIdx in xoptions["Attributes"]:
-                    attr = DialogExport.attributeFromIndex(aIdx)
+                    attr = common.ExportAttributes[aIdx][0]
 
                     # export sun azimuth
                     if (attr == "SunAzimuth"):
@@ -818,7 +818,54 @@ class SkyDataViewer(QMainWindow):
 
         self.log("Converting... ")
 
-        self.log("Converted " + str(1) + " sample(s)")
+        # init
+        fpath, fext = os.path.splitext(dialog.convertOptions["Filename"])
+        fnamein = dialog.convertOptions["Filename"]
+        fnameout = fpath + "_new" + fext
+        numrows = 0
+
+        # open files
+        with open(fnamein, 'r') as filein:
+            with open(fnameout, 'w') as fileout:
+                # assume CSV for now (technically could be other delimiter)
+                reader = csv.reader(filein, delimiter=',')
+                writer = csv.writer(fileout, delimiter=',', lineterminator='\n')
+                # read/write header
+                header = next(reader, None)
+                writer.writerow(header)
+                mapping = { header[i]: i for i in range(0, len(header)) }
+
+                # read first row
+                firstrow = next(reader, None)
+
+                # what will be the new pixel region?
+                pixregion = common.PixelRegionMin # start with min value
+                if "PixelRegion" in mapping: # overwrite with value in file if exists
+                    pixregion = firstrow[mapping["PixelRegion"]]
+                if "PixelRegion" in dialog.convertOptions: # overwrite with desired conversion
+                    pixregion = dialog.convertOptions["PixelRegion"]
+
+                # what will be the new pixel weighting?
+                pixweight = common.PixelWeighting.Mean  # start with min value
+                if "PixelWeighting" in mapping:  # overwrite with value in file if exists
+                    pixweight = common.PixelWeighting(int(firstrow[mapping["PixelWeighting"]]))
+                if "PixelWeighting" in dialog.convertOptions:  # overwrite with desired conversion
+                    pixweight = common.PixelWeighting(dialog.convertOptions["PixelWeighting"])
+
+                # reset read file
+                filein.seek(0)
+                next(reader, None) # skip header
+
+                # read each sample row, update, and write out
+                for row in reader:
+                    # update row with new values
+                    row[mapping["PixelRegion"]] = pixregion
+                    row[mapping["PixelWeighting"]] = pixweight.value
+                    # write row to conversion file
+                    writer.writerow(row)
+                    numrows += 1
+
+        self.log("Converted " + str(numrows) + " sample(s)")
 
     def setupExportFile(self):
         dialog = DialogExport(common.AppSettings["ExportOptions"])

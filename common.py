@@ -78,6 +78,7 @@ ExportAttributes = [
     ("PixelRGB",            "Sample Pixel RGB Channels"),
     ("Radiance",            "Sample Radiance (W/m²/sr) per Wavelength (350-2500nm)"),
 ]
+SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "Scattered", SkyCover.OVC: "Overcast"}
 
 # default export options
 DefExportOptions = {
