@@ -15,10 +15,10 @@
 #  Not for commercial use. Do not redistribute without permission.
 #
 
-__all__ = ['GetUVFromAngles', 'CalculateSunAngles', 'FisheyeAngleWarp', 'GetAngleFromUV', 'PlotSamplePath']
+__all__ = ['CentralAngle', 'FisheyeAngleWarp', 'GetAngleFromUV', 'GetUVFromAngles']
 
 import math
-from datetime import time, timedelta, datetime
+#from datetime import time, timedelta, datetime
 
 EARTH_MEAN_RADIUS = 6371.01 # In km
 ASTRONOMICAL_UNIT = 149597890 # In km
@@ -80,48 +80,48 @@ def GetUVFromAngle(theta, phi, inRadians=True):
     radius = phi / (math.pi / 2.0)
     return (0.5 * (radius * math.cos(theta) + 1), 0.5 * (radius * math.sin(theta) + 1))
 
-def CalculateSunAngles(time, coord):
-    """ Calculate the angles representing the position of the sun based on a 
-          provided time and coordinates. 
-    """
-    # Calculate difference in days of Julian Days
-    decHours = time.hour + (time.minute + time.second / 60.0) / 60.0
-    liAux1 = (time.month - 14) / 12
-    liAux2 = (1461*(time.year + 4800 + liAux1)) / 4 + (367 * (time.month - 2 - 12 * liAux1)) / 12 - (3*((time.year + 4900 + liAux1) / 100)) / 4 + time.day - 32075
-    julianDate = liAux2 - 0.5 + decHours / 24.0
-    elapsedJulianDays =julianDate - 2451545.0
-
-    # Calculate ecliptic coordinates 
-    omega = 2.1429 - 0.0010394594 * elapsedJulianDays
-    meanLongitude = 4.8950630 + 0.017202791698 * elapsedJulianDays
-    anomaly = 6.2400600 + 0.0172019699 * elapsedJulianDays;
-    eclipticLongitude = meanLongitude + 0.03341607 * math.sin(anomaly) + 0.00034894 * math.sin(2*anomaly) - 0.0001134 - 0.0000203 * math.sin(omega)
-    eclipticObliquity = 0.4090928 - 6.2140e-9 * elapsedJulianDays + 0.0000396 * math.cos(omega);
-
-    # Calculate celestial coordinates
-    sinEclipticLongitude = math.sin(eclipticLongitude)
-    dY = math.cos(eclipticObliquity) * sinEclipticLongitude;
-    dX = math.cos(eclipticLongitude)
-    rightAscension = math.atan2(dY, dX);
-    declination = math.asin(math.sin(eclipticObliquity) * sinEclipticLongitude)
-
-    # Calculate local coordinates
-    greenwichMeanSiderealTime = 6.6974243242 + 0.0657098283 * elapsedJulianDays + decHours
-    localMeanSiderealTime = (greenwichMeanSiderealTime * 15 + coord['longitude']) * math.pi / 180.0;
-
-    latitudeInRadians = coord['latitude'] * math.pi / 180.0
-    cosLatitude = math.cos(latitudeInRadians)
-    sinLatitude = math.sin(latitudeInRadians)
-    hourAngle = localMeanSiderealTime - rightAscension
-    cosHourAngle = math.cos(hourAngle)
-    elevation = math.acos(cosLatitude * cosHourAngle * math.cos(declination) + math.sin(declination) * sinLatitude)
-    dY = -math.sin(hourAngle)
-    dX = math.tan(declination) * cosLatitude - sinLatitude * cosHourAngle
-    azimuth = math.atan2(dY, dX)
-    if azimuth < 0.0:
-        azimuth = azimuth + 2 * math.pi
-
-    elevation = elevation + (EARTH_MEAN_RADIUS / ASTRONOMICAL_UNIT) * math.sin(elevation)
-
-    return (azimuth, math.pi / 2.0 - elevation)
+# def CalculateSunAngles(time, coord):
+#     """ Calculate the angles representing the position of the sun based on a
+#           provided time and coordinates.
+#     """
+#     # Calculate difference in days of Julian Days
+#     decHours = time.hour + (time.minute + time.second / 60.0) / 60.0
+#     liAux1 = (time.month - 14) / 12
+#     liAux2 = (1461*(time.year + 4800 + liAux1)) / 4 + (367 * (time.month - 2 - 12 * liAux1)) / 12 - (3*((time.year + 4900 + liAux1) / 100)) / 4 + time.day - 32075
+#     julianDate = liAux2 - 0.5 + decHours / 24.0
+#     elapsedJulianDays =julianDate - 2451545.0
+#
+#     # Calculate ecliptic coordinates
+#     omega = 2.1429 - 0.0010394594 * elapsedJulianDays
+#     meanLongitude = 4.8950630 + 0.017202791698 * elapsedJulianDays
+#     anomaly = 6.2400600 + 0.0172019699 * elapsedJulianDays;
+#     eclipticLongitude = meanLongitude + 0.03341607 * math.sin(anomaly) + 0.00034894 * math.sin(2*anomaly) - 0.0001134 - 0.0000203 * math.sin(omega)
+#     eclipticObliquity = 0.4090928 - 6.2140e-9 * elapsedJulianDays + 0.0000396 * math.cos(omega);
+#
+#     # Calculate celestial coordinates
+#     sinEclipticLongitude = math.sin(eclipticLongitude)
+#     dY = math.cos(eclipticObliquity) * sinEclipticLongitude;
+#     dX = math.cos(eclipticLongitude)
+#     rightAscension = math.atan2(dY, dX);
+#     declination = math.asin(math.sin(eclipticObliquity) * sinEclipticLongitude)
+#
+#     # Calculate local coordinates
+#     greenwichMeanSiderealTime = 6.6974243242 + 0.0657098283 * elapsedJulianDays + decHours
+#     localMeanSiderealTime = (greenwichMeanSiderealTime * 15 + coord['longitude']) * math.pi / 180.0;
+#
+#     latitudeInRadians = coord['latitude'] * math.pi / 180.0
+#     cosLatitude = math.cos(latitudeInRadians)
+#     sinLatitude = math.sin(latitudeInRadians)
+#     hourAngle = localMeanSiderealTime - rightAscension
+#     cosHourAngle = math.cos(hourAngle)
+#     elevation = math.acos(cosLatitude * cosHourAngle * math.cos(declination) + math.sin(declination) * sinLatitude)
+#     dY = -math.sin(hourAngle)
+#     dX = math.tan(declination) * cosLatitude - sinLatitude * cosHourAngle
+#     azimuth = math.atan2(dY, dX)
+#     if azimuth < 0.0:
+#         azimuth = azimuth + 2 * math.pi
+#
+#     elevation = elevation + (EARTH_MEAN_RADIUS / ASTRONOMICAL_UNIT) * math.sin(elevation)
+#
+#     return (azimuth, math.pi / 2.0 - elevation)
 
