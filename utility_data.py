@@ -35,6 +35,8 @@ from PIL import Image
 import exifread
 import spa
 import common
+import utility
+import utility_angles
 
 
 GaussianKernels = {}
@@ -78,9 +80,9 @@ def imageEXIF(filepath):
         data = exifread.process_file(f, details=False)
     return data
 
-# - pixels --------------------------------------------------------------------
-# - pixels --------------------------------------------------------------------
-# - pixels --------------------------------------------------------------------
+# - HDR -----------------------------------------------------------------------
+# - HDR -----------------------------------------------------------------------
+# - HDR -----------------------------------------------------------------------
 
 # debugging
 # for row in range(0, kernel.shape[0]):
@@ -95,8 +97,65 @@ def imageEXIF(filepath):
 # print(np.sum(utility_data.KernelGauss5x5SD1)
 
 '''
-Function to retrieve the pixels of specific coordinates of an image.
-:param coords: A list of (x, y) points to lookup in the image file.
+Function to search for and retrieve the filepath of a capture image.
+:param datadir: The data directory to search in.
+:param capture: The (datetime) capture timestamp.
+:param exposure: The exposure value of the image.
+:return: A filepath of the specific image.
+'''
+def findHDRFile(datadir, capture, exposure):
+    datestr = datetime.strftime(capture, "%Y-%m-%d")
+    timestr = datetime.strftime(capture, "%H.%M.%S")
+    expidx = common.ExposureIdxMap[exposure]
+
+    # find image path of capture timestamp
+    path = os.path.join(datadir, datestr, "HDR", timestr)
+    if not os.path.exists(path):
+        return ''
+
+    # gather all exposure photos taken at capture timestamp
+    photos = utility.findFiles(path, mode=1, ext=["jpg"])
+    if (len(photos) <= 0):
+        return ''
+
+    # is there a photo for the currently selected exposure?
+    if (expidx >= len(photos)):
+        return ''
+
+    return photos[expidx]
+
+'''
+Function to compute and retrieve a list of (x, y) points in a specific image given polar coordinates.
+:param imgfile: Filepath to an image.
+:param coords: A list of (azimuth, altitude) coordinates.
+:return: A list of (x, y) points corresponding to the coordinates provided. 
+'''
+def computePointsInImage(imgfile, coords):
+    if not os.path.exists(imgfile) or not coords:
+        return []
+
+    # load image and retrieve stats
+    image = Image.open(imgfile)
+    center = (int(image.width / 2), int(image.height / 2))
+    radius = image.height / 2
+    diameter = radius * 2
+    image.close()
+
+    points = []
+
+    # compute each coordinate in the image
+    for c in coords:
+        u, v = utility_angles.FisheyeAngleWarp(c[0], c[1], inRadians=False)
+        u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
+        x = (center[0] - radius) + (u * diameter)
+        y = (center[1] - radius) + (v * diameter)
+        points.append((int(x), int(y)))
+
+    return points
+
+'''
+Function to retrieve the pixels of specific points of an image.
+:param points: A list of (x, y) points to lookup in the image file.
 :param file: Optional path to the image file.
 :param pixels: Optional numpy array of pixels in format [[[R G B (A)]]].
 :param region: n for (n x n) region of pixels considered in pixel weighting.
@@ -105,9 +164,9 @@ Function to retrieve the pixels of specific coordinates of an image.
 :note: Coordinates MUST be within image bounds or this function will throw an exception!
 :note: Alpha component may or may not be included, depending on image format.
 '''
-def collectPixels(coords, file='', pixels=None, region=1, weighting=common.PixelWeighting.Mean):
+def collectPixels(points, file='', pixels=None, region=1, weighting=common.PixelWeighting.Mean):
     if pixels is None:
-        if not os.path.exists(file) or not coords:
+        if not os.path.exists(file) or not points:
             return []
         image = Image.open(file)
         #imgPixels = img.load()
@@ -117,14 +176,14 @@ def collectPixels(coords, file='', pixels=None, region=1, weighting=common.Pixel
     result = []
     if pixels.any():
         if region <= 1:
-            result = [pixels[int(c[1]), int(c[0])] for c in coords]
+            result = [pixels[int(c[1]), int(c[0])] for c in points]
         else:
             if weighting == common.PixelWeighting.Mean:
-                result = [pixelWeightedMean(pixels, c, region) for c in coords]
+                result = [pixelWeightedMean(pixels, c, region) for c in points]
             elif weighting == common.PixelWeighting.Median:
-                result = [pixelWeightedMedian(pixels, c, region) for c in coords]
+                result = [pixelWeightedMedian(pixels, c, region) for c in points]
             elif weighting == common.PixelWeighting.Gaussian:
-                result = [pixelWeightedGaussian(pixels, c, GaussianKernels[region]) for c in coords]
+                result = [pixelWeightedGaussian(pixels, c, GaussianKernels[region]) for c in points]
     return result
 
 def gaussianKernel(width):
@@ -251,7 +310,7 @@ def loadSkyCoverData(filepath, isDir=True):
                 skycover.append((
                     datetime.strptime(row[0] + " " + row[1], dtfmtstr),
                     datetime.strptime(row[0] + " " + row[2], dtfmtstr),
-                    common.SkyCoverFromStr[row[3]]
+                    common.SkyCoverStrMap[row[3]]
                 ))
             except ValueError or IndexError:
                 continue

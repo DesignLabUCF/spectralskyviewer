@@ -44,11 +44,12 @@ Exposures = [
     2.000000,
     4.000000,
 ]
+ExposureIdxMap = {Exposures[i]: i for i in range(0, len(Exposures))}
 
 # sky cover categories
 SkyCover = Enum('SkyCover', 'UNK CLR SCT OVC')
+SkyCoverStrMap = {e.name: e for e in SkyCover}
 SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "Scattered", SkyCover.OVC: "Overcast"}
-SkyCoverFromStr = {"UNK": SkyCover.UNK, "CLR": SkyCover.CLR, "SCT": SkyCover.SCT, "OVC": SkyCover.OVC}
 
 # pixel region and weighting settings
 PixelRegionMin = 1
@@ -78,7 +79,6 @@ ExportAttributes = [
     ("PixelRGB",            "Sample Pixel RGB Channels"),
     ("Radiance",            "Sample Radiance (W/m²/sr) per Wavelength (350-2500nm)"),
 ]
-SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "Scattered", SkyCover.OVC: "Overcast"}
 
 # default export options
 DefExportOptions = {

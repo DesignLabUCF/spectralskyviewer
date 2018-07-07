@@ -542,7 +542,7 @@ class SkyDataViewer(QMainWindow):
             return
 
         # At this point we are assuming the photos are sorted (increasing) by exposure time!!!
-        # A safer method would be to gather all EXIF DateTimeOriginal fields and sort manually
+        # TODO: A safer method would be to gather all EXIF DateTimeOriginal fields and sort manually
 
         # gather all exposure photos taken at time selected
         photos = utility.findFiles(self.captureTimeHDRDirs[index], mode=1, ext=["jpg"])
@@ -823,6 +823,8 @@ class SkyDataViewer(QMainWindow):
         fnamein = dialog.convertOptions["Filename"]
         fnameout = fpath + "_new" + fext
         numrows = 0
+        pixregion = common.PixelRegionMin
+        pixweight = common.PixelWeighting.Mean
 
         # open files
         with open(fnamein, 'r') as filein:
@@ -835,18 +837,16 @@ class SkyDataViewer(QMainWindow):
                 writer.writerow(header)
                 mapping = { header[i]: i for i in range(0, len(header)) }
 
-                # read first row
+                # read first row for pixregion, pixweight, exposure
                 firstrow = next(reader, None)
 
                 # what will be the new pixel region?
-                pixregion = common.PixelRegionMin # start with min value
                 if "PixelRegion" in mapping: # overwrite with value in file if exists
                     pixregion = firstrow[mapping["PixelRegion"]]
                 if "PixelRegion" in dialog.convertOptions: # overwrite with desired conversion
                     pixregion = dialog.convertOptions["PixelRegion"]
 
                 # what will be the new pixel weighting?
-                pixweight = common.PixelWeighting.Mean  # start with min value
                 if "PixelWeighting" in mapping:  # overwrite with value in file if exists
                     pixweight = common.PixelWeighting(int(firstrow[mapping["PixelWeighting"]]))
                 if "PixelWeighting" in dialog.convertOptions:  # overwrite with desired conversion
@@ -856,14 +856,61 @@ class SkyDataViewer(QMainWindow):
                 filein.seek(0)
                 next(reader, None) # skip header
 
-                # read each sample row, update, and write out
+                # init
+                currtime = datetime.min
+                currfile = ''
+                currexposure = 0
+                currcoords = []
+                currrows = []
+
+                # read rows
                 for row in reader:
-                    # update row with new values
-                    row[mapping["PixelRegion"]] = pixregion
-                    row[mapping["PixelWeighting"]] = pixweight.value
-                    # write row to conversion file
-                    writer.writerow(row)
-                    numrows += 1
+
+                    # is this row a new capture timestamp of samples?
+                    ts = datetime.strptime(row[mapping["Date"]] + " " + row[mapping["Time"]], "%Y-%m-%d %H:%M:%S")
+                    exp = float(row[mapping["Exposure"]])
+                    if ts != currtime or exp != currexposure:
+                        # if so, flush our cached rows read so far
+                        if os.path.exists(currfile):
+                            points = utility_data.computePointsInImage(currfile, currcoords)
+                            pixels = utility_data.collectPixels(points, file=currfile, region=pixregion, weighting=pixweight)
+                            # update cached row with new values and write to convert file
+                            for i in range(0, len(currrows)):
+                                # update
+                                currrows[i][mapping["PixelRegion"]] = pixregion
+                                currrows[i][mapping["PixelWeighting"]] = pixweight.value
+                                currrows[i][mapping["Red"]] = pixels[i][0]
+                                currrows[i][mapping["Green"]] = pixels[i][1]
+                                currrows[i][mapping["Blue"]] = pixels[i][2]
+                                # write
+                                writer.writerow(currrows[i])
+                                numrows += 1
+                        # get ready for a new capture timestamp of samples that this row kicked off
+                        currtime = ts
+                        currexposure = exp
+                        currfile = utility_data.findHDRFile(common.AppSettings["DataDirectory"], currtime, currexposure)
+                        currrows = []
+                        currcoords = []
+
+                    # cache this row
+                    currrows.append(row)
+                    currcoords.append((float(row[mapping["SampleAzimuth"]]), float(row[mapping["SampleAltitude"]])))
+
+                # flush any remaining cached rows
+                if len(currrows) > 0 and os.path.exists(currfile):
+                    points = utility_data.computePointsInImage(currfile, currcoords)
+                    pixels = utility_data.collectPixels(points, file=currfile, region=pixregion, weighting=pixweight)
+                    # update cached row with new values and write to convert file
+                    for i in range(0, len(currrows)):
+                        # update
+                        currrows[i][mapping["PixelRegion"]] = pixregion
+                        currrows[i][mapping["PixelWeighting"]] = pixweight.value
+                        currrows[i][mapping["Red"]] = pixels[i][0]
+                        currrows[i][mapping["Green"]] = pixels[i][1]
+                        currrows[i][mapping["Blue"]] = pixels[i][2]
+                        # write
+                        writer.writerow(currrows[i])
+                        numrows += 1
 
         self.log("Converted " + str(numrows) + " sample(s)")
 

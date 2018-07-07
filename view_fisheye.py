@@ -116,23 +116,15 @@ class ViewFisheye(QWidget):
             else:
                 self.myPhotoTime = utility_data.imageEXIFDateTime(path)
 
-            # compute each sample's coordinate in the photo
-            self.samplePointsInFile = []
-            center = (int(self.myPhotoSrcRect.width() / 2), int(self.myPhotoSrcRect.height()/2))
-            radius = self.myPhotoSrcRect.height() / 2
-            diameter = radius * 2
-            for i in range(0, len(common.SamplingPattern)):
-                u, v = utility_angles.FisheyeAngleWarp(common.SamplingPattern[i][0], common.SamplingPattern[i][1], inRadians=False)
-                u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
-                x = (center[0] - radius) + (u * diameter)
-                y = (center[1] - radius) + (v * diameter)
-                self.samplePointsInFile.append((int(x), int(y)))
+            # cache each sample's coordinate in the photo
+            self.samplePointsInFile = utility_data.computePointsInImage(path, common.SamplingPattern)
 
             # keep a copy the image's pixels in memory (used later for exporting, etc.)
             ptr = self.myPhoto.bits()
             ptr.setsize(self.myPhoto.byteCount())
             pixbgr = np.asarray(ptr).reshape(self.myPhoto.height(), self.myPhoto.width(), 4)
-            # HACKAROONIE: byte order is not the same as image format, so swapped it around. should handle this better :/
+            # HACKAROONIE: byte order is not the same as image format, so swapped it around :/
+            # TODO: should handle this better
             self.myPhotoPixels = np.copy(pixbgr)
             red = np.copy(self.myPhotoPixels[:, :, 0])
             self.myPhotoPixels[:, :, 0] = self.myPhotoPixels[:, :, 2]
