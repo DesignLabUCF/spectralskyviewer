@@ -76,6 +76,10 @@ class DialogExport(QDialog):
             self.radPixelMedian.setChecked(True)
         elif (pw == common.PixelWeighting.Gaussian):
             self.radPixelGaussian.setChecked(True)
+        if (not self.exportOptions["IsHDR"]):
+            self.radHDRNo.setChecked(True)
+        else:
+            self.radHDRYes.setChecked(True)
 
     def initWidgets(self):
         # layout
@@ -138,6 +142,16 @@ class DialogExport(QDialog):
         grpPixelWeighting = QGroupBox("Pixel Weighting:", self)
         grpPixelWeighting.setLayout(boxPixelWeighting)
         layout.addWidget(grpPixelWeighting, 0, Qt.AlignTop)
+
+        # hdr
+        self.radHDRNo = QRadioButton("No")
+        self.radHDRYes = QRadioButton("Yes")
+        boxHDR = QHBoxLayout()
+        boxHDR.addWidget(self.radHDRNo)
+        boxHDR.addWidget(self.radHDRYes)
+        grpHDR = QGroupBox("HDR (multiple exposures)", self)
+        grpHDR.setLayout(boxHDR)
+        layout.addWidget(grpHDR, 0, Qt.AlignTop)
 
         # attributes
         self.lstAttributes = QListView()

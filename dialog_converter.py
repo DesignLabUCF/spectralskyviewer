@@ -69,22 +69,32 @@ class DialogConverter(QDialog):
         pnlFile.setLayout(boxFile)
         layout.addWidget(pnlFile, 0, Qt.AlignTop)
 
+        # hdr
+        self.radHDRNo = QRadioButton("No")
+        self.radHDRYes = QRadioButton("Yes")
+        boxHDR = QHBoxLayout()
+        boxHDR.addWidget(self.radHDRNo)
+        boxHDR.addWidget(self.radHDRYes)
+        grpHDR = QGroupBox("HDR (multiple exposures)", self)
+        grpHDR.setLayout(boxHDR)
+        layout.addWidget(grpHDR, 0, Qt.AlignTop)
+
         # attributes
         self.lstAttributes = QListView()
         model = QStandardItemModel()
         model.itemChanged.connect(self.attributeSelected)
         # pixel region
-        self.itmPixelRegion = QStandardItem(common.ExportAttributes[9][1])
+        self.itmPixelRegion = QStandardItem(common.ExportAttributes[common.ExportIdxMap["PixelRegion"]][1])
         self.itmPixelRegion.setEditable(False)
         self.itmPixelRegion.setCheckable(True)
         model.appendRow(self.itmPixelRegion)
         # pixel weighting
-        self.itmPixelWeighting = QStandardItem(common.ExportAttributes[10][1])
+        self.itmPixelWeighting = QStandardItem(common.ExportAttributes[common.ExportIdxMap["PixelWeighting"]][1])
         self.itmPixelWeighting.setEditable(False)
         self.itmPixelWeighting.setCheckable(True)
         model.appendRow(self.itmPixelWeighting)
         # pixel exposure
-        self.itmExposure = QStandardItem(common.ExportAttributes[11][1])
+        self.itmExposure = QStandardItem(common.ExportAttributes[common.ExportIdxMap["Exposure"]][1])
         self.itmExposure.setEditable(False)
         self.itmExposure.setCheckable(True)
         model.appendRow(self.itmExposure)
@@ -176,6 +186,9 @@ class DialogConverter(QDialog):
 
         # save convert filename
         self.convertOptions["Filename"] = self.txtFile.text()
+
+        # save hdr
+        self.convertOptions["IsHDR"] = self.radHDRYes.isChecked()
 
         # save pixel region
         self.convertOptions["PixelRegion"] = int(self.cbxPixelRegion.currentText())

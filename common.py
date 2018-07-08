@@ -78,6 +78,7 @@ ExportAttributes = [
     ("PixelRGB",            "Sample Pixel RGB Channels"),
     ("Radiance",            "Sample Radiance (W/m²/sr) per Wavelength (350-2500nm)"),
 ]
+ExportIdxMap = {ExportAttributes[i][0]: i for i in range(0, len(ExportAttributes))}
 
 # default export options
 DefExportOptions = {
@@ -85,6 +86,7 @@ DefExportOptions = {
     "Delimiter": ",",
     "PixelRegion": PixelRegionMin,
     "PixelWeighting": PixelWeighting.Mean.value,
+    "IsHDR": False,
     "Attributes": [0, 1, 2, 3, 5, 6, 7, 11, 11]
 }
 
