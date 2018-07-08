@@ -148,7 +148,7 @@ class DialogExport(QDialog):
             item.setEditable(False)
             item.setCheckable(True)
             # id, date, time - are required
-            if (i >= 0 and i <= 2):
+            if (i <= 1):
                 item.setCheckState(Qt.Checked)
                 item.setEnabled(False)
             # everything else is optional

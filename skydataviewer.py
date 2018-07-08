@@ -736,9 +736,6 @@ class SkyDataViewer(QMainWindow):
                 sIdx = self.wgtFisheye.samplesSelected[i]
 
                 # export each required attribute
-                # ID
-                file.write(str(sampleidx))
-                file.write(delimiter)
                 # date
                 file.write(str(self.capture.date()))
                 file.write(delimiter)

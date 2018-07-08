@@ -63,7 +63,6 @@ HDRRawExts = ['.cr2', '.raw', '.dng']
 ExportAttributes = [
     # column name           description
     # required ----------------------------------------------------------------------
-    ("Index",               "Sample ID"),
     ("Date",                "Date of Capture"),
     ("Time",                "Time of Capture"),
     # optional ----------------------------------------------------------------------
@@ -86,7 +85,7 @@ DefExportOptions = {
     "Delimiter": ",",
     "PixelRegion": PixelRegionMin,
     "PixelWeighting": PixelWeighting.Mean.value,
-    "Attributes": [0, 1, 2, 3, 4, 6, 7, 8, 12, 13]
+    "Attributes": [0, 1, 2, 3, 5, 6, 7, 11, 11]
 }
 
 # default application settings
