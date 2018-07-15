@@ -105,6 +105,7 @@ DefAppSettings = {
     "ShowCompass": False,
     "ShowSunPath": False,
     "ShowSamples": False,
+    "ShowSampleShadows": False,
     "ShowUVGrid": False,
     "ShowEXIF": True,
     "ShowStatusBar": True,
@@ -112,6 +113,7 @@ DefAppSettings = {
     "PixelWeighting": PixelWeighting.Mean.value,
     "AvoidSunAngle": 0,
     "GraphResolution": 5,
+    "GraphLineThickness": 1,
 }
 DefAppSettings.update({"ExportOptions": dict(DefExportOptions)})
 

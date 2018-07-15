@@ -83,6 +83,7 @@ class ViewFisheye(QWidget):
         self.penSelected = [] # list of pens, one for each sampling pattern location
         self.penSelectRect = QPen(Qt.white, 1, Qt.DashLine)
         self.penSun = QPen(Qt.yellow, 1, Qt.SolidLine)
+        self.penShadow = QPen(Qt.black, 3, Qt.SolidLine)
         self.fontFixed = QFont('Courier New', 8)
         self.fontScaled = QFont('Courier New', 8)
         self.fontBounds = 50
@@ -583,9 +584,15 @@ class ViewFisheye(QWidget):
                         painter.drawEllipse(r)
                         painter.drawText(r.x()-r.width(), r.y(), str(i))
 
-                # always draw selected samples
-                #painter.setPen(self.penSelected)
+                # draw selected sample shadows
                 r = QRect()
+                if (common.AppSettings["ShowSampleShadows"]):
+                    painter.setPen(self.penShadow)
+                    for i in self.samplesSelected:
+                        r.setCoords(self.sampleBoundsVisible[i].x() + 1, self.sampleBoundsVisible[i].y() + 1, self.sampleBoundsVisible[i].right() + 2, self.sampleBoundsVisible[i].bottom() + 2)
+                        painter.drawEllipse(r)
+
+                # draw selected samples
                 for i in self.samplesSelected:
                     r.setCoords(self.sampleBoundsVisible[i].x(), self.sampleBoundsVisible[i].y(), self.sampleBoundsVisible[i].right() + 1, self.sampleBoundsVisible[i].bottom() + 1)
                     painter.setPen(self.penSelected[i])

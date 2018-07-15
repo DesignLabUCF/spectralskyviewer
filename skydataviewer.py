@@ -55,6 +55,7 @@ class SkyDataViewer(QMainWindow):
         self.exposure = 0
         self.spaData = spa.spa_data()
         self.skyData = []
+        self.dontSaveSettings = False
 
         # load settings
         if (os.path.exists(common.AppSettings["Filename"])):
@@ -137,7 +138,12 @@ class SkyDataViewer(QMainWindow):
         self.actSamples.setCheckable(True)
         self.actSamples.setChecked(common.AppSettings["ShowSamples"])
         self.actSamples.setStatusTip('Toggle display of sampling pattern')
-        self.actSamples.triggered.connect(self.toggleSamples)
+        self.actSamples.triggered.connect(lambda: self.toggleSamples(self.actSamples.isChecked(), self.actSamples))
+        self.actSampleShadows = QAction(QIcon(), 'Show Sample Shadows', self)
+        self.actSampleShadows.setCheckable(True)
+        self.actSampleShadows.setChecked(common.AppSettings["ShowSampleShadows"])
+        self.actSampleShadows.setStatusTip('Toggle display of selected sample shadows')
+        self.actSampleShadows.triggered.connect(lambda: self.toggleSamples(self.actSampleShadows.isChecked(), self.actSampleShadows))
         self.actUVGrid = QAction(QIcon(), 'Show &UVGrid', self)
         self.actUVGrid.setCheckable(True)
         self.actUVGrid.setChecked(common.AppSettings["ShowUVGrid"])
@@ -166,7 +172,10 @@ class SkyDataViewer(QMainWindow):
         self.actPixelGaussian.triggered.connect(lambda: self.togglePixelWeighting(self.actPixelGaussian))
         self.actGraphRes = QAction(QIcon(), 'Graph Resolution', self)
         self.actGraphRes.setStatusTip('Specify radiance graph resolution.')
-        self.actGraphRes.triggered.connect(self.toggleGraphResolution)
+        self.actGraphRes.triggered.connect(lambda: self.toggleGraphOptions(self.actGraphRes))
+        self.actGraphLine = QAction(QIcon(), 'Graph Line Thickness', self)
+        self.actGraphLine.setStatusTip('Specify radiance graph line thickness.')
+        self.actGraphLine.triggered.connect(lambda: self.toggleGraphOptions(self.actGraphLine))
         pixWeightGroup = QActionGroup(self)
         pixWeightGroup.addAction(self.actPixelMean)
         pixWeightGroup.addAction(self.actPixelMedian)
@@ -210,6 +219,11 @@ class SkyDataViewer(QMainWindow):
         actAbout = QAction(QIcon(), '&About', self)
         actAbout.setStatusTip('Information about this application')
         #actAbout.triggered.connect(self.close)
+        actDontSave = QAction(QIcon(), 'Don\'t Save Settings', self)
+        actDontSave.setCheckable(True)
+        actDontSave.setChecked(False)
+        actDontSave.setStatusTip('Use this to prevent the application from stomping your settings.')
+        actDontSave.triggered.connect(self.toggleDontSave)
 
         # menubar
         menubar = self.menuBar()
@@ -227,6 +241,7 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actCompass)
         menu.addAction(self.actSunPath)
         menu.addAction(self.actSamples)
+        menu.addAction(self.actSampleShadows)
         menu.addAction(self.actUVGrid)
         menu.addSeparator()
         submenu = menu.addMenu('Pixel Region')
@@ -239,6 +254,7 @@ class SkyDataViewer(QMainWindow):
         submenu.addAction(self.actPixelGaussian)
         menu.addSeparator()
         menu.addAction(self.actGraphRes)
+        menu.addAction(self.actGraphLine)
         menu = menubar.addMenu('&Samples')
         menu.addAction(self.actExportSetup)
         menu.addAction(self.actExportSelected)
@@ -253,6 +269,7 @@ class SkyDataViewer(QMainWindow):
 
         menu = menubar.addMenu('&Help')
         menu.addAction(actAbout)
+        menu.addAction(actDontSave)
 
         # # toolbar
         # toolbar = self.addToolBar('Toolbar')
@@ -361,7 +378,7 @@ class SkyDataViewer(QMainWindow):
 
         # energy graph
         self.wgtGraph = pg.PlotWidget(name='ASD')
-        self.wgtGraph.setLabel('left', 'Solar Irradiance', units='W/m²/nm')
+        self.wgtGraph.setLabel('left', 'Radiance', units='W/m²/sr/nm')
         self.wgtGraph.setLabel('bottom', 'Wavelength', units='nm')
         self.resetGraph()
         #self.wgtGraphErrors = QLabel()
@@ -424,20 +441,22 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.repaint()
 
     def resetGraph(self):
-        XAxisMin = 0
-        XAxisMax = 3000  # nm
-        XAxisMinDef = 350
-        XAxisMaxDef = 2500
-        YAxisMin = 0
-        YAxisMax = 1.0  # W/m²/nm
-        YAxisMinDef = 0
-        YAxisMaxDef = 0.4
-        self.wgtGraph.setXRange(XAxisMinDef, XAxisMaxDef)
-        self.wgtGraph.setYRange(YAxisMinDef, YAxisMaxDef)
-        self.wgtGraph.setLimits(xMin=XAxisMin, xMax=XAxisMax,
-                                minXRange=100, maxXRange=XAxisMax - XAxisMin,
-                                yMin=YAxisMin, yMax=YAxisMax,
-                                minYRange=0.05, maxYRange=YAxisMax-YAxisMin)
+        # XAxisMin = 0
+        # XAxisMax = 3000  # nm
+        # XAxisMinDef = 350
+        # XAxisMaxDef = 2500
+        # YAxisMin = 0
+        # YAxisMax = 1.0  # W/m²/sr/nm
+        # YAxisMinDef = 0
+        # YAxisMaxDef = 0.4
+        # self.wgtGraph.setXRange(XAxisMinDef, XAxisMaxDef)
+        # self.wgtGraph.setYRange(YAxisMinDef, YAxisMaxDef)
+        # self.wgtGraph.setLimits(xMin=XAxisMin, xMax=XAxisMax,
+        #                         minXRange=100, maxXRange=XAxisMax - XAxisMin,
+        #                         yMin=YAxisMin, yMax=YAxisMax,
+        #                         minYRange=0.05, maxYRange=YAxisMax-YAxisMin)
+        self.wgtGraph.getPlotItem().getAxis('left').enableAutoSIPrefix(enable=False)
+        self.wgtGraph.getPlotItem().getAxis('bottom').enableAutoSIPrefix(enable=False)
         #self.wgtGraph.setAspectLocked(True, None)
 
     def browseForData(self):
@@ -668,7 +687,7 @@ class SkyDataViewer(QMainWindow):
             xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[i], common.AppSettings["GraphResolution"])
             #xs = xs[::common.AppSettings["GraphResolution"]]
             #ys = ys[::common.AppSettings["GraphResolution"]]
-            self.wgtGraph.plot(y=ys, x=xs, pen=self.wgtFisheye.getSamplePatternRGB(i)) # pen=(i, len(indices))
+            self.wgtGraph.plot(y=ys, x=xs, pen=pg.mkPen(color=self.wgtFisheye.getSamplePatternRGB(i), width=common.AppSettings["GraphLineThickness"])) # pen=(i, len(indices))
             #self.wgtGraph.addItem() # add a label/icon to graph with number of samples available
 
     def selectSamples(self, message):
@@ -934,6 +953,7 @@ class SkyDataViewer(QMainWindow):
             menuCtx.addAction(self.actSamples)
             menuCtx.addAction(self.actUVGrid)
             menuCtx.addAction(self.actGraphRes)
+            menuCtx.addAction(self.actGraphLine)
             menuCtx.addSeparator()
             menuCtx.addAction(self.actSelectAll)
             menuCtx.addAction(self.actSelectInv)
@@ -968,6 +988,7 @@ class SkyDataViewer(QMainWindow):
         self.actCompass.setEnabled(state)
         self.actSunPath.setEnabled(state)
         self.actSamples.setEnabled(state)
+        self.actSampleShadows.setEnabled(state)
 
     def toggleUVGrid(self, state):
         common.AppSettings["ShowUVGrid"] = state
@@ -981,9 +1002,13 @@ class SkyDataViewer(QMainWindow):
         common.AppSettings["ShowSunPath"] = state
         self.wgtFisheye.repaint()
 
-    def toggleSamples(self, state):
-        common.AppSettings["ShowSamples"] = state
-        self.wgtFisheye.repaint()
+    def toggleSamples(self, state, action):
+        if action == self.actSamples:
+            common.AppSettings["ShowSamples"] = state
+            self.wgtFisheye.repaint()
+        elif action == self.actSampleShadows:
+            common.AppSettings["ShowSampleShadows"] = state
+            self.wgtFisheye.repaint()
 
     def togglePixelRegion(self, action):
         region = common.PixelRegionMin # n for (n x n) pixel region
@@ -996,7 +1021,7 @@ class SkyDataViewer(QMainWindow):
         elif (action == self.actPixel1deg):
             region = 9
 
-        if ok and region >= utility_data.PixelRegionMin and region % 2 == 1:
+        if ok and region >= common.PixelRegionMin and region % 2 == 1:
             common.AppSettings["PixelRegion"] = region
             #self.wgtFisheye.repaint()
         else:
@@ -1010,15 +1035,23 @@ class SkyDataViewer(QMainWindow):
         elif (action == self.actPixelGaussian):
             common.AppSettings["PixelWeighting"] = common.PixelWeighting.Gaussian.value
 
-    def toggleGraphResolution(self):
-        resolution = 0
+    def toggleGraphOptions(self, action):
         ok = True
-        resolution, ok = QInputDialog.getInt(self, "Radiance Graph Resolution", "Plot every (nm):", 1, 1, 50, 1, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
-        if ok and resolution > 0 and resolution <= 50:
-            common.AppSettings["GraphResolution"] = resolution
-            self.graphSamples(self.wgtFisheye.samplesSelected)
-        else:
-            QMessageBox.warning(self, "Input Validation", "Radiance graph resolution must be 1-50(nm).", QMessageBox.Ok)
+        value = 0
+        if action == self.actGraphRes:
+            value, ok = QInputDialog.getInt(self, "Radiance Graph Resolution", "Plot every (nm):", 1, 1, 50, 1, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+            if ok and value > 0 and value <= 50:
+                common.AppSettings["GraphResolution"] = value
+                self.graphSamples(self.wgtFisheye.samplesSelected)
+            else:
+                QMessageBox.warning(self, "Input Validation", "Radiance graph resolution must be 1-50(nm).", QMessageBox.Ok)
+        elif action == self.actGraphLine:
+            value, ok = QInputDialog.getInt(self, "Radiance Graph Line Thickness", "Thickness:", 1, 1, 5, 1, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+            if ok and value > 0 and value <= 5:
+                common.AppSettings["GraphLineThickness"] = value
+                self.graphSamples(self.wgtFisheye.samplesSelected)
+            else:
+                QMessageBox.warning(self, "Input Validation", "Radiance graph line thickness must be between 1-5.", QMessageBox.Ok)
 
     def toggleAvoidSun(self):
         angle = 0
@@ -1029,6 +1062,9 @@ class SkyDataViewer(QMainWindow):
             #self.wgtFisheye.repaint()
         else:
             QMessageBox.warning(self, "Input Validation", "Circumsolar angle must be 0-180°.", QMessageBox.Ok)
+
+    def toggleDontSave(self, state):
+        self.dontSaveSettings = state
 
     def center(self):
         frame = self.frameGeometry()
@@ -1045,6 +1081,9 @@ class SkyDataViewer(QMainWindow):
         # btn.clicked.connect(QApplication.instance().quit)
         event.accept()
 
+        if self.dontSaveSettings:
+            return
+
         # cache settings
         common.AppSettings["WindowWidth"] = self.width()
         common.AppSettings["WindowHeight"] = self.height()
@@ -1056,12 +1095,6 @@ class SkyDataViewer(QMainWindow):
         common.AppSettings["VertSplitBottom"] = bottom
         common.AppSettings["ShowEXIF"] = self.actEXIF.isChecked()
         common.AppSettings["ShowStatusBar"] = self.actStatusBar.isChecked()
-        # common.AppSettings["ShowMask"] = self.actMask.isChecked()
-        # common.AppSettings["ShowHUD"] = self.actHUD.isChecked()
-        # common.AppSettings["ShowCompass"] = self.actCompass.isChecked()
-        # common.AppSettings["ShowSunPath"] = self.actSunPath.isChecked()
-        # common.AppSettings["ShowSamples"] = self.actSamples.isChecked()
-        # common.AppSettings["ShowUVGrid"] = self.actUVGrid.isChecked()
 
         # dump settings to file
         with open(common.AppSettings["Filename"], 'w') as file:
