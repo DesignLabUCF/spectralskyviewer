@@ -50,15 +50,15 @@ class SkyDataViewer(QMainWindow):
 
         # member variables
         self.capture = datetime.min
-        self.captureTimeHDRDirs = []  # some number of these per day
-        self.captureTimeASDFiles = [] # length should be equal to sampling pattern length
+        self.captureTimeHDRDirs = []   # some number of these per day
+        self.captureTimeASDFiles = []  # length should be equal to sampling pattern length
         self.exposure = 0
         self.spaData = spa.spa_data()
         self.skyData = []
         self.dontSaveSettings = False
 
         # load settings
-        if (os.path.exists(common.AppSettings["Filename"])):
+        if os.path.exists(common.AppSettings["Filename"]):
             loaded = []
             with open(common.AppSettings["Filename"], 'r') as file:
                 loaded = json.load(file)
@@ -67,7 +67,7 @@ class SkyDataViewer(QMainWindow):
                     common.AppSettings.update({key: loaded[key]})
         # validate settings
                 common.AppSettings["ExportOptions"]["Attributes"].sort()
-        if (len(common.AppSettings["DataDirectory"]) > 0 and not os.path.exists(common.AppSettings["DataDirectory"])):
+        if len(common.AppSettings["DataDirectory"]) > 0 and not os.path.exists(common.AppSettings["DataDirectory"]):
             common.AppSettings["DataDirectory"] = ""
 
         # load sampling pattern
@@ -83,7 +83,7 @@ class SkyDataViewer(QMainWindow):
         self.setWindowTitle("Sky Data Viewer")
         self.setWindowIcon(QIcon('res/icon.png'))
         self.statusBar().showMessage('Ready')
-        if (common.AppSettings["ShowStatusBar"]):
+        if common.AppSettings["ShowStatusBar"]:
             self.statusBar().show()
         else:
             self.statusBar().hide()
@@ -181,11 +181,11 @@ class SkyDataViewer(QMainWindow):
         pixWeightGroup.addAction(self.actPixelMedian)
         pixWeightGroup.addAction(self.actPixelGaussian)
         pixWeight = common.PixelWeighting(common.AppSettings["PixelWeighting"])
-        if (pixWeight == common.PixelWeighting.Mean):
+        if pixWeight == common.PixelWeighting.Mean:
             self.actPixelMean.setChecked(True)
-        elif (pixWeight == common.PixelWeighting.Median):
+        elif pixWeight == common.PixelWeighting.Median:
             self.actPixelMedian.setChecked(True)
-        elif (pixWeight == common.PixelWeighting.Gaussian):
+        elif pixWeight == common.PixelWeighting.Gaussian:
             self.actPixelGaussian.setChecked(True)
 
         # sky sample menu actions
@@ -462,12 +462,12 @@ class SkyDataViewer(QMainWindow):
     def browseForData(self):
         directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', common.AppSettings["DataDirectory"])
         directory = QDir.toNativeSeparators(directory)
-        if (directory is not None and len(directory) > 0 and directory != common.AppSettings["DataDirectory"]):
+        if directory is not None and len(directory) > 0 and directory != common.AppSettings["DataDirectory"]:
             common.AppSettings["DataDirectory"] = directory
             self.loadData()
 
     def loadData(self):
-        if (len(common.AppSettings["DataDirectory"]) <= 0 or not os.path.exists(common.AppSettings["DataDirectory"])):
+        if len(common.AppSettings["DataDirectory"]) <= 0 or not os.path.exists(common.AppSettings["DataDirectory"]):
             return
 
         # GUI
@@ -477,7 +477,7 @@ class SkyDataViewer(QMainWindow):
         captureDateDirs = utility.findFiles(common.AppSettings["DataDirectory"], mode=2)
         captureDateDirs[:] = [dir for dir in captureDateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
         captureDates = [os.path.basename(dir) for dir in captureDateDirs]
-        if (len(captureDates) > 0):
+        if len(captureDates) > 0:
             self.cbxDate.addItems(captureDates)
 
         # load site info for SPA calculations
@@ -485,7 +485,7 @@ class SkyDataViewer(QMainWindow):
         self.skyData = utility_data.loadSkyCoverData(common.AppSettings["DataDirectory"])
 
     def dateSelected(self, index):
-        if (index < 0 or index >= self.cbxDate.count()):
+        if index < 0 or index >= self.cbxDate.count():
             return
 
         # reset
@@ -503,7 +503,7 @@ class SkyDataViewer(QMainWindow):
         # find all capture time dirs
         self.captureTimeHDRDirs = utility.findFiles(pathHDR, mode=2)
         self.captureTimeHDRDirs[:] = [dir for dir in self.captureTimeHDRDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
-        if (len(self.captureTimeHDRDirs) <= 0):
+        if len(self.captureTimeHDRDirs) <= 0:
             QMessageBox.critical(self, "Error", "No HDR capture folders found.\nFormat is time of capture (e.g. 08.57.23).", QMessageBox.Ok)
             return
 
@@ -514,7 +514,7 @@ class SkyDataViewer(QMainWindow):
 
         # compute and apply sun path
         data = utility_data.loadSPASiteData(pathDate) # reload site info per date directory if exists
-        if (data != None):
+        if data != None:
             self.spaData = data
         utility_data.fillSPADateTime(self.spaData, self.capture)
         sunpath = utility_data.computeSunPath(self.spaData)
@@ -527,7 +527,7 @@ class SkyDataViewer(QMainWindow):
         self.cbxTime.addItems([os.path.basename(x) for x in self.captureTimeHDRDirs])
         self.cbxTime.setCurrentIndex(1) # because combobox first element is not a valid value
         self.sldTime.setRange(0, len(self.captureTimeHDRDirs) - 1)
-        if (self.exposure < 0):
+        if self.exposure < 0:
             self.cbxExposure.setCurrentIndex(1) # because combobox first element is not a valid value
             self.exposure = 0
         self.cbxTime.blockSignals(False)
@@ -541,7 +541,7 @@ class SkyDataViewer(QMainWindow):
         self.wgtFisheye.selectSamples("none")
 
     def timeSelected(self, index):
-        if (index < 0 or index >= self.cbxTime.count()):
+        if index < 0 or index >= self.cbxTime.count():
             return
 
         # reset
@@ -551,11 +551,11 @@ class SkyDataViewer(QMainWindow):
         # get sender of event
         # both capture time choicebox and slider route to this event handler, so we need to know who sent the event
         widget = self.sender()
-        if (widget == self.cbxTime):
+        if widget == self.cbxTime:
             index -= 1  # because combobox first element is not a valid value
 
         # handle unselected time, exposure, or rare events triggered when we have no data loaded yet
-        if (index < 0 or self.exposure < 0 or len(self.captureTimeHDRDirs) <= 0):
+        if index < 0 or self.exposure < 0 or len(self.captureTimeHDRDirs) <= 0:
             self.wgtFisheye.setPhoto(None)
             self.wgtFisheye.repaint()
             return
@@ -565,12 +565,12 @@ class SkyDataViewer(QMainWindow):
 
         # gather all exposure photos taken at time selected
         photos = utility.findFiles(self.captureTimeHDRDirs[index], mode=1, ext=["jpg"])
-        if (len(photos) <= 0):
+        if len(photos) <= 0:
             self.log("Error: No photos found in:\n" + self.captureTimeHDRDirs[index])
             return
 
         # is there a photo for the currently selected exposure?
-        if (self.exposure >= len(photos)):
+        if self.exposure >= len(photos):
             self.wgtFisheye.setPhoto(None)
             self.wgtFisheye.repaint()
             return
@@ -588,11 +588,11 @@ class SkyDataViewer(QMainWindow):
         # update datetime panel
         # both capture time choicebox and slider route to this event handler, so only update the other one
         self.lblData.setText(photos[self.exposure])
-        if (widget == self.cbxTime):
+        if widget == self.cbxTime:
             self.sldTime.blockSignals(True)       # prevent calling this event handler again
             self.sldTime.setSliderPosition(index)
             self.sldTime.blockSignals(False)
-        elif (widget == self.sldTime):
+        elif widget == self.sldTime:
             self.cbxTime.blockSignals(True)       # prevent calling this event handler again
             self.cbxTime.setCurrentIndex(index+1) # because combobox first element is not a valid value
             self.cbxTime.blockSignals(False)
@@ -626,7 +626,7 @@ class SkyDataViewer(QMainWindow):
         # find all capture time dirs
         captureTimeASDDirs = utility.findFiles(pathASD, mode=2)
         captureTimeASDDirs[:] = [dir for dir in captureTimeASDDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
-        if (len(captureTimeASDDirs) <= 0):
+        if len(captureTimeASDDirs) <= 0:
             self.log("Error: No ASD capture time dirs found: " + str(self.capture.date()))
             return
 
@@ -637,22 +637,22 @@ class SkyDataViewer(QMainWindow):
             timestr = str(self.capture.date()) + " " + os.path.basename(dir)
             time = datetime.strptime(timestr, "%Y-%m-%d %H.%M.%S")
             delta = (self.capture - time).total_seconds()
-            if (abs(delta) <= threshold):
+            if abs(delta) <= threshold:
                 asdTime = time
                 break
 
         # is there an equivalent ASD capture?
-        if (asdTime is None):
+        if asdTime is None:
             self.log("Error: No ASD capture time dir found within " + str(threshold) + "s of HDR capture time: " + str(self.capture))
             return
 
         # gather all ASD files for capture time
         asdTimeDir = os.path.join(pathASD, str(asdTime.time()).replace(":", "."))
         self.captureTimeASDFiles = utility.findFiles(asdTimeDir, mode=1, ext=[".txt"])
-        if (len(self.captureTimeASDFiles) <= 0):
+        if len(self.captureTimeASDFiles) <= 0:
             self.log("Error: No ASD .txt files found for: " + str(asdTime))
             return
-        if (len(self.captureTimeASDFiles) < len(common.SamplingPattern)):
+        if len(self.captureTimeASDFiles) < len(common.SamplingPattern):
             self.log("Error: Found only " + str(len(self.captureTimeASDFiles)) + " ASD files. Sample pattern should have " + str(len(common.SamplingPattern)))
             return
 
@@ -665,7 +665,7 @@ class SkyDataViewer(QMainWindow):
     def exposureSelected(self, index):
         index -= 1 # -1 because combobox first element is not a valid value
         self.exposure = index
-        if (self.captureTimeHDRDirs is not None and len(self.captureTimeHDRDirs) > 0):
+        if self.captureTimeHDRDirs is not None and len(self.captureTimeHDRDirs) > 0:
             self.sldTime.valueChanged.emit(self.sldTime.value())
 
     def graphSamples(self, indices):
@@ -673,16 +673,16 @@ class SkyDataViewer(QMainWindow):
         self.wgtGraph.clear()
 
         # nothing to graph
-        if (len(indices) <= 0):
+        if len(indices) <= 0:
             return
-        if (len(self.captureTimeHDRDirs) <= 0):   # no HDR photo
+        if len(self.captureTimeHDRDirs) <= 0:   # no HDR photo
             return
-        if (len(self.captureTimeASDFiles) <= 0):  # no ASD files
+        if len(self.captureTimeASDFiles) <= 0:  # no ASD files
             return
 
         # load and plot data
         for i in indices:
-            if (i >= len(self.captureTimeASDFiles)):
+            if i >= len(self.captureTimeASDFiles):
                 break
             xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[i], common.AppSettings["GraphResolution"])
             #xs = xs[::common.AppSettings["GraphResolution"]]
@@ -697,16 +697,16 @@ class SkyDataViewer(QMainWindow):
         xoptions = common.AppSettings["ExportOptions"]
 
         # we shouldn't be here if export file hasn't been configured
-        if (len(xoptions["Filename"]) <= 0):
+        if len(xoptions["Filename"]) <= 0:
             QMessageBox.critical(self, "Error", "Please configure export file first!", QMessageBox.Ok)
             return
 
         # nothing to export
-        if (len(self.captureTimeHDRDirs) <= 0):   # no HDR photo
+        if len(self.captureTimeHDRDirs) <= 0:   # no HDR photo
             return
-        if (len(self.captureTimeASDFiles) <= 0):  # no ASD files
+        if len(self.captureTimeASDFiles) <= 0:  # no ASD files
             return
-        if (len(self.wgtFisheye.samplesSelected) <= 0): # nothing selected
+        if len(self.wgtFisheye.samplesSelected) <= 0:  # nothing selected
             return
 
         self.log("Exporting... ")
@@ -722,17 +722,17 @@ class SkyDataViewer(QMainWindow):
         skycover = utility_data.findCaptureSkyCover(self.capture, self.skyData)
 
         # create file if not exists
-        if (not os.path.exists(xoptions["Filename"])):
+        if not os.path.exists(xoptions["Filename"]):
             # create dirs if not exists
-            if (not os.path.exists(os.path.dirname(xoptions["Filename"]))):
+            if not os.path.exists(os.path.dirname(xoptions["Filename"])):
                 os.makedirs(os.path.dirname(xoptions["Filename"]))
             # write header
             with open(xoptions["Filename"], "w") as file:
                 for i in range(0, len(xoptions["Attributes"])):
                     attr = DialogExport.attributeFromIndex(xoptions["Attributes"][i])
-                    if (attr == "PixelRGB"):
+                    if attr == "PixelRGB":
                         file.write("Red" + delimiter + "Green" + delimiter + "Blue" + delimiter)
-                    elif (attr == "Radiance"):
+                    elif attr == "Radiance":
                         for w in range(350, 2500):
                             file.write(str(w) + delimiter)
                         file.write(str(2500))
@@ -767,28 +767,28 @@ class SkyDataViewer(QMainWindow):
                     attr = common.ExportAttributes[aIdx][0]
 
                     # export sun azimuth
-                    if (attr == "SunAzimuth"):
+                    if attr == "SunAzimuth":
                         file.write('{0:07.04f}'.format(sunpos[0]))
                         file.write(delimiter)
                     # export sun altitude
-                    elif (attr == "SunAltitude"):
+                    elif attr == "SunAltitude":
                         file.write('{0:07.04f}'.format(sunpos[1]))
                         file.write(delimiter)
                     # export sky cover
-                    elif (attr == "SkyCover"):
+                    elif attr == "SkyCover":
                         file.write(str(skycover.value))
                         file.write(delimiter)
                     # export index
-                    elif (attr == "SamplePatternIndex"):
+                    elif attr == "SamplePatternIndex":
                         file.write(str(sIdx))
                         file.write(delimiter)
                     # export sample azimuth
-                    elif (attr == "SampleAzimuth"):
+                    elif attr == "SampleAzimuth":
                         angle = common.SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(angle[0]))
                         file.write(delimiter)
                     # export sample altitude
-                    elif (attr == "SampleAltitude"):
+                    elif attr == "SampleAltitude":
                         angle = common.SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(angle[1]))
                         file.write(delimiter)
@@ -797,15 +797,15 @@ class SkyDataViewer(QMainWindow):
                         file.write(str(pixregion))
                         file.write(delimiter)
                     # export pixel weighting method
-                    elif (attr == "PixelWeighting"):
+                    elif attr == "PixelWeighting":
                         file.write(str(pixweight.value))
                         file.write(delimiter)
                     # export exposure time
-                    elif (attr == "Exposure"):
+                    elif attr == "Exposure":
                         file.write(str(common.Exposures[self.exposure]))
                         file.write(delimiter)
                     # export pixel
-                    elif (attr == "PixelRGB"):
+                    elif attr == "PixelRGB":
                         file.write(str(pixels[i][0])) # red
                         file.write(delimiter)
                         file.write(str(pixels[i][1])) # green
@@ -813,7 +813,7 @@ class SkyDataViewer(QMainWindow):
                         file.write(str(pixels[i][2])) # blue
                         file.write(delimiter)
                     # export solar radiance spectrum
-                    elif (attr == "Radiance"):
+                    elif attr == "Radiance":
                         xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[sIdx])
                         count = len(xs)
                         for j in range(0, count-1):
@@ -851,7 +851,7 @@ class SkyDataViewer(QMainWindow):
                 # read/write header
                 header = next(reader, None)
                 writer.writerow(header)
-                mapping = { header[i]: i for i in range(0, len(header)) }
+                mapping = {header[i]: i for i in range(0, len(header))}
 
                 # read first row for pixregion, pixweight, exposure
                 firstrow = next(reader, None)
@@ -933,7 +933,7 @@ class SkyDataViewer(QMainWindow):
     def setupExportFile(self):
         dialog = DialogExport(common.AppSettings["ExportOptions"])
         code = dialog.exec()
-        if (code != QDialog.Accepted):
+        if code != QDialog.Accepted:
             return
 
         # save the export options in app settings
@@ -943,7 +943,7 @@ class SkyDataViewer(QMainWindow):
         self.actExportSelected.setEnabled(True)
 
     def triggerContextMenu(self, widget, event):
-        if (widget == self.wgtFisheye):
+        if widget == self.wgtFisheye:
             menuCtx = QMenu(self)
             menuCtx.addAction(self.actMask)
             menuCtx.addAction(self.actHUD)
@@ -963,14 +963,14 @@ class SkyDataViewer(QMainWindow):
             menuCtx.exec_(widget.mapToGlobal(event.pos()))
 
     def toggleEXIFPanel(self, state):
-        if (state):
+        if state:
             self.splitHoriz.setSizes([self.width() * 0.75, self.width() * 0.25])
         else:
             left, right = self.splitHoriz.sizes()
             self.splitHoriz.setSizes([left + right, 0])
 
     def toggleStatusBar(self, state):
-        if (state):
+        if state:
             self.statusBar().show()
             #self.centralWidget().layout().setContentsMargins(10,10,10,0)
         else:
@@ -1014,11 +1014,11 @@ class SkyDataViewer(QMainWindow):
         region = common.PixelRegionMin # n for (n x n) pixel region
         ok = True
 
-        if (action == self.actPixel1):
+        if action == self.actPixel1:
             region = 1
-        elif (action == self.actPixelnxn):
+        elif action == self.actPixelnxn:
             region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, common.PixelRegionMin, common.PixelRegionMax, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
-        elif (action == self.actPixel1deg):
+        elif action == self.actPixel1deg:
             region = 9
 
         if ok and region >= common.PixelRegionMin and region % 2 == 1:
@@ -1028,11 +1028,11 @@ class SkyDataViewer(QMainWindow):
             QMessageBox.warning(self, "Input Validation", "Pixel Region must be an odd positive number.", QMessageBox.Ok)
 
     def togglePixelWeighting(self, action):
-        if (action == self.actPixelMean):
+        if action == self.actPixelMean:
             common.AppSettings["PixelWeighting"] = common.PixelWeighting.Mean.value
-        elif (action == self.actPixelMedian):
+        elif action == self.actPixelMedian:
             common.AppSettings["PixelWeighting"] = common.PixelWeighting.Median.value
-        elif (action == self.actPixelGaussian):
+        elif action == self.actPixelGaussian:
             common.AppSettings["PixelWeighting"] = common.PixelWeighting.Gaussian.value
 
     def toggleGraphOptions(self, action):

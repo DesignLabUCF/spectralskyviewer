@@ -115,11 +115,11 @@ def findHDRFile(datadir, capture, exposure):
 
     # gather all exposure photos taken at capture timestamp
     photos = utility.findFiles(path, mode=1, ext=["jpg"])
-    if (len(photos) <= 0):
+    if len(photos) <= 0:
         return ''
 
     # is there a photo for the currently selected exposure?
-    if (expidx >= len(photos)):
+    if expidx >= len(photos):
         return ''
 
     return photos[expidx]
@@ -242,13 +242,13 @@ Function to check if a raw data photo is available, given a path to an existing 
 :note: This assumes the raw data file is the same name (but different extension) of given file.
 '''
 def isHDRRawAvailable(hdrImgPath):
-    if (not os.path.exists(hdrImgPath)):
+    if not os.path.exists(hdrImgPath):
         return False
     pathSplit = os.path.splitext(hdrImgPath.lower())
     for ext in common.HDRRawExts:
-        if (pathSplit[1] == ext):
+        if pathSplit[1] == ext:
             return True
-        elif (os.path.exists(pathSplit[0] + ext)):
+        elif os.path.exists(pathSplit[0] + ext):
             return True
     return False
 
@@ -266,7 +266,7 @@ Function to load a ViewSpecPro spectroradiometer ASD file.
 :return: 2 lists, Xs (wavelengths) and Ys (irradiance)        
 '''
 def loadASDFile(filepath, step=1):
-    if (not os.path.exists(filepath)):
+    if not os.path.exists(filepath):
         return [], []
     xdata = []
     ydata = []
@@ -290,9 +290,9 @@ Function to load a file with data with capture dates+times and sky cover assessm
 :return: A list of (datetime, datetime, skycover) for each capture timespan accounted for. 
 '''
 def loadSkyCoverData(filepath, isDir=True):
-    if (isDir):
+    if isDir:
         filepath = os.path.join(filepath, 'skycover.csv') # assumes this filename if dir specified
-    if (not os.path.exists(filepath)):
+    if not os.path.exists(filepath):
         return []
 
     # (datetime, datetime, skycover)
@@ -304,7 +304,7 @@ def loadSkyCoverData(filepath, isDir=True):
         reader = csv.reader(f, delimiter=',')
         next(reader, None)  # ignore header
         for row in reader:
-            if (len(row) < 4):
+            if len(row) < 4:
                 continue
             try:
                 skycover.append((
@@ -327,7 +327,7 @@ def findCaptureSkyCover(capture, skycovers):
     capture = capture.replace(second=0)
     sky = common.SkyCover.UNK
     for sc in skycovers:
-        if (capture >= sc[0] and capture <= sc[1]):
+        if capture >= sc[0] and capture <= sc[1]:
             sky = sc[2]
             break
     return sky
@@ -344,9 +344,9 @@ Function to load a file with a sky sampling pattern.
 :return: A list of (azimuth, altitude) coordinates in degrees. And a list in radians.
 '''
 def loadSamplingPattern(filepath, isDir=True):
-    if (isDir):
+    if isDir:
         filepath = os.path.join(filepath, 'sampling.csv') # assumes this filename if dir specified
-    if (not os.path.exists(filepath)):
+    if not os.path.exists(filepath):
         return [], []
 
     # (azimuth, altitude)
@@ -383,9 +383,9 @@ Function to load a file with data used for NREL SPA's algorithm.
 :return: A filled in spa.spa_data object.
 '''
 def loadSPASiteData(filepath, isDir=True):
-    if (isDir):
+    if isDir:
         filepath = os.path.join(filepath, 'spa.csv') # assumes this filename if dir specified
-    if (not os.path.exists(filepath)):
+    if not os.path.exists(filepath):
         return None
 
     # create spa data and fill with default values from their example
@@ -484,7 +484,7 @@ Function to fill a spa_data object from NREL SPA with specified date and time.
 :note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
 '''
 def fillSPADateTime(spadata, dt):
-    if (spadata == None or dt == None):
+    if spadata is None or dt is None:
         return
     spadata.year = dt.year
     spadata.month = dt.month
@@ -501,7 +501,7 @@ Function to compute the (azimuth, altitude) position of the sun using NREL SPA.
 '''
 def computeSunPosition(spadata):
     spa.spa_calculate(spadata)
-    altitude = 90 - spadata.zenith # this application uses altitude (90 - zenith)
+    altitude = 90 - spadata.zenith  # this application uses altitude (90 - zenith)
     #altitude = spadata.zenith
     return (spadata.azimuth, altitude)
 
@@ -521,11 +521,11 @@ def computeSunPath(spadata):
     for i in range(0, 24):
         spadata2.hour = i
         spa.spa_calculate(spadata2)
-        altitude = 90 - spadata2.zenith # this application uses altitude (90 - zenith)
+        altitude = 90 - spadata2.zenith  # this application uses altitude (90 - zenith)
         #altitude = spadata.zenith
         # we only care about altitude when sun is visible (not on other side of Earth)
-        if (altitude >= 0 and altitude <= 90):
-        #if (altitude <= 90):
+        if altitude >= 0 and altitude <= 90:
+        #if altitude <= 90:
             dt = datetime(spadata2.year, spadata2.month, spadata2.day, spadata2.hour, spadata2.minute, int(spadata2.second))
             sunpath.append((spadata2.azimuth, altitude, dt))
     return sunpath
@@ -540,9 +540,9 @@ Function to load a solar position (sunpath) file exported from NREL's SPA calcul
 :return: A list of (azimuth, altitude, datetime) tuples with solar position and timestamp
 '''
 def loadSunPath(filepath, isDir=True):
-    if (isDir):
-        filepath = os.path.join(filepath, 'spa.csv') # assumes this filename if dir specified
-    if (not os.path.exists(filepath)):
+    if isDir:
+        filepath = os.path.join(filepath, 'spa.csv')  # assumes this filename if dir specified
+    if not os.path.exists(filepath):
         return []
     sunpath = []
     with open(filepath, 'r') as f:
@@ -560,6 +560,6 @@ def loadSunPath(filepath, isDir=True):
             # this application uses altitude (90 - zenith)
             point = (float(row[3]), 90-float(row[2]), dt)
             # we only care about altitude when sun is visible (not on other side of Earth)
-            if (point[1] >=0 and point[1] <= 90):
+            if point[1] >=0 and point[1] <= 90:
                 sunpath.append(point)
     return sunpath

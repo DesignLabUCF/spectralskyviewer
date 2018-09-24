@@ -177,7 +177,7 @@ class DialogConverter(QDialog):
 
     def convertPressed(self):
         # validate dataset before proceeding
-        if self.txtFile.text() == None or len(self.txtFile.text()) <= 0:
+        if self.txtFile.text() is None or len(self.txtFile.text()) <= 0:
             QMessageBox.critical(self, "Error", "Invalid sample dataset filename!", QMessageBox.Ok)
             return
         if not os.path.exists(self.txtFile.text()):
@@ -194,11 +194,11 @@ class DialogConverter(QDialog):
         self.convertOptions["PixelRegion"] = int(self.cbxPixelRegion.currentText())
 
         # save pixel weighting
-        if (self.radPixelMean.isChecked()):
+        if self.radPixelMean.isChecked():
             self.convertOptions["PixelWeighting"] = common.PixelWeighting.Mean.value
-        elif (self.radPixelMedian.isChecked()):
+        elif self.radPixelMedian.isChecked():
             self.convertOptions["PixelWeighting"] = common.PixelWeighting.Median.value
-        elif (self.radPixelGaussian.isChecked()):
+        elif self.radPixelGaussian.isChecked():
             self.convertOptions["PixelWeighting"] = common.PixelWeighting.Gaussian.value
 
         # save pixel region

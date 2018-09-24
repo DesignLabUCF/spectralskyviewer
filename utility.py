@@ -55,13 +55,13 @@ If the rect has been flipped so that either the width or height is negative, thi
 def rectForwardFacing(rect):
     newrect = rect
     # rect is flipped horizontally and vertically
-    if (rect[2] < rect[0] and rect[3] < rect[1]):
+    if rect[2] < rect[0] and rect[3] < rect[1]:
         newrect = [rect[2], rect[3], rect[0], rect[1]]
     # rect is flipped horizontally
-    elif (rect[2] < rect[0]):
+    elif rect[2] < rect[0]:
         newrect = [rect[2], rect[1], rect[0], rect[3]]
     # rect is flipped vertically
-    elif (rect[3] < rect[1]):
+    elif rect[3] < rect[1]:
         newrect = [rect[0], rect[3], rect[2], rect[1]]
     return newrect
 
