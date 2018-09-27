@@ -29,6 +29,7 @@ import sys
 import os
 import json
 import csv
+import math
 from datetime import datetime
 from PyQt5.QtCore import Qt, QDir
 from PyQt5.QtGui import QIcon, QFont
@@ -66,12 +67,14 @@ class SkyDataViewer(QMainWindow):
                 if (key in common.AppSettings):
                     common.AppSettings.update({key: loaded[key]})
         # validate settings
-                common.AppSettings["ExportOptions"]["Attributes"].sort()
+        common.AppSettings["ExportOptions"]["Attributes"].sort()
         if len(common.AppSettings["DataDirectory"]) > 0 and not os.path.exists(common.AppSettings["DataDirectory"]):
             common.AppSettings["DataDirectory"] = ""
 
         # load sampling pattern
-        common.SamplingPattern, common.SamplingPatternRads = utility_data.loadSamplingPattern(common.AppSettings["DataDirectory"])
+        common.SamplingPattern = utility_data.loadSamplingPattern(common.AppSettings["DataDirectory"])
+        common.SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in common.SamplingPattern]
+        common.SamplingPatternAlts = list(set([s[1] for s in common.SamplingPattern]))
 
         # init
         QToolTip.setFont(QFont('SansSerif', 8))
@@ -80,7 +83,7 @@ class SkyDataViewer(QMainWindow):
         self.initWidgets()
         # self.setGeometry(0, 0, 1024, 768)
         self.resize(common.AppSettings["WindowWidth"], common.AppSettings["WindowHeight"])
-        self.setWindowTitle("Sky Data Viewer")
+        self.setWindowTitle("SkyDataViewer")
         self.setWindowIcon(QIcon('res/icon.png'))
         self.statusBar().showMessage('Ready')
         if common.AppSettings["ShowStatusBar"]:
@@ -114,68 +117,76 @@ class SkyDataViewer(QMainWindow):
         self.actStatusBar.setChecked(common.AppSettings["ShowStatusBar"])
         self.actStatusBar.setStatusTip('Toggle display of status bar')
         self.actStatusBar.triggered.connect(self.toggleStatusBar)
-        self.actMask = QAction(QIcon(), 'Show &Mask', self)
-        self.actMask.setCheckable(True)
-        self.actMask.setChecked(common.AppSettings["ShowMask"])
-        self.actMask.setStatusTip('Toggle display of fisheye mask')
-        self.actMask.triggered.connect(self.toggleMask)
         self.actHUD = QAction(QIcon(), 'Show &HUD', self)
         self.actHUD.setCheckable(True)
         self.actHUD.setChecked(common.AppSettings["ShowHUD"])
         self.actHUD.setStatusTip('Toggle display of HUD')
-        self.actHUD.triggered.connect(self.toggleHUD)
+        self.actHUD.triggered.connect(lambda: self.toggleHUDView(self.actHUD))
+        self.actMask = QAction(QIcon(), 'Show &Mask', self)
+        self.actMask.setCheckable(True)
+        self.actMask.setChecked(common.AppSettings["ShowMask"])
+        self.actMask.setStatusTip('Toggle display of fisheye mask')
+        self.actMask.triggered.connect(lambda: self.toggleHUDView(self.actMask))
         self.actCompass = QAction(QIcon(), 'Show &Compass', self)
         self.actCompass.setCheckable(True)
         self.actCompass.setChecked(common.AppSettings["ShowCompass"])
         self.actCompass.setStatusTip('Toggle display of compass')
-        self.actCompass.triggered.connect(self.toggleCompass)
+        self.actCompass.triggered.connect(lambda: self.toggleHUDView(self.actCompass))
+        self.actLensWarp = QAction(QIcon(), 'Show &Lens Warp', self)
+        self.actLensWarp.setCheckable(True)
+        self.actLensWarp.setChecked(common.AppSettings["ShowLensWarp"])
+        self.actLensWarp.setStatusTip('Toggle display of lens warp amount')
+        self.actLensWarp.triggered.connect(lambda: self.toggleHUDView(self.actLensWarp))
         self.actSunPath = QAction(QIcon(), 'Show Su&n Path', self)
         self.actSunPath.setCheckable(True)
         self.actSunPath.setChecked(common.AppSettings["ShowSunPath"])
         self.actSunPath.setStatusTip('Toggle display of sun path')
-        self.actSunPath.triggered.connect(self.toggleSunPath)
+        self.actSunPath.triggered.connect(lambda: self.toggleHUDView(self.actSunPath))
         self.actSamples = QAction(QIcon(), 'Show &Samples', self)
         self.actSamples.setCheckable(True)
         self.actSamples.setChecked(common.AppSettings["ShowSamples"])
         self.actSamples.setStatusTip('Toggle display of sampling pattern')
-        self.actSamples.triggered.connect(lambda: self.toggleSamples(self.actSamples.isChecked(), self.actSamples))
-        self.actSampleShadows = QAction(QIcon(), 'Show Sample Shadows', self)
-        self.actSampleShadows.setCheckable(True)
-        self.actSampleShadows.setChecked(common.AppSettings["ShowSampleShadows"])
-        self.actSampleShadows.setStatusTip('Toggle display of selected sample shadows')
-        self.actSampleShadows.triggered.connect(lambda: self.toggleSamples(self.actSampleShadows.isChecked(), self.actSampleShadows))
+        self.actSamples.triggered.connect(lambda: self.toggleHUDView(self.actSamples))
+        self.actShadows = QAction(QIcon(), 'Show Shadows', self)
+        self.actShadows.setCheckable(True)
+        self.actShadows.setChecked(common.AppSettings["ShowShadows"])
+        self.actShadows.setStatusTip('Toggle display of shadows on HUD')
+        self.actShadows.triggered.connect(lambda: self.toggleHUDView(self.actShadows))
         self.actUVGrid = QAction(QIcon(), 'Show &UVGrid', self)
         self.actUVGrid.setCheckable(True)
         self.actUVGrid.setChecked(common.AppSettings["ShowUVGrid"])
         self.actUVGrid.setStatusTip('Toggle display of UV grid')
-        self.actUVGrid.triggered.connect(self.toggleUVGrid)
+        self.actUVGrid.triggered.connect(lambda: self.toggleHUDView(self.actUVGrid))
         self.actPixel1 = QAction(QIcon(), '1 Pixel', self)
-        self.actPixel1.setStatusTip('Use a single pixel as region.')
-        self.actPixel1.triggered.connect(lambda: self.togglePixelRegion(self.actPixel1))
+        self.actPixel1.setStatusTip('Use a single pixel as region')
+        self.actPixel1.triggered.connect(lambda: self.togglePixelOptions(self.actPixel1))
         self.actPixelnxn = QAction(QIcon(), '(n x n) Pixels', self)
-        self.actPixelnxn.setStatusTip('Use an (n x n) pixel region.')
-        self.actPixelnxn.triggered.connect(lambda: self.togglePixelRegion(self.actPixelnxn))
+        self.actPixelnxn.setStatusTip('Use an (n x n) pixel region')
+        self.actPixelnxn.triggered.connect(lambda: self.togglePixelOptions(self.actPixelnxn))
         self.actPixel1deg = QAction(QIcon(), '1° Steridian Pixels', self)
-        self.actPixel1deg.setStatusTip('Use a 1° steridian pixel region.')
-        self.actPixel1deg.triggered.connect(lambda: self.togglePixelRegion(self.actPixel1deg))
+        self.actPixel1deg.setStatusTip('Use a 1° steridian pixel region')
+        self.actPixel1deg.triggered.connect(lambda: self.togglePixelOptions(self.actPixel1deg))
         self.actPixelMean = QAction(QIcon(), 'Mean Weighting', self)
         self.actPixelMean.setCheckable(True)
-        self.actPixelMean.setStatusTip('Apply mean weighting to pixels.')
-        self.actPixelMean.triggered.connect(lambda: self.togglePixelWeighting(self.actPixelMean))
+        self.actPixelMean.setStatusTip('Apply mean weighting to pixels')
+        self.actPixelMean.triggered.connect(lambda: self.togglePixelOptions(self.actPixelMean))
         self.actPixelMedian = QAction(QIcon(), 'Median Weighting', self)
         self.actPixelMedian.setCheckable(True)
-        self.actPixelMedian.setStatusTip('Apply median weighting to pixels.')
-        self.actPixelMedian.triggered.connect(lambda: self.togglePixelWeighting(self.actPixelMedian))
+        self.actPixelMedian.setStatusTip('Apply median weighting to pixels')
+        self.actPixelMedian.triggered.connect(lambda: self.togglePixelOptions(self.actPixelMedian))
         self.actPixelGaussian = QAction(QIcon(), 'Gaussian Weighting', self)
         self.actPixelGaussian.setCheckable(True)
-        self.actPixelGaussian.setStatusTip('Apply Gaussian weighting to pixels.')
-        self.actPixelGaussian.triggered.connect(lambda: self.togglePixelWeighting(self.actPixelGaussian))
+        self.actPixelGaussian.setStatusTip('Apply Gaussian weighting to pixels')
+        self.actPixelGaussian.triggered.connect(lambda: self.togglePixelOptions(self.actPixelGaussian))
         self.actGraphRes = QAction(QIcon(), 'Graph Resolution', self)
-        self.actGraphRes.setStatusTip('Specify radiance graph resolution.')
+        self.actGraphRes.setStatusTip('Specify radiance graph resolution')
         self.actGraphRes.triggered.connect(lambda: self.toggleGraphOptions(self.actGraphRes))
         self.actGraphLine = QAction(QIcon(), 'Graph Line Thickness', self)
-        self.actGraphLine.setStatusTip('Specify radiance graph line thickness.')
+        self.actGraphLine.setStatusTip('Specify radiance graph line thickness')
         self.actGraphLine.triggered.connect(lambda: self.toggleGraphOptions(self.actGraphLine))
+        self.actHUDTextScale = QAction(QIcon(), 'HUD Text Scale', self)
+        self.actHUDTextScale.setStatusTip('Adjust scale of HUD text')
+        self.actHUDTextScale.triggered.connect(lambda: self.toggleGraphOptions(self.actGraphLine))
         pixWeightGroup = QActionGroup(self)
         pixWeightGroup.addAction(self.actPixelMean)
         pixWeightGroup.addAction(self.actPixelMedian)
@@ -209,7 +220,7 @@ class SkyDataViewer(QMainWindow):
         self.actClearAll.setStatusTip('Clear selected samples')
         self.actClearAll.triggered.connect(lambda: self.selectSamples('none'))
         self.actAvoidSun = QAction(QIcon(), 'Avoid Circumsolar', self)
-        self.actAvoidSun.setStatusTip('Deselect samples around sun within a specified angle.')
+        self.actAvoidSun.setStatusTip('Deselect samples around sun within a specified angle')
         self.actAvoidSun.triggered.connect(self.toggleAvoidSun)
         self.actSampleConverter = QAction(QIcon(), 'Sample &Converter', self)
         self.actSampleConverter.setStatusTip('Re-export samples with different properties')
@@ -218,11 +229,11 @@ class SkyDataViewer(QMainWindow):
         # help menu actions
         actAbout = QAction(QIcon(), '&About', self)
         actAbout.setStatusTip('Information about this application')
-        #actAbout.triggered.connect(self.close)
+        actAbout.triggered.connect(self.toggleAbout)
         actDontSave = QAction(QIcon(), 'Don\'t Save Settings', self)
         actDontSave.setCheckable(True)
         actDontSave.setChecked(False)
-        actDontSave.setStatusTip('Use this to prevent the application from stomping your settings.')
+        actDontSave.setStatusTip('Use this to prevent the application from stomping your settings')
         actDontSave.triggered.connect(self.toggleDontSave)
 
         # menubar
@@ -235,13 +246,13 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actEXIF)
         menu.addAction(self.actStatusBar)
         menu.addSeparator()
-        menu.addAction(self.actMask)
         menu.addAction(self.actHUD)
-        menu.addSeparator()
+        menu.addAction(self.actMask)
         menu.addAction(self.actCompass)
+        menu.addAction(self.actLensWarp)
         menu.addAction(self.actSunPath)
         menu.addAction(self.actSamples)
-        menu.addAction(self.actSampleShadows)
+        menu.addAction(self.actShadows)
         menu.addAction(self.actUVGrid)
         menu.addSeparator()
         submenu = menu.addMenu('Pixel Region')
@@ -255,8 +266,11 @@ class SkyDataViewer(QMainWindow):
         menu.addSeparator()
         menu.addAction(self.actGraphRes)
         menu.addAction(self.actGraphLine)
+        menu.addSeparator()
+        menu.addAction(self.actHUDTextScale)
         menu = menubar.addMenu('&Samples')
         menu.addAction(self.actExportSetup)
+        menu.addSeparator()
         menu.addAction(self.actExportSelected)
         menu.addAction(self.actSampleConverter)
         menu.addSeparator()
@@ -265,8 +279,6 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actClearAll)
         menu.addSeparator()
         menu.addAction(self.actAvoidSun)
-
-
         menu = menubar.addMenu('&Help')
         menu.addAction(actAbout)
         menu.addAction(actDontSave)
@@ -316,15 +328,15 @@ class SkyDataViewer(QMainWindow):
         # toolbox
         self.btn2DRender = QPushButton(self)
         self.btn2DRender.setIcon(self.btn2DRender.style().standardIcon(QStyle.SP_DesktopIcon))
-        self.btn2DRender.setToolTip('Original')
+        self.btn2DRender.setToolTip('2D View')
         self.btn3DRender = QPushButton(self)
         self.btn3DRender.setIcon(self.btn3DRender.style().standardIcon(QStyle.SP_DesktopIcon))
-        self.btn3DRender.setToolTip('3D Render')
-        self.btnOrthoRender = QPushButton(self)
-        self.btnOrthoRender.setIcon(self.btnOrthoRender.style().standardIcon(QStyle.SP_DesktopIcon))
-        self.btnOrthoRender.setToolTip('Orthographic')
+        self.btn3DRender.setToolTip('3D View')
+        # self.btnOrthoRender = QPushButton(self)
+        # self.btnOrthoRender.setIcon(self.btnOrthoRender.style().standardIcon(QStyle.SP_DesktopIcon))
+        # self.btnOrthoRender.setToolTip('Orthographic')
         self.btnResetView = QPushButton(self)
-        self.btnResetView.setIcon(self.btnOrthoRender.style().standardIcon(QStyle.SP_BrowserReload))
+        self.btnResetView.setIcon(self.btnResetView.style().standardIcon(QStyle.SP_BrowserReload))
         self.btnResetView.setToolTip('Reset View')
         self.btnResetView.clicked.connect(self.resetViewPressed)
         boxToolbox = QVBoxLayout()
@@ -333,7 +345,7 @@ class SkyDataViewer(QMainWindow):
         boxToolbox.setAlignment(Qt.AlignTop)
         boxToolbox.addWidget(self.btn2DRender)
         boxToolbox.addWidget(self.btn3DRender)
-        boxToolbox.addWidget(self.btnOrthoRender)
+        #boxToolbox.addWidget(self.btnOrthoRender)
         boxToolbox.addStretch(1)
         boxToolbox.addWidget(self.btnResetView)
         pnlToolbox = QWidget()
@@ -945,12 +957,13 @@ class SkyDataViewer(QMainWindow):
     def triggerContextMenu(self, widget, event):
         if widget == self.wgtFisheye:
             menuCtx = QMenu(self)
-            menuCtx.addAction(self.actMask)
             menuCtx.addAction(self.actHUD)
-            menuCtx.addSeparator()
+            menuCtx.addAction(self.actMask)
             menuCtx.addAction(self.actCompass)
+            menuCtx.addAction(self.actLensWarp)
             menuCtx.addAction(self.actSunPath)
             menuCtx.addAction(self.actSamples)
+            menuCtx.addAction(self.actShadows)
             menuCtx.addAction(self.actUVGrid)
             menuCtx.addAction(self.actGraphRes)
             menuCtx.addAction(self.actGraphLine)
@@ -959,6 +972,7 @@ class SkyDataViewer(QMainWindow):
             menuCtx.addAction(self.actSelectInv)
             menuCtx.addAction(self.actClearAll)
             menuCtx.addAction(self.actAvoidSun)
+            menuCtx.addSeparator()
             menuCtx.addAction(self.actExportSelected)
             menuCtx.exec_(widget.mapToGlobal(event.pos()))
 
@@ -977,63 +991,60 @@ class SkyDataViewer(QMainWindow):
             self.statusBar().hide()
             #self.centralWidget().layout().setContentsMargins(10,10,10,10)
 
-    def toggleMask(self, state):
-        common.AppSettings["ShowMask"] = state
-        self.wgtFisheye.repaint()
+    def toggleHUDView(self, action):
+        state = action.isChecked()
 
-    def toggleHUD(self, state):
-        common.AppSettings["ShowHUD"] = state
-        self.wgtFisheye.repaint()
-        self.actUVGrid.setEnabled(state)
-        self.actCompass.setEnabled(state)
-        self.actSunPath.setEnabled(state)
-        self.actSamples.setEnabled(state)
-        self.actSampleShadows.setEnabled(state)
-
-    def toggleUVGrid(self, state):
-        common.AppSettings["ShowUVGrid"] = state
-        self.wgtFisheye.repaint()
-
-    def toggleCompass(self, state):
-        common.AppSettings["ShowCompass"] = state
-        self.wgtFisheye.repaint()
-
-    def toggleSunPath(self, state):
-        common.AppSettings["ShowSunPath"] = state
-        self.wgtFisheye.repaint()
-
-    def toggleSamples(self, state, action):
-        if action == self.actSamples:
+        if action == self.actHUD:
+            common.AppSettings["ShowHUD"] = state
+            self.actUVGrid.setEnabled(state)
+            self.actCompass.setEnabled(state)
+            self.actSunPath.setEnabled(state)
+            self.actSamples.setEnabled(state)
+            self.actShadows.setEnabled(state)
+        elif action == self.actMask:
+            common.AppSettings["ShowMask"] = state
+        elif action == self.actUVGrid:
+            common.AppSettings["ShowUVGrid"] = state
+        elif action == self.actCompass:
+            common.AppSettings["ShowCompass"] = state
+        elif action == self.actLensWarp:
+            common.AppSettings["ShowLensWarp"] = state
+        elif action == self.actSunPath:
+            common.AppSettings["ShowSunPath"] = state
+        elif action == self.actSamples:
             common.AppSettings["ShowSamples"] = state
-            self.wgtFisheye.repaint()
-        elif action == self.actSampleShadows:
-            common.AppSettings["ShowSampleShadows"] = state
-            self.wgtFisheye.repaint()
+        elif action == self.actShadows:
+            common.AppSettings["ShowShadows"] = state
 
-    def togglePixelRegion(self, action):
-        region = common.PixelRegionMin # n for (n x n) pixel region
-        ok = True
+        self.wgtFisheye.repaint()
 
-        if action == self.actPixel1:
-            region = 1
-        elif action == self.actPixelnxn:
-            region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, common.PixelRegionMin, common.PixelRegionMax, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
-        elif action == self.actPixel1deg:
-            region = 9
+    def togglePixelOptions(self, action):
+        # pixel region
+        if action == self.actPixel1 or action == self.actPixelnxn or action == self.actPixel1deg:
+            region = common.PixelRegionMin  # n for (n x n) pixel region
+            ok = True
 
-        if ok and region >= common.PixelRegionMin and region % 2 == 1:
+            if action == self.actPixel1:
+                region = 1
+            elif action == self.actPixelnxn:
+                region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, common.PixelRegionMin, common.PixelRegionMax, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+                if not ok or region % 2 == 0:
+                    QMessageBox.warning(self, "Input Validation", "Pixel Region must be an odd positive number.", QMessageBox.Ok)
+            elif action == self.actPixel1deg:
+                region = 9
+
             common.AppSettings["PixelRegion"] = region
-            #self.wgtFisheye.repaint()
-        else:
-            QMessageBox.warning(self, "Input Validation", "Pixel Region must be an odd positive number.", QMessageBox.Ok)
 
-    def togglePixelWeighting(self, action):
-        if action == self.actPixelMean:
-            common.AppSettings["PixelWeighting"] = common.PixelWeighting.Mean.value
-        elif action == self.actPixelMedian:
-            common.AppSettings["PixelWeighting"] = common.PixelWeighting.Median.value
-        elif action == self.actPixelGaussian:
-            common.AppSettings["PixelWeighting"] = common.PixelWeighting.Gaussian.value
+        # pixel weighting
+        elif action == self.actPixelMean or action == self.actPixelMedian or action == self.actPixelGaussian:
+            if action == self.actPixelMean:
+                common.AppSettings["PixelWeighting"] = common.PixelWeighting.Mean.value
+            elif action == self.actPixelMedian:
+                common.AppSettings["PixelWeighting"] = common.PixelWeighting.Median.value
+            elif action == self.actPixelGaussian:
+                common.AppSettings["PixelWeighting"] = common.PixelWeighting.Gaussian.value
+
+        # self.wgtFisheye.repaint()
 
     def toggleGraphOptions(self, action):
         ok = True
@@ -1064,6 +1075,9 @@ class SkyDataViewer(QMainWindow):
             QMessageBox.warning(self, "Input Validation", "Circumsolar angle must be 0-180°.", QMessageBox.Ok)
 
     def toggleDontSave(self, state):
+        self.dontSaveSettings = state
+
+    def toggleAbout(self, state):
         self.dontSaveSettings = state
 
     def center(self):

@@ -31,6 +31,7 @@ from enum import Enum
 # sky sampling pattern (azimuth, altitude)
 SamplingPattern = []
 SamplingPatternRads = []
+SamplingPatternAlts = []  # a unique set of the altitudes
 
 # exposure times of the HDR data (in seconds)
 Exposures = [
@@ -103,9 +104,10 @@ DefAppSettings = {
     "ShowMask": True,
     "ShowHUD": True,
     "ShowCompass": False,
+    "ShowLensWarp": False,
     "ShowSunPath": False,
     "ShowSamples": False,
-    "ShowSampleShadows": False,
+    "ShowShadows": False,
     "ShowUVGrid": False,
     "ShowEXIF": True,
     "ShowStatusBar": True,

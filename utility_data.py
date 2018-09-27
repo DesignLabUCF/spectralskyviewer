@@ -349,9 +349,8 @@ def loadSamplingPattern(filepath, isDir=True):
     if not os.path.exists(filepath):
         return [], []
 
-    # (azimuth, altitude)
+    # list of (azimuth, altitude)
     patternDegs = []
-    patternRads = []
 
     # loop through each row of the file
     with open(filepath, 'r') as f:
@@ -365,9 +364,7 @@ def loadSamplingPattern(filepath, isDir=True):
             except ValueError or IndexError:
                 continue
 
-    patternRads = [(math.radians(s[0]), math.radians(s[1])) for s in patternDegs]
-
-    return patternDegs, patternRads
+    return patternDegs
 
 # - SPA -----------------------------------------------------------------------
 # - SPA -----------------------------------------------------------------------

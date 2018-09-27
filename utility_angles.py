@@ -14,14 +14,7 @@
 #
 #  Not for commercial use. Do not redistribute without permission.
 #
-
-__all__ = ['CentralAngle', 'FisheyeAngleWarp', 'GetAngleFromUV', 'GetUVFromAngles']
-
 import math
-#from datetime import time, timedelta, datetime
-
-EARTH_MEAN_RADIUS = 6371.01 # In km
-ASTRONOMICAL_UNIT = 149597890 # In km
 
 
 def CentralAngle(a, b, inRadians=True):
@@ -37,7 +30,7 @@ def CentralAngle(a, b, inRadians=True):
 def FisheyeAngleWarp(theta, phi, inRadians=True):
     """ Take in a pair of angles and return the corresponding angles on the 
           fisheye image taking into account the position of North, etc.
-        Note phi is assumed to be altitude (not zenith)!!
+        NOTE phi is assumed to be altitude (not zenith)!!
     """
     if inRadians:
         phi = phi * 180.0 / math.pi
@@ -71,7 +64,7 @@ def GetAngleFromUV(x, y):
 def GetUVFromAngle(theta, phi, inRadians=True):
     """ Get the UV coordinates for a pair of angles representing position
           on a fisheye hemisphere image.
-        Note phi is assumed to be zenith here (not altitude)!!
+        NOTE phi is assumed to be zenith here (not altitude)!!
     """
     if not inRadians:
         phi = phi * math.pi / 180.0
@@ -80,6 +73,9 @@ def GetUVFromAngle(theta, phi, inRadians=True):
     radius = phi / (math.pi / 2.0)
     return (0.5 * (radius * math.cos(theta) + 1), 0.5 * (radius * math.sin(theta) + 1))
 
+#EARTH_MEAN_RADIUS = 6371.01  # In km
+#ASTRONOMICAL_UNIT = 149597890  # In km
+#
 # def CalculateSunAngles(time, coord):
 #     """ Calculate the angles representing the position of the sun based on a
 #           provided time and coordinates.

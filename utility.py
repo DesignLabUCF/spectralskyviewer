@@ -76,6 +76,15 @@ def naturalSortKey(s, _nsre=RegexDigits):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(_nsre, s)]
 
 '''
+Use this to iterate over a sequence taking into account a step size.
+:param seq: The sequence to iterate over.
+:param step: The step size.
+:author: https://stackoverflow.com/a/434328/1002098
+'''
+def chunker(seq, step):
+    return (seq[pos:pos + step] for pos in range(0, len(seq), step))
+
+'''
 Verify that a string is a valid date or datetime
 :param datestr: String that is to be verified.
 :param datefmtstr: Format datetime string (e.g. "%Y-%m-%d")

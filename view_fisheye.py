@@ -78,12 +78,13 @@ class ViewFisheye(QWidget):
         self.painter = QPainter()
         self.mask = QImage()
         self.pathSun = QPainterPath()
-        self.brushBG = QBrush(Qt.black, Qt.SolidPattern)
         self.penText = QPen(Qt.white, 1, Qt.SolidLine)
+        self.penSun = QPen(QColor(255, 165, 0), 2, Qt.SolidLine)
         self.penSelected = []  # list of pens, one for each sampling pattern location
         self.penSelectRect = QPen(Qt.white, 1, Qt.DashLine)
-        self.penSun = QPen(Qt.yellow, 1, Qt.SolidLine)
-        self.penShadow = QPen(Qt.black, 3, Qt.SolidLine)
+        self.penShadowText = QPen(Qt.black, 1, Qt.SolidLine)
+        self.penShadowSun = QPen(Qt.black, 2, Qt.SolidLine)
+        self.penShadowSelected = QPen(Qt.black, 3, Qt.SolidLine)
         self.fontFixed = QFont('Courier New', 8)
         self.fontScaled = QFont('Courier New', 8)
         self.fontBounds = 50
@@ -466,23 +467,21 @@ class ViewFisheye(QWidget):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-
-        # start draw
         painter = QPainter()
         painter.begin(self)
 
         # background
+        brushBG = QBrush(Qt.black, Qt.SolidPattern)
         if not common.AppSettings["ShowMask"]:
-            self.brushBG.setColor(Qt.darkGray)
-            self.brushBG.setStyle(Qt.Dense1Pattern)
+            brushBG.setColor(Qt.darkGray)
+            brushBG.setStyle(Qt.Dense1Pattern)
             painter.setBackground(Qt.gray)
-
         else:
-            self.brushBG.setColor(Qt.black)
-            self.brushBG.setStyle(Qt.SolidPattern)
+            brushBG.setColor(Qt.black)
+            brushBG.setStyle(Qt.SolidPattern)
             painter.setBackground(Qt.black)
         painter.setBackgroundMode(Qt.OpaqueMode)
-        painter.setBrush(self.brushBG)
+        painter.setBrush(brushBG)
         painter.setPen(Qt.NoPen)
         painter.drawRect(0, 0, self.width(), self.height())
 
@@ -544,25 +543,51 @@ class ViewFisheye(QWidget):
                     destRect.moveTo(self.viewCenter[0] + self.myPhotoRadius - self.fontScaled.pointSizeF()*2, self.viewCenter[1] + self.myPhotoRadius - self.fontScaled.pointSizeF()*3)
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
 
-                # draw sun path
-                if common.AppSettings["ShowSunPath"]:
-                    painter.setPen(self.penSun)
-                    sunradius = self.myPhotoRadius * 0.1
-                    painter.drawEllipse(self.sunPositionVisible[0]-sunradius/2, self.sunPositionVisible[1]-sunradius/2, sunradius, sunradius)
-                    painter.drawPath(self.pathSun)
-                    for i in range(0, self.pathSun.elementCount()):
-                        e = self.pathSun.elementAt(i)
-                        destRect.moveTo(e.x, e.y + 5)
-                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.sunPathPoints[i][2].hour))
+                # draw lens warp
+                if common.AppSettings["ShowLensWarp"]:
+                    painter.setPen(self.penText)
+                    photoDiameter = self.myPhotoRadius * 2
+                    zenstep = self.myPhotoRadius / 9.0  #
+                    center = QPoint(self.viewCenter[0], self.viewCenter[1])
+                    # default polar longitudes along azimuth
+                    for i in range(0, int(len(self.compassTicks)/2), 3):
+                        p1 = QPoint(self.compassTicks[i][2], self.compassTicks[i][3])
+                        p2 = QPoint(self.compassTicks[i+18][2], self.compassTicks[i+18][3])  # tick opposite 180 degrees
+                        painter.drawLine(p1, p2)
+                    # default polar latitudes along zenith
+                    for alt in common.SamplingPatternAlts:
+                        u, v = utility_angles.FisheyeAngleWarp(90, alt, inRadians=False)
+                        u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
+                        x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
+                        y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
+                        painter.drawEllipse(center, x - self.viewCenter[0], x - self.viewCenter[0])
+                    # default latitude/longitude intersection points
+                    painter.setBrush(Qt.white)
+                    for azi in range(0, 360, 30):
+                        #for alt in range(0, 90, 10):
+                        for alt in common.SamplingPatternAlts:
+                            u, v = utility_angles.FisheyeAngleWarp(azi, alt, inRadians=False)
+                            u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
+                            x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
+                            y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
+                            painter.drawEllipse(QPoint(x, y), 2, 2)
+                    # lens polar longitudes along azimuth
+                    # lens polar latitudes along zenith
+                    painter.setBrush(Qt.NoBrush)
 
                 # draw compass
                 if common.AppSettings["ShowCompass"]:
-                    painter.setPen(self.penText)
                     # ticks
+                    if common.AppSettings["ShowShadows"]:
+                        painter.setPen(self.penShadowText)
+                        for tick in self.compassTicks:
+                            destRect.moveTo(tick[4] + 1, tick[5] + 1)
+                            painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(tick[6]))  # + "°"
+                    painter.setPen(self.penText)
                     for tick in self.compassTicks:
                         painter.drawLine(tick[0], tick[1], tick[2], tick[3])
                         destRect.moveTo(tick[4], tick[5])
-                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(tick[6])) # + "°"
+                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(tick[6]))  # + "°"
                     # radius
                     painter.drawEllipse(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius, diameter, diameter)
                     # cardinal directions
@@ -582,15 +607,43 @@ class ViewFisheye(QWidget):
                         painter.drawEllipse(r)
                         painter.drawText(r.x()-r.width(), r.y(), str(i))
 
-                # draw selected sample shadows
+                # draw sun path
+                if common.AppSettings["ShowSunPath"]:
+                    sunradius = self.myPhotoRadius * 0.1
+                    # shadows
+                    painter.setPen(self.penShadowSun)
+                    if common.AppSettings["ShowShadows"]:
+                        painter.drawEllipse(self.sunPositionVisible[0] - sunradius / 2 + 1,
+                                            self.sunPositionVisible[1] - sunradius / 2 + 1, sunradius,
+                                            sunradius)
+                        self.pathSun.translate(1.0, 1.0)
+                        painter.drawPath(self.pathSun)
+                        self.pathSun.translate(-1.0, -1.0)
+                        for i in range(0, self.pathSun.elementCount()):
+                            e = self.pathSun.elementAt(i)
+                            destRect.moveTo(e.x, e.y + self.fontScaled.pointSizeF() + 1)
+                            painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft,
+                                             str(self.sunPathPoints[i][2].hour))
+                    # sun, path, hours
+                    painter.setPen(self.penSun)
+                    painter.drawEllipse(self.sunPositionVisible[0] - sunradius / 2,
+                                        self.sunPositionVisible[1] - sunradius / 2, sunradius, sunradius)
+                    painter.drawPath(self.pathSun)
+                    for i in range(0, self.pathSun.elementCount()):
+                        e = self.pathSun.elementAt(i)
+                        destRect.moveTo(e.x, e.y + self.fontScaled.pointSizeF())
+                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft,
+                                         str(self.sunPathPoints[i][2].hour))
+
+                # draw selected samples (ALWAYS)
                 r = QRect()
-                if common.AppSettings["ShowSampleShadows"]:
-                    painter.setPen(self.penShadow)
+                # shadows
+                if common.AppSettings["ShowShadows"]:
+                    painter.setPen(self.penShadowSelected)
                     for i in self.samplesSelected:
                         r.setCoords(self.sampleBoundsVisible[i].x() + 1, self.sampleBoundsVisible[i].y() + 1, self.sampleBoundsVisible[i].right() + 2, self.sampleBoundsVisible[i].bottom() + 2)
                         painter.drawEllipse(r)
-
-                # draw selected samples
+                # samples
                 for i in self.samplesSelected:
                     r.setCoords(self.sampleBoundsVisible[i].x(), self.sampleBoundsVisible[i].y(), self.sampleBoundsVisible[i].right() + 1, self.sampleBoundsVisible[i].bottom() + 1)
                     painter.setPen(self.penSelected[i])
