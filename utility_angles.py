@@ -4,7 +4,7 @@
 # ====================================================================
 # angle_utilities.py
 # Provides functionality to convert between UV coordinates and angles as well
-#   as other useful angle utilities. 
+#   as other useful angle utilities.
 #
 #  Copyright 2014-2015 Program of Computer Graphics, Cornell University
 #     580 Rhodes Hall
@@ -20,11 +20,11 @@ import math
 def CentralAngle(a, b, inRadians=True):
     """ Take in a pair of polar coordintes and return the corresponding central angle between them.
         Note that a and b are tuples of (azimuth, altitude) or in other words (longitude, latitude).
+        https://en.wikipedia.org/wiki/Great-circle_distance#Formulas
     """
     if not inRadians:
         a = (math.radians(a[0]), math.radians(a[1]))
         b = (math.radians(b[0]), math.radians(b[1]))
-    # https://en.wikipedia.org/wiki/Great-circle_distance#Formulas
     return math.acos( math.sin(a[1]) * math.sin(b[1]) + math.cos(a[1]) * math.cos(b[1]) * math.cos( abs(a[0]-b[0]) ) )
 
 def FisheyeAngleWarp(theta, phi, inRadians=True):
@@ -73,6 +73,19 @@ def GetUVFromAngle(theta, phi, inRadians=True):
     radius = phi / (math.pi / 2.0)
     return (0.5 * (radius * math.cos(theta) + 1), 0.5 * (radius * math.sin(theta) + 1))
 
+def GetUVFromAngleWithWarp(theta, phi, inRadians=True):
+    """ Get the UV coordinates for a pair of angles representing position
+          on a fisheye hemisphere image.
+        NOTE phi is assumed to be zenith here (not altitude)!!
+    """
+    if not inRadians:
+        phi = phi * math.pi / 180.0
+        theta = theta * math.pi / 180.0
+
+    radius = phi / (math.pi / 2.0)
+    return (0.5 * (radius * math.cos(theta) + 1), 0.5 * (radius * math.sin(theta) + 1))
+
+
 #EARTH_MEAN_RADIUS = 6371.01  # In km
 #ASTRONOMICAL_UNIT = 149597890  # In km
 #
@@ -120,4 +133,3 @@ def GetUVFromAngle(theta, phi, inRadians=True):
 #     elevation = elevation + (EARTH_MEAN_RADIUS / ASTRONOMICAL_UNIT) * math.sin(elevation)
 #
 #     return (azimuth, math.pi / 2.0 - elevation)
-

@@ -60,8 +60,8 @@ PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')
 # types of RAW data
 HDRRawExts = ['.cr2', '.raw', '.dng']
 
-# export attributes
-ExportAttributes = [
+# sample export features
+SampleFeatures = [
     # column name           description
     # required ----------------------------------------------------------------------
     ("Date",                "Date of Capture"),
@@ -73,22 +73,24 @@ ExportAttributes = [
     ("SamplePatternIndex",  "Sample Pattern Index"),
     ("SampleAzimuth",       "Sample Azimuth (East from North)"),
     ("SampleAltitude",      "Sample Altitude (90 - Zenith)"),
-    ("PixelRegion",         "Sample Pixel Kernel Size (n x n)"),
+    ("SunPointAngle",       "Sun Point Angle (SPA)"),
+    ("PixelRegion",         "Sample Pixel Region (n x n)"),
     ("PixelWeighting",      "Sample Pixel Weighting Algorithm"),
     ("Exposure",            "Photo Exposure Time (s)"),
     ("PixelRGB",            "Sample Pixel RGB Channels"),
     ("Radiance",            "Sample Radiance (W/m²/sr) per Wavelength (350-2500nm)"),
 ]
-ExportIdxMap = {ExportAttributes[i][0]: i for i in range(0, len(ExportAttributes))}
+SampleFeatureIdxMap = {SampleFeatures[i][0]: i for i in range(0, len(SampleFeatures))}
 
 # default export options
 DefExportOptions = {
     "Filename": "",
     "Delimiter": ",",
+    "IsHDR": False,
     "PixelRegion": PixelRegionMin,
     "PixelWeighting": PixelWeighting.Mean.value,
-    "IsHDR": False,
-    "Attributes": [0, 1, 2, 3, 5, 6, 7, 11, 11]
+    "SpectrumResolution": 1,
+    "Features": [0, 1, 2, 3, 5, 6, 7, 8, 10, 11]
 }
 
 # default application settings

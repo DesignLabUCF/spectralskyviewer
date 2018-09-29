@@ -79,6 +79,7 @@ class ViewFisheye(QWidget):
         self.mask = QImage()
         self.pathSun = QPainterPath()
         self.penText = QPen(Qt.white, 1, Qt.SolidLine)
+        self.penLens = QPen(Qt.magenta, 1, Qt.SolidLine)
         self.penSun = QPen(QColor(255, 165, 0), 2, Qt.SolidLine)
         self.penSelected = []  # list of pens, one for each sampling pattern location
         self.penSelectRect = QPen(Qt.white, 1, Qt.DashLine)
@@ -545,23 +546,23 @@ class ViewFisheye(QWidget):
 
                 # draw lens warp
                 if common.AppSettings["ShowLensWarp"]:
+                    # first draw ideal lens curvature
                     painter.setPen(self.penText)
                     photoDiameter = self.myPhotoRadius * 2
-                    zenstep = self.myPhotoRadius / 9.0  #
                     center = QPoint(self.viewCenter[0], self.viewCenter[1])
-                    # default polar longitudes along azimuth
+                    # ideal polar longitudes along azimuth
                     for i in range(0, int(len(self.compassTicks)/2), 3):
                         p1 = QPoint(self.compassTicks[i][2], self.compassTicks[i][3])
                         p2 = QPoint(self.compassTicks[i+18][2], self.compassTicks[i+18][3])  # tick opposite 180 degrees
                         painter.drawLine(p1, p2)
-                    # default polar latitudes along zenith
+                    # ideal polar latitudes along zenith
                     for alt in common.SamplingPatternAlts:
                         u, v = utility_angles.FisheyeAngleWarp(90, alt, inRadians=False)
                         u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
                         x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
                         y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
                         painter.drawEllipse(center, x - self.viewCenter[0], x - self.viewCenter[0])
-                    # default latitude/longitude intersection points
+                    # ideal latitude/longitude intersection points
                     painter.setBrush(Qt.white)
                     for azi in range(0, 360, 30):
                         #for alt in range(0, 90, 10):
@@ -571,9 +572,22 @@ class ViewFisheye(QWidget):
                             x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
                             y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
                             painter.drawEllipse(QPoint(x, y), 2, 2)
+                    painter.setBrush(Qt.NoBrush)
+
+                    # second, draw lens warped curviture
+                    painter.setPen(self.penLens)
+                    painter.setBrush(Qt.magenta)
+                    for azi in range(0, 360, 30):
+                        # for alt in range(0, 90, 10):
+                        for alt in common.SamplingPatternAlts:
+                            u, v = utility_angles.FisheyeAngleWarp(azi, alt, inRadians=False)
+                            u, v = utility_angles.GetUVFromAngleWithWarp(u, v, inRadians=False)
+                            x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
+                            y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
+                            painter.drawEllipse(QPoint(x, y), 2, 2)
+                    painter.setBrush(Qt.NoBrush)
                     # lens polar longitudes along azimuth
                     # lens polar latitudes along zenith
-                    painter.setBrush(Qt.NoBrush)
 
                 # draw compass
                 if common.AppSettings["ShowCompass"]:

@@ -77,27 +77,27 @@ class DialogAbout(QDialog):
         # layout.addWidget(grpHDR, 0, Qt.AlignTop)
         #
         # # attributes
-        # self.lstAttributes = QListView()
+        # self.lstSampleFeatures = QListView()
         # model = QStandardItemModel()
         # model.itemChanged.connect(self.attributeSelected)
         # # pixel region
-        # self.itmPixelRegion = QStandardItem(common.ExportAttributes[common.ExportIdxMap["PixelRegion"]][1])
+        # self.itmPixelRegion = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["PixelRegion"]][1])
         # self.itmPixelRegion.setEditable(False)
         # self.itmPixelRegion.setCheckable(True)
         # model.appendRow(self.itmPixelRegion)
         # # pixel weighting
-        # self.itmPixelWeighting = QStandardItem(common.ExportAttributes[common.ExportIdxMap["PixelWeighting"]][1])
+        # self.itmPixelWeighting = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["PixelWeighting"]][1])
         # self.itmPixelWeighting.setEditable(False)
         # self.itmPixelWeighting.setCheckable(True)
         # model.appendRow(self.itmPixelWeighting)
         # # pixel exposure
-        # self.itmExposure = QStandardItem(common.ExportAttributes[common.ExportIdxMap["Exposure"]][1])
+        # self.itmExposure = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["Exposure"]][1])
         # self.itmExposure.setEditable(False)
         # self.itmExposure.setCheckable(True)
         # model.appendRow(self.itmExposure)
-        # self.lstAttributes.setModel(model)
+        # self.lstSampleFeatures.setModel(model)
         # boxAttr = QVBoxLayout()
-        # boxAttr.addWidget(self.lstAttributes)
+        # boxAttr.addWidget(self.lstSampleFeatures)
         # grpAttr = QGroupBox("Attributes To Convert:", self)
         # grpAttr.setLayout(boxAttr)
         # layout.addWidget(grpAttr, 1)

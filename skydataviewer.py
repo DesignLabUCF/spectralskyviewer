@@ -39,6 +39,7 @@ import common
 import spa
 import utility
 import utility_data
+import utility_angles
 from view_fisheye import ViewFisheye
 from dialog_export import DialogExport
 from dialog_converter import DialogConverter
@@ -67,7 +68,7 @@ class SkyDataViewer(QMainWindow):
                 if (key in common.AppSettings):
                     common.AppSettings.update({key: loaded[key]})
         # validate settings
-        common.AppSettings["ExportOptions"]["Attributes"].sort()
+        common.AppSettings["ExportOptions"]["Features"].sort()
         if len(common.AppSettings["DataDirectory"]) > 0 and not os.path.exists(common.AppSettings["DataDirectory"]):
             common.AppSettings["DataDirectory"] = ""
 
@@ -740,8 +741,8 @@ class SkyDataViewer(QMainWindow):
                 os.makedirs(os.path.dirname(xoptions["Filename"]))
             # write header
             with open(xoptions["Filename"], "w") as file:
-                for i in range(0, len(xoptions["Attributes"])):
-                    attr = DialogExport.attributeFromIndex(xoptions["Attributes"][i])
+                for i in range(0, len(xoptions["Features"])):
+                    attr = DialogExport.attributeFromIndex(xoptions["Features"][i])
                     if attr == "PixelRGB":
                         file.write("Red" + delimiter + "Green" + delimiter + "Blue" + delimiter)
                     elif attr == "Radiance":
@@ -775,8 +776,8 @@ class SkyDataViewer(QMainWindow):
                 file.write(delimiter)
 
                 # export each optional attribute
-                for aIdx in xoptions["Attributes"]:
-                    attr = common.ExportAttributes[aIdx][0]
+                for aIdx in xoptions["Features"]:
+                    attr = common.SampleFeatures[aIdx][0]
 
                     # export sun azimuth
                     if attr == "SunAzimuth":
@@ -796,13 +797,20 @@ class SkyDataViewer(QMainWindow):
                         file.write(delimiter)
                     # export sample azimuth
                     elif attr == "SampleAzimuth":
-                        angle = common.SamplingPattern[sIdx]
-                        file.write('{0:07.04f}'.format(angle[0]))
+                        point = common.SamplingPattern[sIdx]
+                        file.write('{0:07.04f}'.format(point[0]))
                         file.write(delimiter)
                     # export sample altitude
                     elif attr == "SampleAltitude":
-                        angle = common.SamplingPattern[sIdx]
-                        file.write('{0:07.04f}'.format(angle[1]))
+                        point = common.SamplingPattern[sIdx]
+                        file.write('{0:07.04f}'.format(point[1]))
+                        file.write(delimiter)
+                    # export sun point/sample angle
+                    elif attr == "SunPointAngle":
+                        point = common.SamplingPattern[sIdx]
+                        angle = utility_angles.CentralAngle(sunpos, point, inRadians=False)
+                        angle = math.degrees(angle)
+                        file.write('{0:07.03f}'.format(angle))
                         file.write(delimiter)
                     # export pixel neighborhood
                     elif (attr == "PixelRegion"):

@@ -26,7 +26,7 @@
 # @summary: Dialog for exporting sky data.
 # ====================================================================
 import os
-from PyQt5.QtGui import QIcon, QStandardItem, QStandardItemModel
+from PyQt5.QtGui import QIcon, QStandardItem, QStandardItemModel, QIntValidator
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 import common
@@ -45,7 +45,7 @@ class DialogExport(QDialog):
 
     @staticmethod
     def attributeFromIndex(index):
-        return common.ExportAttributes[index][0]
+        return common.SampleFeatures[index][0]
 
     def __init__(self, options=None):
         super().__init__(None, Qt.WindowSystemMenuHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
@@ -58,7 +58,7 @@ class DialogExport(QDialog):
 
         # init
         self.initWidgets()
-        self.setWindowTitle("Export Configuration")
+        self.setWindowTitle("Sample Export Options")
         self.setWindowIcon(QIcon('res/icon.png'))
         if self.exportOptions["Delimiter"] == "\t":
             self.radTab.setChecked(True)
@@ -76,10 +76,8 @@ class DialogExport(QDialog):
             self.radPixelMedian.setChecked(True)
         elif pw == common.PixelWeighting.Gaussian:
             self.radPixelGaussian.setChecked(True)
-        if not self.exportOptions["IsHDR"]:
-            self.radHDRNo.setChecked(True)
-        else:
-            self.radHDRYes.setChecked(True)
+        self.chxHDR.setChecked(self.exportOptions["IsHDR"])
+        self.txtResolution.setText(str(self.exportOptions["SpectrumResolution"]))
 
     def initWidgets(self):
         # layout
@@ -89,7 +87,7 @@ class DialogExport(QDialog):
         # layout.setSizeConstraint(QLayout.SetFixedSize)
 
         # file
-        lblFile = QLabel("Export Data To:")
+        lblFile = QLabel("Export Samples To:")
         self.txtFile = QLineEdit()
         self.txtFile.setMinimumWidth(400)
         self.txtFile.setText(self.exportOptions["Filename"])
@@ -120,16 +118,24 @@ class DialogExport(QDialog):
         grpFormat.setLayout(boxFormat)
         layout.addWidget(grpFormat, 0, Qt.AlignTop)
 
+        # hdr
+        self.chxHDR = QCheckBox()
+        boxHDR = QHBoxLayout()
+        boxHDR.addWidget(self.chxHDR)
+        grpHDR = QGroupBox("HDR", self)
+        grpHDR.setLayout(boxHDR)
+
         # pixel region
         self.cbxPixelRegion = QComboBox()
         self.cbxPixelRegion.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        lblPixelRegion = QLabel("(n x n)")
         #self.cbxPixelRegion.currentIndexChanged.connect(self.pixelRegionEntered)
         self.cbxPixelRegion.addItems([str(x) for x in range(common.PixelRegionMin, common.PixelRegionMax+1,2)])
         boxPixelRegion = QHBoxLayout()
         boxPixelRegion.addWidget(self.cbxPixelRegion)
-        grpPixelRegion = QGroupBox("(n x n) Pixel Region:", self)
+        boxPixelRegion.addWidget(lblPixelRegion, 0, Qt.AlignRight)
+        grpPixelRegion = QGroupBox("Pixel Region:", self)
         grpPixelRegion.setLayout(boxPixelRegion)
-        layout.addWidget(grpPixelRegion, 0, Qt.AlignTop)
 
         # pixel weighting
         self.radPixelMean = QRadioButton("Mean")
@@ -141,24 +147,34 @@ class DialogExport(QDialog):
         boxPixelWeighting.addWidget(self.radPixelGaussian)
         grpPixelWeighting = QGroupBox("Pixel Weighting:", self)
         grpPixelWeighting.setLayout(boxPixelWeighting)
-        layout.addWidget(grpPixelWeighting, 0, Qt.AlignTop)
 
-        # hdr
-        self.radHDRNo = QRadioButton("No")
-        self.radHDRYes = QRadioButton("Yes")
-        boxHDR = QHBoxLayout()
-        boxHDR.addWidget(self.radHDRNo)
-        boxHDR.addWidget(self.radHDRYes)
-        grpHDR = QGroupBox("HDR (multiple exposures)", self)
-        grpHDR.setLayout(boxHDR)
-        layout.addWidget(grpHDR, 0, Qt.AlignTop)
+        # add all pixel options to window
+        boxPixelOptions = QHBoxLayout()
+        boxPixelOptions.addWidget(grpHDR, 0, Qt.AlignLeft)
+        boxPixelOptions.addWidget(grpPixelRegion, 0, Qt.AlignLeft)
+        boxPixelOptions.addWidget(grpPixelWeighting, 1)
+        boxPixelOptions.setContentsMargins(0,0,0,0)
+        pnlPixelOptions = QWidget()
+        pnlPixelOptions.setLayout(boxPixelOptions)
+        layout.addWidget(pnlPixelOptions, 0, Qt.AlignTop)
 
-        # attributes
-        self.lstAttributes = QListView()
+        # spectrum resolution
+        self.txtResolution = QLineEdit()
+        self.txtResolution.setValidator(QIntValidator(1, 100))
+        lblResolution = QLabel("(nm)")
+        boxResolution = QHBoxLayout()
+        boxResolution.addWidget(self.txtResolution)
+        boxResolution.addWidget(lblResolution, 0, Qt.AlignRight)
+        grpResolution = QGroupBox("Spectrum Resolution:", self)
+        grpResolution.setLayout(boxResolution)
+        layout.addWidget(grpResolution, 0, Qt.AlignTop)
+
+        # sample features
+        self.lstSampleFeatures = QListView()
         model = QStandardItemModel()
         # optional attributes
-        for i in range(0, len(common.ExportAttributes)):
-            item = QStandardItem(common.ExportAttributes[i][1])
+        for i in range(0, len(common.SampleFeatures)):
+            item = QStandardItem(common.SampleFeatures[i][1])
             item.setEditable(False)
             item.setCheckable(True)
             # id, date, time - are required
@@ -166,14 +182,14 @@ class DialogExport(QDialog):
                 item.setCheckState(Qt.Checked)
                 item.setEnabled(False)
             # everything else is optional
-            elif i in self.exportOptions["Attributes"]:
+            elif i in self.exportOptions["Features"]:
                 item.setCheckState(Qt.Checked)
             model.appendRow(item)
-        self.lstAttributes.setModel(model)
-        boxAttr = QVBoxLayout()
-        boxAttr.addWidget(self.lstAttributes)
-        grpAttr = QGroupBox("Export Attributes:", self)
-        grpAttr.setLayout(boxAttr)
+        self.lstSampleFeatures.setModel(model)
+        boxFeatures = QVBoxLayout()
+        boxFeatures.addWidget(self.lstSampleFeatures)
+        grpAttr = QGroupBox("Sample Features:", self)
+        grpAttr.setLayout(boxFeatures)
         layout.addWidget(grpAttr, 1)
 
         # accept/decline buttons
@@ -221,28 +237,28 @@ class DialogExport(QDialog):
             if QMessageBox.warning(self, "Warning", "Exported samples will be appended to existing file.\nAre you sure you want to do this?", QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
                 return
 
-        # save export filename
+        # save export file
         self.exportOptions["Filename"] = self.txtFile.text()
-
-        # save file format
         if self.radCSV.isChecked():     self.exportOptions["Delimiter"] = ","
         elif self.radTab.isChecked():   self.exportOptions["Delimiter"] = "\t"
         elif self.radSpace.isChecked(): self.exportOptions["Delimiter"] = " "
 
-        # save pixel region
+        # save pixel options
+        self.exportOptions["IsHDR"] = self.chxHDR.isChecked()
         self.exportOptions["PixelRegion"] = int(self.cbxPixelRegion.currentText())
-
-        # save pixel weighting
         if self.radPixelMean.isChecked():       self.exportOptions["PixelWeighting"] = common.PixelWeighting.Mean.value
         elif self.radPixelMedian.isChecked():   self.exportOptions["PixelWeighting"] = common.PixelWeighting.Median.value
         elif self.radPixelGaussian.isChecked(): self.exportOptions["PixelWeighting"] = common.PixelWeighting.Gaussian.value
 
-        # save selected attributes
+        # save spectrum options
+        self.exportOptions["SpectrumResolution"] = int(self.txtResolution.text())
+
+        # save selected sample features
         attributes = []
-        for i in range(0, self.lstAttributes.model().rowCount()):
-            item = self.lstAttributes.model().item(i)
+        for i in range(0, self.lstSampleFeatures.model().rowCount()):
+            item = self.lstSampleFeatures.model().item(i)
             if item.checkState() != Qt.Unchecked:
                 attributes.append(i)
-        self.exportOptions.update({"Attributes": attributes})
+        self.exportOptions.update({"Features": attributes})
 
         self.accept()

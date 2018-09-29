@@ -26,7 +26,7 @@
 # @summary: Dialog for converting (importing/exporting) sky data.
 # ====================================================================
 import os
-from PyQt5.QtGui import QIcon, QStandardItem, QStandardItemModel
+from PyQt5.QtGui import QIcon, QStandardItem, QStandardItemModel, QIntValidator
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 import common
@@ -42,7 +42,7 @@ class DialogConverter(QDialog):
 
         # init
         self.initWidgets()
-        self.setWindowTitle("Converter Options")
+        self.setWindowTitle("Sample Convert Options")
         self.setWindowIcon(QIcon('res/icon.png'))
 
     def initWidgets(self):
@@ -53,7 +53,7 @@ class DialogConverter(QDialog):
         # layout.setSizeConstraint(QLayout.SetFixedSize)
 
         # file
-        lblFile = QLabel("Sample Dataset to Convert:")
+        lblFile = QLabel("Sample Dataset:")
         self.txtFile = QLineEdit()
         self.txtFile.setMinimumWidth(400)
         #self.txtFile.setText(self.exportOptions["Filename"])
@@ -69,60 +69,57 @@ class DialogConverter(QDialog):
         pnlFile.setLayout(boxFile)
         layout.addWidget(pnlFile, 0, Qt.AlignTop)
 
-        # hdr
-        self.radHDRNo = QRadioButton("No")
-        self.radHDRYes = QRadioButton("Yes")
-        boxHDR = QHBoxLayout()
-        boxHDR.addWidget(self.radHDRNo)
-        boxHDR.addWidget(self.radHDRYes)
-        grpHDR = QGroupBox("HDR (multiple exposures)", self)
-        grpHDR.setLayout(boxHDR)
-        layout.addWidget(grpHDR, 0, Qt.AlignTop)
-
-        # attributes
-        self.lstAttributes = QListView()
+        # sample features
+        self.lstSampleFeatures = QListView()
         model = QStandardItemModel()
         model.itemChanged.connect(self.attributeSelected)
         # pixel region
-        self.itmPixelRegion = QStandardItem(common.ExportAttributes[common.ExportIdxMap["PixelRegion"]][1])
+        self.itmPixelRegion = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["PixelRegion"]][1])
         self.itmPixelRegion.setEditable(False)
         self.itmPixelRegion.setCheckable(True)
         model.appendRow(self.itmPixelRegion)
         # pixel weighting
-        self.itmPixelWeighting = QStandardItem(common.ExportAttributes[common.ExportIdxMap["PixelWeighting"]][1])
+        self.itmPixelWeighting = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["PixelWeighting"]][1])
         self.itmPixelWeighting.setEditable(False)
         self.itmPixelWeighting.setCheckable(True)
         model.appendRow(self.itmPixelWeighting)
         # pixel exposure
-        self.itmExposure = QStandardItem(common.ExportAttributes[common.ExportIdxMap["Exposure"]][1])
+        self.itmExposure = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["Exposure"]][1])
         self.itmExposure.setEditable(False)
         self.itmExposure.setCheckable(True)
         model.appendRow(self.itmExposure)
-        self.lstAttributes.setModel(model)
-        boxAttr = QVBoxLayout()
-        boxAttr.addWidget(self.lstAttributes)
-        grpAttr = QGroupBox("Attributes To Convert:", self)
-        grpAttr.setLayout(boxAttr)
-        layout.addWidget(grpAttr, 1)
+        self.lstSampleFeatures.setModel(model)
+        boxFeatures = QVBoxLayout()
+        boxFeatures.addWidget(self.lstSampleFeatures)
+        grpFeatures = QGroupBox("Attributes To Convert:", self)
+        grpFeatures.setLayout(boxFeatures)
+        layout.addWidget(grpFeatures, 1)
+
+        # hdr
+        self.chxHDR = QCheckBox()
+        boxHDR = QHBoxLayout()
+        boxHDR.addWidget(self.chxHDR)
+        grpHDR = QGroupBox("HDR", self)
+        grpHDR.setLayout(boxHDR)
 
         # pixel region
         self.cbxPixelRegion = QComboBox()
-        self.cbxPixelRegion.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        #self.cbxPixelRegion.currentIndexChanged.connect(self.pixelRegionEntered)
-        self.cbxPixelRegion.addItems([str(x) for x in range(common.PixelRegionMin, common.PixelRegionMax+1, 2)])
         self.cbxPixelRegion.setEnabled(False)
+        self.cbxPixelRegion.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        lblPixelRegion = QLabel("(n x n)")
+        self.cbxPixelRegion.addItems([str(x) for x in range(common.PixelRegionMin, common.PixelRegionMax+1,2)])
         boxPixelRegion = QHBoxLayout()
         boxPixelRegion.addWidget(self.cbxPixelRegion)
-        grpPixelRegion = QGroupBox("(n x n) Pixel Region:", self)
+        boxPixelRegion.addWidget(lblPixelRegion, 0, Qt.AlignRight)
+        grpPixelRegion = QGroupBox("Pixel Region:", self)
         grpPixelRegion.setLayout(boxPixelRegion)
-        layout.addWidget(grpPixelRegion, 0, Qt.AlignTop)
 
         # pixel weighting
         self.radPixelMean = QRadioButton("Mean")
-        self.radPixelMean.setEnabled(False)
         self.radPixelMedian = QRadioButton("Median")
-        self.radPixelMedian.setEnabled(False)
         self.radPixelGaussian = QRadioButton("Gaussian")
+        self.radPixelMean.setEnabled(False)
+        self.radPixelMedian.setEnabled(False)
         self.radPixelGaussian.setEnabled(False)
         boxPixelWeighting = QHBoxLayout()
         boxPixelWeighting.addWidget(self.radPixelMean)
@@ -130,7 +127,28 @@ class DialogConverter(QDialog):
         boxPixelWeighting.addWidget(self.radPixelGaussian)
         grpPixelWeighting = QGroupBox("Pixel Weighting:", self)
         grpPixelWeighting.setLayout(boxPixelWeighting)
-        layout.addWidget(grpPixelWeighting, 0, Qt.AlignTop)
+
+        # add all pixel options to window
+        boxPixelOptions = QHBoxLayout()
+        boxPixelOptions.addWidget(grpHDR, 0, Qt.AlignLeft)
+        boxPixelOptions.addWidget(grpPixelRegion, 0, Qt.AlignLeft)
+        boxPixelOptions.addWidget(grpPixelWeighting, 1)
+        boxPixelOptions.setContentsMargins(0,0,0,0)
+        pnlPixelOptions = QWidget()
+        pnlPixelOptions.setLayout(boxPixelOptions)
+        layout.addWidget(pnlPixelOptions, 0, Qt.AlignTop)
+
+        # spectrum resolution
+        self.txtResolution = QLineEdit()
+        self.txtResolution.setText("1")
+        self.txtResolution.setValidator(QIntValidator(1, 100))
+        lblResolution = QLabel("(nm)")
+        boxResolution = QHBoxLayout()
+        boxResolution.addWidget(self.txtResolution)
+        boxResolution.addWidget(lblResolution, 0, Qt.AlignRight)
+        grpResolution = QGroupBox("Spectrum Resolution:", self)
+        grpResolution.setLayout(boxResolution)
+        layout.addWidget(grpResolution, 0, Qt.AlignTop)
 
         # exposure
         self.cbxExposure = QComboBox()
