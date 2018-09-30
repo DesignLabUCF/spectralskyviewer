@@ -733,6 +733,7 @@ class SkyDataViewer(QMainWindow):
         pixels = utility_data.collectPixels(points, pixels=self.wgtFisheye.myPhotoPixels, region=pixregion, weighting=pixweight)
         sunpos = utility_data.computeSunPosition(self.spaData)
         skycover = utility_data.findCaptureSkyCover(self.capture, self.skyData)
+        resolution = xoptions["SpectrumResolution"]
 
         # create file if not exists
         if not os.path.exists(xoptions["Filename"]):
@@ -746,9 +747,9 @@ class SkyDataViewer(QMainWindow):
                     if attr == "PixelRGB":
                         file.write("Red" + delimiter + "Green" + delimiter + "Blue" + delimiter)
                     elif attr == "Radiance":
-                        for w in range(350, 2500):
-                            file.write(str(w) + delimiter)
-                        file.write(str(2500))
+                        file.write(str(350))  # first wavelength, no delimiter
+                        for w in range(350 + resolution, 2501, resolution):
+                            file.write(delimiter + str(w))  # delimiter plus another wavelength
                     else:
                         file.write(attr)
                         file.write(delimiter)
@@ -832,13 +833,13 @@ class SkyDataViewer(QMainWindow):
                         file.write(delimiter)
                         file.write(str(pixels[i][2])) # blue
                         file.write(delimiter)
-                    # export solar radiance spectrum
+                    # export spectral radiance
                     elif attr == "Radiance":
                         xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[sIdx])
                         count = len(xs)
-                        for j in range(0, count-1):
-                            file.write(str(ys[j]) + delimiter)
-                        file.write(str(ys[count-1]))
+                        file.write(str(ys[0]))  # first wavelength, no delimiter
+                        for j in range(resolution, count, resolution):
+                            file.write(delimiter + str(ys[j]))  # delimiter plus another wavelength
 
                 # next sample
                 file.write("\n")
@@ -865,7 +866,7 @@ class SkyDataViewer(QMainWindow):
         # open files
         with open(fnamein, 'r') as filein:
             with open(fnameout, 'w') as fileout:
-                # assume CSV for now (technically could be other delimiter)
+                # TODO: assumes CSV for now (technically could be other delimiter)
                 reader = csv.reader(filein, delimiter=',')
                 writer = csv.writer(fileout, delimiter=',', lineterminator='\n')
                 # read/write header
@@ -877,9 +878,9 @@ class SkyDataViewer(QMainWindow):
                 firstrow = next(reader, None)
 
                 # what will be the new pixel region?
-                if "PixelRegion" in mapping: # overwrite with value in file if exists
+                if "PixelRegion" in mapping:  # overwrite with value in file if exists
                     pixregion = firstrow[mapping["PixelRegion"]]
-                if "PixelRegion" in dialog.convertOptions: # overwrite with desired conversion
+                if "PixelRegion" in dialog.convertOptions:  # overwrite with desired conversion
                     pixregion = dialog.convertOptions["PixelRegion"]
 
                 # what will be the new pixel weighting?
@@ -890,7 +891,7 @@ class SkyDataViewer(QMainWindow):
 
                 # reset read file
                 filein.seek(0)
-                next(reader, None) # skip header
+                next(reader, None)  # skip header
 
                 # init
                 currtime = datetime.min

@@ -78,7 +78,7 @@ SampleFeatures = [
     ("PixelWeighting",      "Sample Pixel Weighting Algorithm"),
     ("Exposure",            "Photo Exposure Time (s)"),
     ("PixelRGB",            "Sample Pixel RGB Channels"),
-    ("Radiance",            "Sample Radiance (W/m²/sr) per Wavelength (350-2500nm)"),
+    ("Radiance",            "Sample Radiance (W/m²/sr/nm) (350-2500nm)"),
 ]
 SampleFeatureIdxMap = {SampleFeatures[i][0]: i for i in range(0, len(SampleFeatures))}
 

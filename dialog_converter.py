@@ -205,13 +205,9 @@ class DialogConverter(QDialog):
         # save convert filename
         self.convertOptions["Filename"] = self.txtFile.text()
 
-        # save hdr
+        # save pixel options
         self.convertOptions["IsHDR"] = self.radHDRYes.isChecked()
-
-        # save pixel region
         self.convertOptions["PixelRegion"] = int(self.cbxPixelRegion.currentText())
-
-        # save pixel weighting
         if self.radPixelMean.isChecked():
             self.convertOptions["PixelWeighting"] = common.PixelWeighting.Mean.value
         elif self.radPixelMedian.isChecked():
@@ -219,7 +215,10 @@ class DialogConverter(QDialog):
         elif self.radPixelGaussian.isChecked():
             self.convertOptions["PixelWeighting"] = common.PixelWeighting.Gaussian.value
 
-        # save pixel region
+        # save spectrum options
+        self.convertOptions["SpectrumResolution"] = int(self.txtResolution.text())
+
+        # save exposure
         self.convertOptions["Exposure"] = float(self.cbxExposure.currentText())
 
         self.accept()
