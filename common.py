@@ -28,6 +28,9 @@
 from enum import Enum
 
 
+# max acceptable time delta between measurements of the same capture timestamp
+CaptureEpsilon = 60  # seconds
+
 # sky sampling pattern (azimuth, altitude)
 SamplingPattern = []
 SamplingPatternRads = []

@@ -206,7 +206,7 @@ class DialogConverter(QDialog):
         self.convertOptions["Filename"] = self.txtFile.text()
 
         # save pixel options
-        self.convertOptions["IsHDR"] = self.radHDRYes.isChecked()
+        self.convertOptions["IsHDR"] = self.chxHDR.isChecked()
         self.convertOptions["PixelRegion"] = int(self.cbxPixelRegion.currentText())
         if self.radPixelMean.isChecked():
             self.convertOptions["PixelWeighting"] = common.PixelWeighting.Mean.value

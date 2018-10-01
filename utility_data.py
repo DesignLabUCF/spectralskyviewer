@@ -42,6 +42,38 @@ import utility_angles
 GaussianKernels = {}
 
 
+
+# - Datasets ------------------------------------------------------------------
+# - Datasets ------------------------------------------------------------------
+# - Datasets ------------------------------------------------------------------
+
+'''
+Function to find the delimiter that occurs the most (on the first line). Datasets support different delimiters.
+:param fname: Filename of file to operate on.
+'''
+def discoverDatasetDelimiter(fname):
+    with open(fname, 'r') as file:
+        firstline = file.readline().strip()
+
+    # find delimiter character that occurs the most
+    delimiter = ''
+    most = 0
+    ntabs = firstline.count('\t')
+    ncommas = firstline.count(',')
+    nspaces = firstline.count(' ')
+    if ncommas > most:
+        delimiter = ','
+        most = ncommas
+    if ntabs > most:
+        delimiter = '\t'
+        most = ntabs
+    if nspaces > most:
+        delimiter = ' '
+        most = nspaces
+
+    return delimiter
+
+
 # - EXIF ----------------------------------------------------------------------
 # - EXIF ----------------------------------------------------------------------
 # - EXIF ----------------------------------------------------------------------
@@ -257,26 +289,73 @@ def isHDRRawAvailable(hdrImgPath):
 # - ASD -----------------------------------------------------------------------
 
 '''
+Function to search for and retrieve the filepath of the specified ASD file.
+:param datadir: The data directory to search in.
+:param capture: The (datetime) capture timestamp.
+:param sampleidx: The sample pattern index of the sample in question.
+:return: A filepath of the specific ASD file.
+'''
+def findASDFile(datadir, capture, sampleidx):
+    # find corresponding ASD dir
+    datestr = datetime.strftime(capture, "%Y-%m-%d")
+    pathASD = os.path.join(datadir, datestr, "ASD")
+    if not os.path.exists(pathASD):
+        return ''
+
+    # find all capture time dirs
+    captureDirs = utility.findFiles(pathASD, mode=2)
+    captureDirs[:] = [dir for dir in captureDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
+    if len(captureDirs) <= 0:
+        return ''
+
+    # find an ASD capture time within small threshold of HDR capture time
+    pathCapture = None
+    for dir in captureDirs:
+        timestr = datestr + " " + os.path.basename(dir)
+        time = datetime.strptime(timestr, "%Y-%m-%d %H.%M.%S")
+        delta = (capture - time).total_seconds()
+        if abs(delta) <= common.CaptureEpsilon:
+            pathCapture = os.path.join(pathASD, os.path.basename(dir))
+            break
+    if not os.path.exists(pathCapture):
+        return ''
+
+    # gather all .txt versions of ASD files taken at capture timestamp
+    asdfiles = utility.findFiles(pathCapture, mode=1, ext=["txt"])
+    if len(asdfiles) <= 0 or sampleidx >= len(asdfiles):
+        return ''
+
+    # find specific file by sample pattern index
+    file = asdfiles[sampleidx]
+
+    # make sure by checking first token of file name
+    fnametoks = os.path.basename(file).split('_')
+    if int(fnametoks[0]) != sampleidx:
+       return ''
+
+    return file
+
+'''
 Function to load a ViewSpecPro spectroradiometer ASD file.
 :param filepath: Path to TXT file with ASD data
 :param step: Indicates which rows of the file to load
 :note: File format should be a TXT with the following data per line: Wavelength, Reading
 :note: The TXT files were converted from ViewSpecPro's software in the order .asd to .asd.rad to .asd.rad.txt .
        That may not be a requirement for ASD data of future projects.
-:return: 2 lists, Xs (wavelengths) and Ys (irradiance)        
+:return: 2 lists, Xs (wavelengths) and Ys (radiance values)        
 '''
 def loadASDFile(filepath, step=1):
     if not os.path.exists(filepath):
         return [], []
-    xdata = []
-    ydata = []
+    wavelengths = []
+    radiances = []
     with open(filepath) as f:
-        iter = itertools.islice(f, 0, None, step)
-        data = np.genfromtxt(iter, skip_header=1)
-        xdata = data[:,0]
-        ydata = data[:,1]
-        #xdata, ydata = np.loadtxt(filepath, skiprows=1, unpack=True)
-    return xdata, ydata
+        iter = itertools.islice(f, 1, None, step)
+        data = np.genfromtxt(iter)  #skip_header=1
+        wavelengths = data[:,0]
+        radiances = data[:,1]
+        #wavelengths, radiances = np.loadtxt(filepath, skiprows=1, unpack=True)
+    return wavelengths, radiances
 
 # - sky cover -----------------------------------------------------------------
 # - sky cover -----------------------------------------------------------------

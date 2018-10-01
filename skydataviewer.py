@@ -645,7 +645,7 @@ class SkyDataViewer(QMainWindow):
 
         # find an ASD capture time within small threshold of HDR capture time
         asdTime = None
-        threshold = 60  # seconds
+        threshold = common.CaptureEpsilon  # seconds
         for dir in captureTimeASDDirs:
             timestr = str(self.capture.date()) + " " + os.path.basename(dir)
             time = datetime.strptime(timestr, "%Y-%m-%d %H.%M.%S")
@@ -697,10 +697,10 @@ class SkyDataViewer(QMainWindow):
         for i in indices:
             if i >= len(self.captureTimeASDFiles):
                 break
-            xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[i], common.AppSettings["GraphResolution"])
-            #xs = xs[::common.AppSettings["GraphResolution"]]
-            #ys = ys[::common.AppSettings["GraphResolution"]]
-            self.wgtGraph.plot(y=ys, x=xs, pen=pg.mkPen(color=self.wgtFisheye.getSamplePatternRGB(i), width=common.AppSettings["GraphLineThickness"])) # pen=(i, len(indices))
+            wavelengths, radiances = utility_data.loadASDFile(self.captureTimeASDFiles[i], common.AppSettings["GraphResolution"])
+            #wavelengths = wavelengths[::common.AppSettings["GraphResolution"]]
+            #radiances = radiances[::common.AppSettings["GraphResolution"]]
+            self.wgtGraph.plot(y=radiances, x=wavelengths, pen=pg.mkPen(color=self.wgtFisheye.getSamplePatternRGB(i), width=common.AppSettings["GraphLineThickness"])) # pen=(i, len(indices))
             #self.wgtGraph.addItem() # add a label/icon to graph with number of samples available
 
     def selectSamples(self, message):
@@ -749,7 +749,7 @@ class SkyDataViewer(QMainWindow):
                     elif attr == "Radiance":
                         file.write(str(350))  # first wavelength, no delimiter
                         for w in range(350 + resolution, 2501, resolution):
-                            file.write(delimiter + str(w))  # delimiter plus another wavelength
+                            file.write(delimiter + str(w))  # delimiter plus next wavelength
                     else:
                         file.write(attr)
                         file.write(delimiter)
@@ -839,7 +839,7 @@ class SkyDataViewer(QMainWindow):
                         count = len(xs)
                         file.write(str(ys[0]))  # first wavelength, no delimiter
                         for j in range(resolution, count, resolution):
-                            file.write(delimiter + str(ys[j]))  # delimiter plus another wavelength
+                            file.write(delimiter + str(ys[j]))  # delimiter plus next wavelength
 
                 # next sample
                 file.write("\n")
@@ -862,32 +862,40 @@ class SkyDataViewer(QMainWindow):
         numrows = 0
         pixregion = common.PixelRegionMin
         pixweight = common.PixelWeighting.Mean
+        resolution = 1
+        delimiter = utility_data.discoverDatasetDelimiter(fnamein)
 
         # open files
         with open(fnamein, 'r') as filein:
             with open(fnameout, 'w') as fileout:
-                # TODO: assumes CSV for now (technically could be other delimiter)
-                reader = csv.reader(filein, delimiter=',')
-                writer = csv.writer(fileout, delimiter=',', lineterminator='\n')
-                # read/write header
+                reader = csv.reader(filein, delimiter=delimiter)
+                writer = csv.writer(fileout, delimiter=delimiter, lineterminator='\n')
+
+                # read header
                 header = next(reader, None)
-                writer.writerow(header)
                 mapping = {header[i]: i for i in range(0, len(header))}
 
-                # read first row for pixregion, pixweight, exposure
+                # read first row for taste of current values
                 firstrow = next(reader, None)
 
-                # what will be the new pixel region?
+                # what pixel region to use?
                 if "PixelRegion" in mapping:  # overwrite with value in file if exists
                     pixregion = firstrow[mapping["PixelRegion"]]
                 if "PixelRegion" in dialog.convertOptions:  # overwrite with desired conversion
                     pixregion = dialog.convertOptions["PixelRegion"]
 
-                # what will be the new pixel weighting?
+                # what pixel weighting to use?
                 if "PixelWeighting" in mapping:  # overwrite with value in file if exists
                     pixweight = common.PixelWeighting(int(firstrow[mapping["PixelWeighting"]]))
                 if "PixelWeighting" in dialog.convertOptions:  # overwrite with desired conversion
                     pixweight = common.PixelWeighting(dialog.convertOptions["PixelWeighting"])
+
+                # what spectrum resolution to use?
+                prevrez = int(((2500-350)+1) / (len(header) - mapping["350"]))
+                if "SpectrumResolution" not in dialog.convertOptions:  # use same resolution
+                    resolution = prevrez
+                else:  # overwrite with desired conversion
+                    resolution = dialog.convertOptions["SpectrumResolution"]
 
                 # reset read file
                 filein.seek(0)
@@ -895,12 +903,22 @@ class SkyDataViewer(QMainWindow):
 
                 # init
                 currtime = datetime.min
-                currfile = ''
+                currHDRfile = ''
                 currexposure = 0
                 currcoords = []
                 currrows = []
 
-                # read rows
+                # write header
+                if resolution == prevrez:
+                    writer.writerow(header)  # use exact same header
+                else:  # write new header to account for different spectrum resolution
+                    newheader = []
+                    newheader.extend(header[0:mapping["350"]])
+                    for w in range(350, 2501, resolution):
+                        newheader.append(str(w))
+                    writer.writerow(newheader)
+
+                # read and write rows
                 for row in reader:
 
                     # is this row a new capture timestamp of samples?
@@ -908,9 +926,9 @@ class SkyDataViewer(QMainWindow):
                     exp = float(row[mapping["Exposure"]])
                     if ts != currtime or exp != currexposure:
                         # if so, flush our cached rows read so far
-                        if os.path.exists(currfile):
-                            points = utility_data.computePointsInImage(currfile, currcoords)
-                            pixels = utility_data.collectPixels(points, file=currfile, region=pixregion, weighting=pixweight)
+                        if os.path.exists(currHDRfile):
+                            points = utility_data.computePointsInImage(currHDRfile, currcoords)
+                            pixels = utility_data.collectPixels(points, file=currHDRfile, region=pixregion, weighting=pixweight)
                             # update cached row with new values and write to convert file
                             for i in range(0, len(currrows)):
                                 # update
@@ -925,18 +943,28 @@ class SkyDataViewer(QMainWindow):
                         # get ready for a new capture timestamp of samples that this row kicked off
                         currtime = ts
                         currexposure = exp
-                        currfile = utility_data.findHDRFile(common.AppSettings["DataDirectory"], currtime, currexposure)
+                        currHDRfile = utility_data.findHDRFile(common.AppSettings["DataDirectory"], currtime, currexposure)
                         currrows = []
                         currcoords = []
 
-                    # cache this row
-                    currrows.append(row)
+                    # collect sample coordinate
                     currcoords.append((float(row[mapping["SampleAzimuth"]]), float(row[mapping["SampleAltitude"]])))
 
+                    # collect sample row to be written
+                    if resolution == prevrez:
+                        currrows.append(row)
+                    else:
+                        newrow = []
+                        newrow.extend(row[0:mapping["350"]])
+                        currASDfile = utility_data.findASDFile(common.AppSettings["DataDirectory"], currtime, int(row[mapping["SamplePatternIndex"]]))
+                        ws, rs = utility_data.loadASDFile(currASDfile, resolution)
+                        newrow.extend(rs)
+                        currrows.append(newrow)
+
                 # flush any remaining cached rows
-                if len(currrows) > 0 and os.path.exists(currfile):
-                    points = utility_data.computePointsInImage(currfile, currcoords)
-                    pixels = utility_data.collectPixels(points, file=currfile, region=pixregion, weighting=pixweight)
+                if len(currrows) > 0 and os.path.exists(currHDRfile):
+                    points = utility_data.computePointsInImage(currHDRfile, currcoords)
+                    pixels = utility_data.collectPixels(points, file=currHDRfile, region=pixregion, weighting=pixweight)
                     # update cached row with new values and write to convert file
                     for i in range(0, len(currrows)):
                         # update
