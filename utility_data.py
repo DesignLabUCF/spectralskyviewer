@@ -157,7 +157,7 @@ def findHDRFile(datadir, capture, exposure):
     return photos[expidx]
 
 '''
-Function to compute and retrieve a list of (x, y) points in a specific image given polar coordinates.
+Function to compute and retrieve a list of (x, y) points in a specific image given (azimuth, altitude) coordinates.
 :param imgfile: Filepath to an image.
 :param coords: A list of (azimuth, altitude) coordinates.
 :return: A list of (x, y) points corresponding to the coordinates provided. 
@@ -173,12 +173,10 @@ def computePointsInImage(imgfile, coords):
     diameter = radius * 2
     image.close()
 
-    points = []
-
     # compute each coordinate in the image
+    points = []
     for c in coords:
-        u, v = utility_angles.FisheyeAngleWarp(c[0], c[1], inRadians=False)
-        u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
+        u, v = utility_angles.SkyCoord2FisheyeUV(c[0], c[1])
         x = (center[0] - radius) + (u * diameter)
         y = (center[1] - radius) + (v * diameter)
         points.append((int(x), int(y)))

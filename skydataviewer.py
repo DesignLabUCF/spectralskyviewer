@@ -809,7 +809,7 @@ class SkyDataViewer(QMainWindow):
                     # export sun point/sample angle
                     elif attr == "SunPointAngle":
                         point = common.SamplingPattern[sIdx]
-                        angle = utility_angles.CentralAngle(sunpos, point, inRadians=False)
+                        angle = utility_angles.CentralAngle(sunpos, point)
                         angle = math.degrees(angle)
                         file.write('{0:07.03f}'.format(angle))
                         file.write(delimiter)

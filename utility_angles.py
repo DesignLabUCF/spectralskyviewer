@@ -1,8 +1,31 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 # ====================================================================
-# The file below has been redistributed with permission.
-# Joe Del Rocco - University of Central Florida
+# Copyright (c) 2017-2018 Joe Del Rocco
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 # ====================================================================
-# angle_utilities.py
+# @author: Joe Del Rocco
+# @since: 10/01/2018
+# @summary: A module with angle and coordinate transformations.
+# @note: Parts of this file came from angle_utilities.py written by Dan Knowlton - redistributed with permission.
+# ====================================================================
 # Provides functionality to convert between UV coordinates and angles as well
 #   as other useful angle utilities.
 #
@@ -13,123 +36,77 @@
 #  Web: http://www.graphics.cornell.edu/
 #
 #  Not for commercial use. Do not redistribute without permission.
-#
+# ====================================================================
 import math
 
 
-def CentralAngle(a, b, inRadians=True):
-    """ Take in a pair of polar coordintes and return the corresponding central angle between them.
-        Note that a and b are tuples of (azimuth, altitude) or in other words (longitude, latitude).
-        https://en.wikipedia.org/wiki/Great-circle_distance#Formulas
-    """
+'''
+Convert a sky coordinate (azimuth, altitude) to fisheye UV coordinate (0-1, 0-1).
+Note that images in this application were taken with North facing downward, so we must account for this in UV.
+Note sampling pattern coordinates in this application were measured in altitude, but calculation below requires zenith.
+'''
+def SkyCoord2FisheyeUV(azimuth, altitude):
+    # rotate azimuth so that position of North is pointing directly down
+    azimuth = 360 - ((azimuth + 270) % 360)
+
+    # convert altitude to zenith
+    zenith = (90 - altitude)
+
+    # convert to radians
+    zenith = zenith * math.pi / 180.0
+    azimuth = azimuth * math.pi / 180.0
+
+    # compute radius
+    radius = zenith / (math.pi / 2.0)
+
+    # compute UV
+    return (0.5 * (radius * math.cos(azimuth) + 1), 0.5 * (radius * math.sin(azimuth) + 1))
+
+'''
+Convert a fisheye UV coordinate (0-1, 0-1) to a sky coordinate (azimuth, altitude).
+'''
+def FisheyeUV2SkyCoord(u, v):
+    radius = math.sqrt((u - 0.5) * (u - 0.5) + (v - 0.5) * (v - 0.5))
+    u = u - 0.5
+    v = v - 0.5
+    theta = math.atan2(u, v)
+    phi = radius * math.pi / 2.0
+
+    # convert radians to angles
+    # convert zenith back to altitude
+    return (int((theta * 180.0 / math.pi + 360) % 360), int(90 - 2 * phi * 180.0 / math.pi))
+
+# '''
+# Compute cartesian UV (0-1, 0-1) coordinate given an (azimuth, altitude) sky coordinate.
+# Note sampling pattern coordinates in this application were measured in altitude, but calculation below requires zenith.
+# '''
+# def GetUVFromAngle(azimuth, altitude):
+#     # convert altitude to zenith
+#     zenith = (90 - altitude)
+#     # convert to radians
+#     zenith = zenith * math.pi / 180.0
+#     azimuth = azimuth * math.pi / 180.0
+#     # compute UV
+#     radius = zenith / (math.pi / 2.0)
+#     return (0.5 * (radius * math.cos(azimuth) + 1), 0.5 * (radius * math.sin(azimuth) + 1))
+#
+# '''
+# Compute (azimuth, altitude) sky coordinate given a cartesian UV (0-1, 0-1) coordinate.
+# '''
+# def GetAngleFromUV(u, v):
+#     radius = math.sqrt((u - 0.5) * (u - 0.5) + (v - 0.5) * (v - 0.5))
+#     u = u - 0.5
+#     v = v - 0.5
+#     theta = math.atan2(u, v)
+#     phi = radius * math.pi / 2.0
+#     return (int((theta * 180.0 / math.pi + 360) % 360), int(90 - 2 * phi * 180.0 / math.pi))
+
+'''
+Take in a pair of (azimuth, altitude) sky coordintes and return the corresponding central angle between them.
+https://en.wikipedia.org/wiki/Great-circle_distance#Formulas
+'''
+def CentralAngle(a, b, inRadians=False):
     if not inRadians:
         a = (math.radians(a[0]), math.radians(a[1]))
         b = (math.radians(b[0]), math.radians(b[1]))
     return math.acos( math.sin(a[1]) * math.sin(b[1]) + math.cos(a[1]) * math.cos(b[1]) * math.cos( abs(a[0]-b[0]) ) )
-
-def FisheyeAngleWarp(theta, phi, inRadians=True):
-    """ Take in a pair of angles and return the corresponding angles on the 
-          fisheye image taking into account the position of North, etc.
-        NOTE phi is assumed to be altitude (not zenith)!!
-    """
-    if inRadians:
-        phi = phi * 180.0 / math.pi
-        theta = theta * 180.0 / math.pi
-
-    # Theta is azimuth, with north being directly down. 
-    theta = 360 - ((theta + 270) % 360)
-
-    # This assumes phi is altitude, and then converts it to zenith
-    # sampling pattern coordinates used in this application were recorded in altitude
-    phi = 90 - phi
-
-    if inRadians:
-        phi = phi * math.pi / 180.0
-        theta = theta * math.pi / 180.0
-
-    return (theta, phi)
-
-def GetAngleFromUV(x, y):
-    """ Given the x, y fractional coordinates of a point in an image, return the
-          angles corresponding to this location in degrees. 
-    """
-    radius = math.sqrt((x-0.5) * (x - 0.5) + (y - 0.5) * (y-0.5))
-    x = x - 0.5
-    y = y - 0.5
-    theta = math.atan2(x, y)
-    phi = radius * math.pi / 2.0
-
-    return (int((theta * 180.0 / math.pi + 360) % 360), int(90 - 2 * phi * 180.0 / math.pi))
-
-def GetUVFromAngle(theta, phi, inRadians=True):
-    """ Get the UV coordinates for a pair of angles representing position
-          on a fisheye hemisphere image.
-        NOTE phi is assumed to be zenith here (not altitude)!!
-    """
-    if not inRadians:
-        phi = phi * math.pi / 180.0
-        theta = theta * math.pi / 180.0
-
-    radius = phi / (math.pi / 2.0)
-    return (0.5 * (radius * math.cos(theta) + 1), 0.5 * (radius * math.sin(theta) + 1))
-
-def GetUVFromAngleWithWarp(theta, phi, inRadians=True):
-    """ Get the UV coordinates for a pair of angles representing position
-          on a fisheye hemisphere image.
-        NOTE phi is assumed to be zenith here (not altitude)!!
-    """
-    if not inRadians:
-        phi = phi * math.pi / 180.0
-        theta = theta * math.pi / 180.0
-
-    radius = phi / (math.pi / 2.0)
-    return (0.5 * (radius * math.cos(theta) + 1), 0.5 * (radius * math.sin(theta) + 1))
-
-
-#EARTH_MEAN_RADIUS = 6371.01  # In km
-#ASTRONOMICAL_UNIT = 149597890  # In km
-#
-# def CalculateSunAngles(time, coord):
-#     """ Calculate the angles representing the position of the sun based on a
-#           provided time and coordinates.
-#     """
-#     # Calculate difference in days of Julian Days
-#     decHours = time.hour + (time.minute + time.second / 60.0) / 60.0
-#     liAux1 = (time.month - 14) / 12
-#     liAux2 = (1461*(time.year + 4800 + liAux1)) / 4 + (367 * (time.month - 2 - 12 * liAux1)) / 12 - (3*((time.year + 4900 + liAux1) / 100)) / 4 + time.day - 32075
-#     julianDate = liAux2 - 0.5 + decHours / 24.0
-#     elapsedJulianDays =julianDate - 2451545.0
-#
-#     # Calculate ecliptic coordinates
-#     omega = 2.1429 - 0.0010394594 * elapsedJulianDays
-#     meanLongitude = 4.8950630 + 0.017202791698 * elapsedJulianDays
-#     anomaly = 6.2400600 + 0.0172019699 * elapsedJulianDays;
-#     eclipticLongitude = meanLongitude + 0.03341607 * math.sin(anomaly) + 0.00034894 * math.sin(2*anomaly) - 0.0001134 - 0.0000203 * math.sin(omega)
-#     eclipticObliquity = 0.4090928 - 6.2140e-9 * elapsedJulianDays + 0.0000396 * math.cos(omega);
-#
-#     # Calculate celestial coordinates
-#     sinEclipticLongitude = math.sin(eclipticLongitude)
-#     dY = math.cos(eclipticObliquity) * sinEclipticLongitude;
-#     dX = math.cos(eclipticLongitude)
-#     rightAscension = math.atan2(dY, dX);
-#     declination = math.asin(math.sin(eclipticObliquity) * sinEclipticLongitude)
-#
-#     # Calculate local coordinates
-#     greenwichMeanSiderealTime = 6.6974243242 + 0.0657098283 * elapsedJulianDays + decHours
-#     localMeanSiderealTime = (greenwichMeanSiderealTime * 15 + coord['longitude']) * math.pi / 180.0;
-#
-#     latitudeInRadians = coord['latitude'] * math.pi / 180.0
-#     cosLatitude = math.cos(latitudeInRadians)
-#     sinLatitude = math.sin(latitudeInRadians)
-#     hourAngle = localMeanSiderealTime - rightAscension
-#     cosHourAngle = math.cos(hourAngle)
-#     elevation = math.acos(cosLatitude * cosHourAngle * math.cos(declination) + math.sin(declination) * sinLatitude)
-#     dY = -math.sin(hourAngle)
-#     dX = math.tan(declination) * cosLatitude - sinLatitude * cosHourAngle
-#     azimuth = math.atan2(dY, dX)
-#     if azimuth < 0.0:
-#         azimuth = azimuth + 2 * math.pi
-#
-#     elevation = elevation + (EARTH_MEAN_RADIUS / ASTRONOMICAL_UNIT) * math.sin(elevation)
-#
-#     return (azimuth, math.pi / 2.0 - elevation)

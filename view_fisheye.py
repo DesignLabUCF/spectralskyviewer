@@ -182,7 +182,7 @@ class ViewFisheye(QWidget):
         if sunAvoid > 0:
             sunAvoidRads = math.radians(common.AppSettings["AvoidSunAngle"])
             sunPosRads = (math.radians(self.sunPosition[0]), math.radians(self.sunPosition[1]))
-            self.samplesSelected[:] = [idx for idx in self.samplesSelected if utility_angles.CentralAngle(sunPosRads, common.SamplingPatternRads[idx]) > sunAvoidRads]
+            self.samplesSelected[:] = [idx for idx in self.samplesSelected if utility_angles.CentralAngle(sunPosRads, common.SamplingPatternRads[idx], inRadians=True) > sunAvoidRads]
 
         # update
         self.repaint()
@@ -354,7 +354,7 @@ class ViewFisheye(QWidget):
         if sunAvoid > 0:
             sunAvoidRads = math.radians(common.AppSettings["AvoidSunAngle"])
             sunPosRads = (math.radians(self.sunPosition[0]), math.radians(self.sunPosition[1]))
-            sampleAdjustments[:] = [idx for idx in sampleAdjustments if utility_angles.CentralAngle(sunPosRads, common.SamplingPatternRads[idx]) > sunAvoidRads]
+            sampleAdjustments[:] = [idx for idx in sampleAdjustments if utility_angles.CentralAngle(sunPosRads, common.SamplingPatternRads[idx], inRadians=True) > sunAvoidRads]
 
         # no changes to be made
         if len(sampleAdjustments) <= 0:
@@ -411,14 +411,27 @@ class ViewFisheye(QWidget):
         photoDiameter = self.myPhotoRadius * 2
         sampleRadius = self.myPhotoRadius / 50
         sampleDiameter = sampleRadius * 2
-        ViewFisheye.SelectionRectMin = sampleDiameter # minimum selection rect is based on this
-        u, v = 0, 0
+        ViewFisheye.SelectionRectMin = sampleDiameter  # minimum selection rect is based on this
+        t, p, u, v, x, y = 0, 0, 0, 0, 0, 0
         for i in range(0, len(common.SamplingPattern)):
-            u, v = utility_angles.FisheyeAngleWarp(common.SamplingPattern[i][0], common.SamplingPattern[i][1], inRadians=False)
-            u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
-            u = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
-            v = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
-            self.sampleBoundsVisible[i].setRect(u - sampleRadius, v - sampleRadius, sampleDiameter, sampleDiameter)
+            u, v = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0], common.SamplingPattern[i][1])
+            x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
+            y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
+            self.sampleBoundsVisible[i].setRect(x - sampleRadius, y - sampleRadius, sampleDiameter, sampleDiameter)
+
+        # compute sampling pattern locations - NEW
+        # u, v, x, y = 0, 0, 0, 0
+        # for i in range(0, len(common.SamplingPattern)):
+        #     azi1 = common.SamplingPattern[i][0] - 0.5
+        #     azi2 = common.SamplingPattern[i][0] + 0.5
+        #     alt1 = common.SamplingPattern[i][1] - 0.5
+        #     alt2 = common.SamplingPattern[i][1] + 0.5
+        #
+        #     u, v = utility_angles.RotateNorth(common.SamplingPattern[i][0], common.SamplingPattern[i][1], inRadians=False)
+        #     u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
+        #     x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
+        #     y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
+        #     self.sampleBoundsVisible[i].setRect(x - sampleRadius, y - sampleRadius, sampleDiameter, sampleDiameter)
 
         # compute compass lines
         self.compassTicks.clear()
@@ -437,28 +450,22 @@ class ViewFisheye(QWidget):
             self.compassTicks.append([cx1, cy1, cx2, cy2, lx1, ly1, angle])  # x1, y1, x2, y2, x1lbl, y1lbl, angle
 
         # compute sun path screen points
-        # v = 0.7159*u - 0.0048*math.pow(u, 2) - 0.032*math.pow(u, 3) + 0.0021*math.pow(u, 4)
         self.pathSun = QPainterPath()
         if len(self.sunPathPoints) > 0:
-            t, p, dt = self.sunPathPoints[0]
-            t, p = utility_angles.FisheyeAngleWarp(t, p, inRadians=False)
-            u, v = utility_angles.GetUVFromAngle(t, p, inRadians=False)
+            azi, alt, dt = self.sunPathPoints[0]
+            u, v = utility_angles.SkyCoord2FisheyeUV(azi, alt)
             x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
             y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
             self.pathSun.moveTo(x, y)
             for i in range(1, len(self.sunPathPoints)):
-                t, p, dt = self.sunPathPoints[i]
-                t, p = utility_angles.FisheyeAngleWarp(t, p, inRadians=False)
-                u, v = utility_angles.GetUVFromAngle(t, p, inRadians=False)
+                azi, alt, dt = self.sunPathPoints[i]
+                u, v = utility_angles.SkyCoord2FisheyeUV(azi, alt)
                 x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
                 y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
                 self.pathSun.lineTo(x, y)
 
         # compute sun position screen point
-        t, p = self.sunPosition
-        t, p = utility_angles.FisheyeAngleWarp(t, p, inRadians=False)
-        #p = math.degrees(8 * math.sin(math.radians(p)))
-        u, v = utility_angles.GetUVFromAngle(t, p, inRadians=False)
+        u, v = utility_angles.SkyCoord2FisheyeUV(self.sunPosition[0], self.sunPosition[1])
         x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
         y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
         self.sunPositionVisible = (x, y)
@@ -557,35 +564,33 @@ class ViewFisheye(QWidget):
                         painter.drawLine(p1, p2)
                     # ideal polar latitudes along zenith
                     for alt in common.SamplingPatternAlts:
-                        u, v = utility_angles.FisheyeAngleWarp(90, alt, inRadians=False)
-                        u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
+                        u, v = utility_angles.SkyCoord2FisheyeUV(90, alt)
                         x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
-                        y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
+                        #y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
                         painter.drawEllipse(center, x - self.viewCenter[0], x - self.viewCenter[0])
                     # ideal latitude/longitude intersection points
                     painter.setBrush(Qt.white)
                     for azi in range(0, 360, 30):
                         #for alt in range(0, 90, 10):
                         for alt in common.SamplingPatternAlts:
-                            u, v = utility_angles.FisheyeAngleWarp(azi, alt, inRadians=False)
-                            u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
+                            u, v = utility_angles.SkyCoord2FisheyeUV(azi, alt)
                             x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
                             y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
                             painter.drawEllipse(QPoint(x, y), 2, 2)
                     painter.setBrush(Qt.NoBrush)
 
                     # second, draw lens warped curviture
-                    painter.setPen(self.penLens)
-                    painter.setBrush(Qt.magenta)
-                    for azi in range(0, 360, 30):
-                        # for alt in range(0, 90, 10):
-                        for alt in common.SamplingPatternAlts:
-                            u, v = utility_angles.FisheyeAngleWarp(azi, alt, inRadians=False)
-                            u, v = utility_angles.GetUVFromAngleWithWarp(u, v, inRadians=False)
-                            x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
-                            y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
-                            painter.drawEllipse(QPoint(x, y), 2, 2)
-                    painter.setBrush(Qt.NoBrush)
+                    # painter.setPen(self.penLens)
+                    # painter.setBrush(Qt.magenta)
+                    # for azi in range(0, 360, 30):
+                    #     # for alt in range(0, 90, 10):
+                    #     for alt in common.SamplingPatternAlts:
+                    #         u, v = utility_angles.RotateNorth(azi, alt, inRadians=False)
+                    #         u, v = utility_angles.GetUVFromAngleWithWarp(u, v, inRadians=False)
+                    #         x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
+                    #         y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
+                    #         painter.drawEllipse(QPoint(x, y), 2, 2)
+                    # painter.setBrush(Qt.NoBrush)
                     # lens polar longitudes along azimuth
                     # lens polar latitudes along zenith
 
@@ -717,7 +722,7 @@ class ViewFisheye(QWidget):
                     # coordsXY[1] = int(preRotY / self.myPhotoDestRect.height() * self.myPhoto.height())
                     coordsUV = ((coordsUC[0] + 1) / 2,
                                 (coordsUC[1] + 1) / 2)
-                    coordsTP = utility_angles.GetAngleFromUV(coordsUV[0], coordsUV[1])
+                    coordsTP = utility_angles.FisheyeUV2SkyCoord(coordsUV[0], coordsUV[1])
                     distance = math.sqrt((coordsUC[0] * coordsUC[0]) + (coordsUC[1] * coordsUC[1]))
 
                 # pixels colors
