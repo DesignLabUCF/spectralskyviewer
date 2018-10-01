@@ -2,7 +2,7 @@
 
 A tool to view sky photos with corresponding multispectral radiance measurements side-by-side. Additionally, it can be used to export and convert datasets of sky samples inteaded to be used for machine learning.
 
-The original viewer was [clearskydataviewer](https://github.com/ProgramofComputerGraphics/clearskydataviewer), written by [Dan Knowlton](https://github.com/knowlonix) for the [Program Of Computer Graphics at Cornell](http://www.graphics.cornell.edu). Parts of his sky coordinate to UV angle calculations are retained in [`utility_angles.py`](../blob/master/utility_angles.py).
+The original viewer was [clearskydataviewer](https://github.com/ProgramofComputerGraphics/clearskydataviewer), written by [Dan Knowlton](https://github.com/knowlonix) for the [Program Of Computer Graphics at Cornell](http://www.graphics.cornell.edu). Parts of his sky coordinate to UV angle calculations are retained in [`utility_angles.py`](blob/master/utility_angles.py).
 
 ### Prerequisites
 
