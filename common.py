@@ -28,9 +28,6 @@
 from enum import Enum
 
 
-# max acceptable time delta between measurements of the same capture timestamp
-CaptureEpsilon = 60  # seconds
-
 # sky sampling pattern (azimuth, altitude)
 SamplingPattern = []
 SamplingPatternRads = []
@@ -59,6 +56,12 @@ SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "S
 PixelRegionMin = 1
 PixelRegionMax = 99
 PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')
+
+# field of view used when measuring radiance with spectroradiometer
+RadianceFOV = 1  # degrees
+
+# max acceptable time delta between measurements of the same capture timestamp
+CaptureEpsilon = 60  # seconds
 
 # types of RAW data
 HDRRawExts = ['.cr2', '.raw', '.dng']

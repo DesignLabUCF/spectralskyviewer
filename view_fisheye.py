@@ -30,9 +30,9 @@ import math
 import colorsys
 from enum import Enum
 from datetime import datetime
-from PyQt5.QtCore import Qt, QRect, QPoint, QPointF
-from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QIcon, QColor
-from PyQt5.QtWidgets import QWidget, QStyle, QAction, QMenu
+from PyQt5.QtCore import Qt, QRect, QPoint, QPointF, QLine, QLineF
+from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QColor
+from PyQt5.QtWidgets import QWidget, QStyle
 import numpy as np
 import common
 import utility
@@ -70,6 +70,7 @@ class ViewFisheye(QWidget):
         self.sunPathPoints = []          # [(azimuth (theta), altitude (phi)(90-zenith), datetime)]
         self.compassTicks = []           # [[x1, y1, x2, y2, x1lbl, y1lbl, angle]]
         self.sampleBoundsVisible = []    # bounds QRect(x,y,w,h) of all samples on the photo rendered on screen (scaled)
+        self.sampleAreaVisible = []      # area of 4 points for each sample rendered on screen (scaled)
         self.samplePointsInFile = []     # points (x,y) of all samples in the photo on file
         self.samplesSelected = []        # indices of selected samples
         self.skyCover = common.SkyCover.UNK
@@ -96,6 +97,7 @@ class ViewFisheye(QWidget):
         color = QColor(255, 255, 255)
         for t,p in common.SamplingPattern:
             self.sampleBoundsVisible.append(QRect(0, 0, 0, 0))  # these will need to be recomputed as photo scales
+            self.sampleAreaVisible.append([])
             self.samplePointsInFile.append((0, 0))              # these only need to be computed once per photo
             color.setHsv(t, int(utility.normalize(p, 0, 90)*127+128), 255)
             self.penSelected.append(QPen(color, 3, Qt.SolidLine))
@@ -382,6 +384,7 @@ class ViewFisheye(QWidget):
             self.myPhotoRadius = 0
             for i in range(0, len(common.SamplingPattern)):
                 self.sampleBoundsVisible[i].setRect(self.viewCenter[0], self.viewCenter[1], 0, 0)
+                self.sampleAreaVisible[i] = []
             return
 
         # scale the photo dest rect
@@ -412,7 +415,6 @@ class ViewFisheye(QWidget):
         sampleRadius = self.myPhotoRadius / 50
         sampleDiameter = sampleRadius * 2
         ViewFisheye.SelectionRectMin = sampleDiameter  # minimum selection rect is based on this
-        t, p, u, v, x, y = 0, 0, 0, 0, 0, 0
         for i in range(0, len(common.SamplingPattern)):
             u, v = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0], common.SamplingPattern[i][1])
             x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
@@ -420,18 +422,21 @@ class ViewFisheye(QWidget):
             self.sampleBoundsVisible[i].setRect(x - sampleRadius, y - sampleRadius, sampleDiameter, sampleDiameter)
 
         # compute sampling pattern locations - NEW
-        # u, v, x, y = 0, 0, 0, 0
-        # for i in range(0, len(common.SamplingPattern)):
-        #     azi1 = common.SamplingPattern[i][0] - 0.5
-        #     azi2 = common.SamplingPattern[i][0] + 0.5
-        #     alt1 = common.SamplingPattern[i][1] - 0.5
-        #     alt2 = common.SamplingPattern[i][1] + 0.5
-        #
-        #     u, v = utility_angles.RotateNorth(common.SamplingPattern[i][0], common.SamplingPattern[i][1], inRadians=False)
-        #     u, v = utility_angles.GetUVFromAngle(u, v, inRadians=False)
-        #     x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
-        #     y = (self.viewCenter[1] - self.myPhotoRadius) + (v * photoDiameter)
-        #     self.sampleBoundsVisible[i].setRect(x - sampleRadius, y - sampleRadius, sampleDiameter, sampleDiameter)
+        hFOV = common.RadianceFOV/2
+        for i in range(0, len(common.SamplingPattern)):
+            p1 = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0] - hFOV, common.SamplingPattern[i][1] - hFOV)
+            p2 = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0] - hFOV, common.SamplingPattern[i][1] + hFOV)
+            p3 = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0] + hFOV, common.SamplingPattern[i][1] + hFOV)
+            p4 = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0] + hFOV, common.SamplingPattern[i][1] - hFOV)
+            p1 = QPoint((self.viewCenter[0] - self.myPhotoRadius) + (p1[0] * photoDiameter),
+                        (self.viewCenter[1] - self.myPhotoRadius) + (p1[1] * photoDiameter))
+            p2 = QPoint((self.viewCenter[0] - self.myPhotoRadius) + (p2[0] * photoDiameter),
+                        (self.viewCenter[1] - self.myPhotoRadius) + (p2[1] * photoDiameter))
+            p3 = QPoint((self.viewCenter[0] - self.myPhotoRadius) + (p3[0] * photoDiameter),
+                        (self.viewCenter[1] - self.myPhotoRadius) + (p3[1] * photoDiameter))
+            p4 = QPoint((self.viewCenter[0] - self.myPhotoRadius) + (p4[0] * photoDiameter),
+                        (self.viewCenter[1] - self.myPhotoRadius) + (p4[1] * photoDiameter))
+            self.sampleAreaVisible[i] = [p1, p2, p3, p4]
 
         # compute compass lines
         self.compassTicks.clear()
@@ -622,8 +627,13 @@ class ViewFisheye(QWidget):
                 # draw sampling pattern
                 if common.AppSettings["ShowSamples"]:
                     painter.setPen(self.penText)
+                    for i, points in enumerate(self.sampleAreaVisible):
+                        painter.drawLine(QLine(points[0], points[1]))
+                        painter.drawLine(QLine(points[1], points[2]))
+                        painter.drawLine(QLine(points[2], points[3]))
+                        painter.drawLine(QLine(points[3], points[0]))
                     for i, r in enumerate(self.sampleBoundsVisible):
-                        painter.drawEllipse(r)
+                        #painter.drawEllipse(r)
                         painter.drawText(r.x()-r.width(), r.y(), str(i))
 
                 # draw sun path

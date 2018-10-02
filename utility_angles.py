@@ -22,7 +22,7 @@
 # SOFTWARE.
 # ====================================================================
 # @author: Joe Del Rocco
-# @since: 10/01/2018
+# @since: 11/02/2017
 # @summary: A module with angle and coordinate transformations.
 # @note: Parts of this file came from angle_utilities.py written by Dan Knowlton - redistributed with permission.
 # ====================================================================
@@ -52,15 +52,20 @@ def SkyCoord2FisheyeUV(azimuth, altitude):
     # convert altitude to zenith
     zenith = (90 - altitude)
 
+    # account for lens warp of Sigma 8mm fisheye lens
+    #warp = 1.0 / (math.cos(azimuth / 2) * math.cos(azimuth / 2))
+    #warp = 1.88 * 7.82 * math.sin(0.54 * azimuth)
+
     # convert to radians
     zenith = zenith * math.pi / 180.0
     azimuth = azimuth * math.pi / 180.0
 
-    # compute radius
-    radius = zenith / (math.pi / 2.0)
-
     # compute UV
-    return (0.5 * (radius * math.cos(azimuth) + 1), 0.5 * (radius * math.sin(azimuth) + 1))
+    radius = zenith / (math.pi / 2.0)
+    u = 0.5 * (radius * math.cos(azimuth) + 1)
+    v = 0.5 * (radius * math.sin(azimuth) + 1)
+
+    return u, v
 
 '''
 Convert a fisheye UV coordinate (0-1, 0-1) to a sky coordinate (azimuth, altitude).
@@ -75,31 +80,6 @@ def FisheyeUV2SkyCoord(u, v):
     # convert radians to angles
     # convert zenith back to altitude
     return (int((theta * 180.0 / math.pi + 360) % 360), int(90 - 2 * phi * 180.0 / math.pi))
-
-# '''
-# Compute cartesian UV (0-1, 0-1) coordinate given an (azimuth, altitude) sky coordinate.
-# Note sampling pattern coordinates in this application were measured in altitude, but calculation below requires zenith.
-# '''
-# def GetUVFromAngle(azimuth, altitude):
-#     # convert altitude to zenith
-#     zenith = (90 - altitude)
-#     # convert to radians
-#     zenith = zenith * math.pi / 180.0
-#     azimuth = azimuth * math.pi / 180.0
-#     # compute UV
-#     radius = zenith / (math.pi / 2.0)
-#     return (0.5 * (radius * math.cos(azimuth) + 1), 0.5 * (radius * math.sin(azimuth) + 1))
-#
-# '''
-# Compute (azimuth, altitude) sky coordinate given a cartesian UV (0-1, 0-1) coordinate.
-# '''
-# def GetAngleFromUV(u, v):
-#     radius = math.sqrt((u - 0.5) * (u - 0.5) + (v - 0.5) * (v - 0.5))
-#     u = u - 0.5
-#     v = v - 0.5
-#     theta = math.atan2(u, v)
-#     phi = radius * math.pi / 2.0
-#     return (int((theta * 180.0 / math.pi + 360) % 360), int(90 - 2 * phi * 180.0 / math.pi))
 
 '''
 Take in a pair of (azimuth, altitude) sky coordintes and return the corresponding central angle between them.
