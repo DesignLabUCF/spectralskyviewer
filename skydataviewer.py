@@ -727,13 +727,20 @@ class SkyDataViewer(QMainWindow):
         # init / pre-compute
         sampleidx = 0
         delimiter = xoptions["Delimiter"]
-        pixregion = xoptions["PixelRegion"]
-        pixweight = common.PixelWeighting(xoptions["PixelWeighting"])
-        points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
-        pixels = utility_data.collectPixels(points, pixels=self.wgtFisheye.myPhotoPixels, region=pixregion, weighting=pixweight)
         sunpos = utility_data.computeSunPosition(self.spaData)
         skycover = utility_data.findCaptureSkyCover(self.capture, self.skyData)
         resolution = xoptions["SpectrumResolution"]
+        coords = [common.SamplingPattern[i] for i in self.wgtFisheye.samplesSelected]
+        points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
+        pixweight = common.PixelWeighting(xoptions["PixelWeighting"])
+        if xoptions["ComputePixelRegion"]:
+            # TODO: this is hardcoded to our sampling pattern. compute it properly!!
+            altitudeRegionMap = {90:1, 71.9187:3, 53.3665:5, 33.749:7, 12.1151:9}
+            pixregions = [altitudeRegionMap[c[1]] for c in coords]
+        else:
+            reg = xoptions["PixelRegion"]
+            pixregions = [reg for i in range(0, len(points))]
+        pixels = utility_data.collectPixels(points, pixregions, pixels=self.wgtFisheye.myPhotoPixels, weighting=pixweight)
 
         # create file if not exists
         if not os.path.exists(xoptions["Filename"]):
@@ -815,7 +822,7 @@ class SkyDataViewer(QMainWindow):
                         file.write(delimiter)
                     # export pixel neighborhood
                     elif (attr == "PixelRegion"):
-                        file.write(str(pixregion))
+                        file.write(str(pixregions[i]))
                         file.write(delimiter)
                     # export pixel weighting method
                     elif attr == "PixelWeighting":
@@ -837,9 +844,9 @@ class SkyDataViewer(QMainWindow):
                     elif attr == "Radiance":
                         xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[sIdx])
                         count = len(xs)
-                        file.write(str(ys[0]))  # first wavelength, no delimiter
+                        file.write(str(max(ys[0],0)))  # first wavelength, no delimiter
                         for j in range(resolution, count, resolution):
-                            file.write(delimiter + str(ys[j]))  # delimiter plus next wavelength
+                            file.write(delimiter + str(max(ys[j],0)))  # delimiter plus next wavelength
 
                 # next sample
                 file.write("\n")
@@ -907,6 +914,8 @@ class SkyDataViewer(QMainWindow):
                 currexposure = 0
                 currcoords = []
                 currrows = []
+                # TODO: this is hardcoded to our sampling pattern. compute it properly!!
+                altitudeRegionMap = {90: 1, 71.9187: 3, 53.3665: 5, 33.749: 7, 12.1151: 9}
 
                 # write header
                 if resolution == prevrez:
@@ -920,19 +929,22 @@ class SkyDataViewer(QMainWindow):
 
                 # read and write rows
                 for row in reader:
-
                     # is this row a new capture timestamp of samples?
                     ts = datetime.strptime(row[mapping["Date"]] + " " + row[mapping["Time"]], "%Y-%m-%d %H:%M:%S")
                     exp = float(row[mapping["Exposure"]])
                     if ts != currtime or exp != currexposure:
                         # if so, flush our cached rows read so far
                         if os.path.exists(currHDRfile):
+                            if dialog.convertOptions["ComputePixelRegion"]:
+                                pixregions = [altitudeRegionMap[c[1]] for c in currcoords]
+                            else:
+                                pixregions = [pixregion for i in range(0, len(currcoords))]
                             points = utility_data.computePointsInImage(currHDRfile, currcoords)
-                            pixels = utility_data.collectPixels(points, file=currHDRfile, region=pixregion, weighting=pixweight)
+                            pixels = utility_data.collectPixels(points, pixregions, file=currHDRfile, weighting=pixweight)
                             # update cached row with new values and write to convert file
                             for i in range(0, len(currrows)):
                                 # update
-                                currrows[i][mapping["PixelRegion"]] = pixregion
+                                currrows[i][mapping["PixelRegion"]] = pixregions[i]
                                 currrows[i][mapping["PixelWeighting"]] = pixweight.value
                                 currrows[i][mapping["Red"]] = pixels[i][0]
                                 currrows[i][mapping["Green"]] = pixels[i][1]
@@ -958,17 +970,22 @@ class SkyDataViewer(QMainWindow):
                         newrow.extend(row[0:mapping["350"]])
                         currASDfile = utility_data.findASDFile(common.AppSettings["DataDirectory"], currtime, int(row[mapping["SamplePatternIndex"]]))
                         ws, rs = utility_data.loadASDFile(currASDfile, resolution)
+                        rs[:] = [max(r, 0) for r in rs]
                         newrow.extend(rs)
                         currrows.append(newrow)
 
                 # flush any remaining cached rows
                 if len(currrows) > 0 and os.path.exists(currHDRfile):
+                    if dialog.convertOptions["ComputePixelRegion"]:
+                        pixregions = [altitudeRegionMap[c[1]] for c in currcoords]
+                    else:
+                        pixregions = [pixregion for i in range(0, len(currcoords))]
                     points = utility_data.computePointsInImage(currHDRfile, currcoords)
-                    pixels = utility_data.collectPixels(points, file=currHDRfile, region=pixregion, weighting=pixweight)
+                    pixels = utility_data.collectPixels(points, pixregions, file=currHDRfile, weighting=pixweight)
                     # update cached row with new values and write to convert file
                     for i in range(0, len(currrows)):
                         # update
-                        currrows[i][mapping["PixelRegion"]] = pixregion
+                        currrows[i][mapping["PixelRegion"]] = pixregions[i]
                         currrows[i][mapping["PixelWeighting"]] = pixweight.value
                         currrows[i][mapping["Red"]] = pixels[i][0]
                         currrows[i][mapping["Green"]] = pixels[i][1]

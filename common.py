@@ -54,7 +54,7 @@ SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "S
 
 # pixel region and weighting settings
 PixelRegionMin = 1
-PixelRegionMax = 99
+PixelRegionMax = 51
 PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')
 
 # field of view used when measuring radiance with spectroradiometer
@@ -80,7 +80,7 @@ SampleFeatures = [
     ("SampleAzimuth",       "Sample Azimuth (East from North)"),
     ("SampleAltitude",      "Sample Altitude (90 - Zenith)"),
     ("SunPointAngle",       "Sun Point Angle (SPA)"),
-    ("PixelRegion",         "Sample Pixel Region (n x n)"),
+    ("PixelRegion",         "Sample Pixel Region/Kernel (n x n)"),
     ("PixelWeighting",      "Sample Pixel Weighting Algorithm"),
     ("Exposure",            "Photo Exposure Time (s)"),
     ("PixelRGB",            "Sample Pixel RGB Channels"),
@@ -93,6 +93,7 @@ DefExportOptions = {
     "Filename": "",
     "Delimiter": ",",
     "IsHDR": False,
+    "ComputePixelRegion": True,
     "PixelRegion": PixelRegionMin,
     "PixelWeighting": PixelWeighting.Mean.value,
     "SpectrumResolution": 1,

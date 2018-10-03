@@ -66,9 +66,9 @@ class DialogExport(QDialog):
             self.radSpace.setChecked(True)
         else:
             self.radCSV.setChecked(True)
-        for i in range(0, self.cbxPixelRegion.count()):
-            if int(self.cbxPixelRegion.itemText(i)) == self.exportOptions["PixelRegion"]:
-                self.cbxPixelRegion.setCurrentIndex(i)
+        for i in range(0, self.cbxPixRegFixed.count()):
+            if int(self.cbxPixRegFixed.itemText(i)) == self.exportOptions["PixelRegion"]:
+                self.cbxPixRegFixed.setCurrentIndex(i)
         pw = common.PixelWeighting(self.exportOptions["PixelWeighting"])
         if pw == common.PixelWeighting.Mean:
             self.radPixelMean.setChecked(True)
@@ -76,6 +76,8 @@ class DialogExport(QDialog):
             self.radPixelMedian.setChecked(True)
         elif pw == common.PixelWeighting.Gaussian:
             self.radPixelGaussian.setChecked(True)
+        self.chxPixRegCalc.setChecked(self.exportOptions["ComputePixelRegion"])
+        self.cbxPixRegFixed.setEnabled(not self.exportOptions["ComputePixelRegion"])
         self.chxHDR.setChecked(self.exportOptions["IsHDR"])
         self.txtResolution.setText(str(self.exportOptions["SpectrumResolution"]))
 
@@ -118,22 +120,20 @@ class DialogExport(QDialog):
         grpFormat.setLayout(boxFormat)
         layout.addWidget(grpFormat, 0, Qt.AlignTop)
 
-        # hdr
-        self.chxHDR = QCheckBox()
-        boxHDR = QHBoxLayout()
-        boxHDR.addWidget(self.chxHDR)
-        grpHDR = QGroupBox("HDR", self)
-        grpHDR.setLayout(boxHDR)
-
         # pixel region
-        self.cbxPixelRegion = QComboBox()
-        self.cbxPixelRegion.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        lblPixelRegion = QLabel("(n x n)")
-        #self.cbxPixelRegion.currentIndexChanged.connect(self.pixelRegionEntered)
-        self.cbxPixelRegion.addItems([str(x) for x in range(common.PixelRegionMin, common.PixelRegionMax+1,2)])
+        self.chxPixRegCalc = QCheckBox()
+        self.chxPixRegCalc.stateChanged.connect(self.pixRegCalcChanged)
+        lblPixRegCalc = QLabel("compute")
+        self.cbxPixRegFixed = QComboBox()
+        self.cbxPixRegFixed.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        # self.cbxPixelRegion.currentIndexChanged.connect(self.pixelRegionEntered)
+        self.cbxPixRegFixed.addItems([str(x) for x in range(common.PixelRegionMin, common.PixelRegionMax + 1, 2)])
+        lblPixRegFixed = QLabel("fixed")
         boxPixelRegion = QHBoxLayout()
-        boxPixelRegion.addWidget(self.cbxPixelRegion)
-        boxPixelRegion.addWidget(lblPixelRegion, 0, Qt.AlignRight)
+        boxPixelRegion.addWidget(self.chxPixRegCalc)
+        boxPixelRegion.addWidget(lblPixRegCalc)
+        boxPixelRegion.addWidget(self.cbxPixRegFixed)
+        boxPixelRegion.addWidget(lblPixRegFixed)
         grpPixelRegion = QGroupBox("Pixel Region:", self)
         grpPixelRegion.setLayout(boxPixelRegion)
 
@@ -150,13 +150,19 @@ class DialogExport(QDialog):
 
         # add all pixel options to window
         boxPixelOptions = QHBoxLayout()
-        boxPixelOptions.addWidget(grpHDR, 0, Qt.AlignLeft)
         boxPixelOptions.addWidget(grpPixelRegion, 0, Qt.AlignLeft)
         boxPixelOptions.addWidget(grpPixelWeighting, 1)
         boxPixelOptions.setContentsMargins(0,0,0,0)
         pnlPixelOptions = QWidget()
         pnlPixelOptions.setLayout(boxPixelOptions)
         layout.addWidget(pnlPixelOptions, 0, Qt.AlignTop)
+
+        # HDR
+        self.chxHDR = QCheckBox()
+        boxHDR = QHBoxLayout()
+        boxHDR.addWidget(self.chxHDR)
+        grpHDR = QGroupBox("HDR", self)
+        grpHDR.setLayout(boxHDR)
 
         # spectrum resolution
         self.txtResolution = QLineEdit()
@@ -167,7 +173,15 @@ class DialogExport(QDialog):
         boxResolution.addWidget(lblResolution, 0, Qt.AlignRight)
         grpResolution = QGroupBox("Spectrum Resolution:", self)
         grpResolution.setLayout(boxResolution)
-        layout.addWidget(grpResolution, 0, Qt.AlignTop)
+
+        # add HDR and spectrum options
+        boxStuffOptions = QHBoxLayout()
+        boxStuffOptions.addWidget(grpHDR, 0, Qt.AlignLeft)
+        boxStuffOptions.addWidget(grpResolution, 1)
+        boxStuffOptions.setContentsMargins(0, 0, 0, 0)
+        pnlStuffOptions = QWidget()
+        pnlStuffOptions.setLayout(boxStuffOptions)
+        layout.addWidget(pnlStuffOptions, 0, Qt.AlignTop)
 
         # sample features
         self.lstSampleFeatures = QListView()
@@ -228,6 +242,12 @@ class DialogExport(QDialog):
             extension = ".txt"
         self.txtFile.setText(base + extension)
 
+    def pixRegCalcChanged(self, int):
+        if (self.chxPixRegCalc.isChecked()):
+            self.cbxPixRegFixed.setEnabled(False)
+        else:
+            self.cbxPixRegFixed.setEnabled(True)
+
     def savePressed(self):
         # validate the export before proceeding
         if self.txtFile.text() == None or len(self.txtFile.text()) <= 0:
@@ -244,13 +264,14 @@ class DialogExport(QDialog):
         elif self.radSpace.isChecked(): self.exportOptions["Delimiter"] = " "
 
         # save pixel options
-        self.exportOptions["IsHDR"] = self.chxHDR.isChecked()
-        self.exportOptions["PixelRegion"] = int(self.cbxPixelRegion.currentText())
+        self.exportOptions["ComputePixelRegion"] = self.chxPixRegCalc.isChecked()
+        self.exportOptions["PixelRegion"]     = int(self.cbxPixRegFixed.currentText())
         if self.radPixelMean.isChecked():       self.exportOptions["PixelWeighting"] = common.PixelWeighting.Mean.value
         elif self.radPixelMedian.isChecked():   self.exportOptions["PixelWeighting"] = common.PixelWeighting.Median.value
         elif self.radPixelGaussian.isChecked(): self.exportOptions["PixelWeighting"] = common.PixelWeighting.Gaussian.value
 
-        # save spectrum options
+        # save other options
+        self.exportOptions["IsHDR"] = self.chxHDR.isChecked()
         self.exportOptions["SpectrumResolution"] = int(self.txtResolution.text())
 
         # save selected sample features

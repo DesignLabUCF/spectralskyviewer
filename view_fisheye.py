@@ -752,7 +752,7 @@ class ViewFisheye(QWidget):
                         colorFinal = colorsRegion[halfdim, halfdim]
                         # pixel color weighting
                         if pixreg > 1:
-                            colorFinal = utility_data.collectPixels([coordsXY], pixels=self.myPhotoPixels, region=pixreg, weighting=common.PixelWeighting(common.AppSettings["PixelWeighting"]))[0]
+                            colorFinal = utility_data.collectPixels([coordsXY], [pixreg], pixels=self.myPhotoPixels, weighting=common.PixelWeighting(common.AppSettings["PixelWeighting"]))[0]
 
                 # text strings for information we want to display on HUD
                 textxy = "-1, -1 xy"

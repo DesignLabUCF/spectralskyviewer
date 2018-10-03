@@ -188,13 +188,17 @@ Function to retrieve the pixels of specific points of an image.
 :param points: A list of (x, y) points to lookup in the image file.
 :param file: Optional path to the image file.
 :param pixels: Optional numpy array of pixels in format [[[R G B (A)]]].
-:param region: n for (n x n) region of pixels considered in pixel weighting.
+:param regions: A list of ints for size of (n x n) pixel region/kernel used during pixel convolution.
 :param weighting: Pixel weighting convolution algorithm.
 :return: A list of (R,G,B(,A)) tuples representing the pixel colors.
+:note: Length of regions must match length of points.
 :note: Coordinates MUST be within image bounds or this function will throw an exception!
 :note: Alpha component may or may not be included, depending on image format.
 '''
-def collectPixels(points, file='', pixels=None, region=1, weighting=common.PixelWeighting.Mean):
+def collectPixels(points, regions, file='', pixels=None, weighting=common.PixelWeighting.Gaussian):
+    if len(regions) != len(points):
+        return []
+
     if pixels is None:
         if not os.path.exists(file) or not points:
             return []
@@ -204,35 +208,17 @@ def collectPixels(points, file='', pixels=None, region=1, weighting=common.Pixel
         image.close()
 
     result = []
-    if pixels.any():
-        if region <= 1:
-            result = [pixels[int(c[1]), int(c[0])] for c in points]
+    for i, p in enumerate(points):
+        if regions[i] == 1:
+            result.append(pixels[int(p[1]), int(p[0])])
         else:
             if weighting == common.PixelWeighting.Mean:
-                result = [pixelWeightedMean(pixels, c, region) for c in points]
+                result.append(pixelWeightedMean(pixels, p, regions[i]))
             elif weighting == common.PixelWeighting.Median:
-                result = [pixelWeightedMedian(pixels, c, region) for c in points]
+                result.append(pixelWeightedMean(pixels, p, regions[i]))
             elif weighting == common.PixelWeighting.Gaussian:
-                result = [pixelWeightedGaussian(pixels, c, GaussianKernels[region]) for c in points]
+                result.append(pixelWeightedGaussian(pixels, p, GaussianKernels[regions[i]]))
     return result
-
-def gaussianKernel(width):
-    kernel = np.zeros(shape=(width,width,1), dtype=np.float32)
-    radius = int(width/2)
-    # sigma = 1.0
-    sigma = radius/2.0 # for [-2*sigma, 2*sigma]
-    total = 0.0
-    # gaussian function
-    #gaussian = lambda x: x + 1
-    #kernel = gaussian(kernel)
-    for row in range(0, width):
-        for col in range(0, width):
-            kernel[row,col,0] = math.exp(-0.5 * (pow((col - radius) / sigma, 2.0) + pow((row - radius) / sigma, 2.0))) / (2 * math.pi * sigma * sigma)
-            total += kernel[row,col,0]
-    # normalize
-    kernel = kernel / total
-    return kernel
-GaussianKernels = {w:gaussianKernel(w) for w in range(common.PixelRegionMin+2, common.PixelRegionMax+1, 2)}
 
 def pixelWeightedMean(pixels, coord, dim):
     radius = int(dim / 2)
@@ -265,6 +251,24 @@ def pixelWeightedGaussian(pixels, coord, kernel):
     pxl = np.around(pxl, decimals=1, out=pxl)
     pxl = pxl.astype(np.uint8, copy=False)
     return pxl
+
+def gaussianKernel(width):
+    kernel = np.zeros(shape=(width,width,1), dtype=np.float32)
+    radius = int(width/2)
+    # sigma = 1.0
+    sigma = radius/2.0 # for [-2*sigma, 2*sigma]
+    total = 0.0
+    # gaussian function
+    #gaussian = lambda x: x + 1
+    #kernel = gaussian(kernel)
+    for row in range(0, width):
+        for col in range(0, width):
+            kernel[row,col,0] = math.exp(-0.5 * (pow((col - radius) / sigma, 2.0) + pow((row - radius) / sigma, 2.0))) / (2 * math.pi * sigma * sigma)
+            total += kernel[row,col,0]
+    # normalize
+    kernel = kernel / total
+    return kernel
+GaussianKernels = {w:gaussianKernel(w) for w in range(common.PixelRegionMin+2, common.PixelRegionMax+1, 2)}
 
 '''
 Function to check if a raw data photo is available, given a path to an existing photo.

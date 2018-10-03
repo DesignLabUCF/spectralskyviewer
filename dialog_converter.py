@@ -69,7 +69,7 @@ class DialogConverter(QDialog):
         pnlFile.setLayout(boxFile)
         layout.addWidget(pnlFile, 0, Qt.AlignTop)
 
-        # sample features
+        # sample features to convert
         self.lstSampleFeatures = QListView()
         model = QStandardItemModel()
         model.itemChanged.connect(self.attributeSelected)
@@ -88,6 +88,12 @@ class DialogConverter(QDialog):
         self.itmExposure.setEditable(False)
         self.itmExposure.setCheckable(True)
         model.appendRow(self.itmExposure)
+        # spectral radiance
+        self.itmRadiance = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["Radiance"]][1])
+        self.itmRadiance.setEditable(False)
+        self.itmRadiance.setCheckable(True)
+        model.appendRow(self.itmRadiance)
+        # add features to list
         self.lstSampleFeatures.setModel(model)
         boxFeatures = QVBoxLayout()
         boxFeatures.addWidget(self.lstSampleFeatures)
@@ -95,22 +101,22 @@ class DialogConverter(QDialog):
         grpFeatures.setLayout(boxFeatures)
         layout.addWidget(grpFeatures, 1)
 
-        # hdr
-        self.chxHDR = QCheckBox()
-        boxHDR = QHBoxLayout()
-        boxHDR.addWidget(self.chxHDR)
-        grpHDR = QGroupBox("HDR", self)
-        grpHDR.setLayout(boxHDR)
-
         # pixel region
-        self.cbxPixelRegion = QComboBox()
-        self.cbxPixelRegion.setEnabled(False)
-        self.cbxPixelRegion.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        lblPixelRegion = QLabel("(n x n)")
-        self.cbxPixelRegion.addItems([str(x) for x in range(common.PixelRegionMin, common.PixelRegionMax+1,2)])
+        self.chxPixRegCalc = QCheckBox()
+        self.chxPixRegCalc.stateChanged.connect(self.pixRegCalcChanged)
+        self.chxPixRegCalc.setEnabled(False)
+        lblPixRegCalc = QLabel("compute")
+        self.cbxPixRegFixed = QComboBox()
+        self.cbxPixRegFixed.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.cbxPixRegFixed.addItems([str(x) for x in range(common.PixelRegionMin, common.PixelRegionMax+1, 2)])
+        self.cbxPixRegFixed.setEnabled(False)
+        self.chxPixRegCalc.setChecked(True)
+        lblPixRegFixed = QLabel("fixed")
         boxPixelRegion = QHBoxLayout()
-        boxPixelRegion.addWidget(self.cbxPixelRegion)
-        boxPixelRegion.addWidget(lblPixelRegion, 0, Qt.AlignRight)
+        boxPixelRegion.addWidget(self.chxPixRegCalc)
+        boxPixelRegion.addWidget(lblPixRegCalc)
+        boxPixelRegion.addWidget(self.cbxPixRegFixed)
+        boxPixelRegion.addWidget(lblPixRegFixed)
         grpPixelRegion = QGroupBox("Pixel Region:", self)
         grpPixelRegion.setLayout(boxPixelRegion)
 
@@ -121,6 +127,7 @@ class DialogConverter(QDialog):
         self.radPixelMean.setEnabled(False)
         self.radPixelMedian.setEnabled(False)
         self.radPixelGaussian.setEnabled(False)
+        self.radPixelGaussian.setChecked(True)
         boxPixelWeighting = QHBoxLayout()
         boxPixelWeighting.addWidget(self.radPixelMean)
         boxPixelWeighting.addWidget(self.radPixelMedian)
@@ -130,7 +137,6 @@ class DialogConverter(QDialog):
 
         # add all pixel options to window
         boxPixelOptions = QHBoxLayout()
-        boxPixelOptions.addWidget(grpHDR, 0, Qt.AlignLeft)
         boxPixelOptions.addWidget(grpPixelRegion, 0, Qt.AlignLeft)
         boxPixelOptions.addWidget(grpPixelWeighting, 1)
         boxPixelOptions.setContentsMargins(0,0,0,0)
@@ -138,29 +144,45 @@ class DialogConverter(QDialog):
         pnlPixelOptions.setLayout(boxPixelOptions)
         layout.addWidget(pnlPixelOptions, 0, Qt.AlignTop)
 
-        # spectrum resolution
-        self.txtResolution = QLineEdit()
-        self.txtResolution.setText("1")
-        self.txtResolution.setValidator(QIntValidator(1, 100))
-        lblResolution = QLabel("(nm)")
-        boxResolution = QHBoxLayout()
-        boxResolution.addWidget(self.txtResolution)
-        boxResolution.addWidget(lblResolution, 0, Qt.AlignRight)
-        grpResolution = QGroupBox("Spectrum Resolution:", self)
-        grpResolution.setLayout(boxResolution)
-        layout.addWidget(grpResolution, 0, Qt.AlignTop)
+        # HDR
+        self.chxHDR = QCheckBox()
+        self.chxHDR.stateChanged.connect(self.isHDRChanged)
+        boxHDR = QHBoxLayout()
+        boxHDR.addWidget(self.chxHDR)
+        grpHDR = QGroupBox("HDR", self)
+        grpHDR.setLayout(boxHDR)
 
         # exposure
         self.cbxExposure = QComboBox()
         self.cbxExposure.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        # self.cbxExposure.currentIndexChanged.connect(self.pixelRegionEntered)
         self.cbxExposure.addItems([str(x) for x in common.Exposures])
         self.cbxExposure.setEnabled(False)
         boxExposure = QHBoxLayout()
         boxExposure.addWidget(self.cbxExposure)
         grpExposure = QGroupBox("Photo Exposure:", self)
         grpExposure.setLayout(boxExposure)
-        layout.addWidget(grpExposure, 0, Qt.AlignTop)
+
+        # spectrum resolution
+        self.txtResolution = QLineEdit()
+        self.txtResolution.setText("1")
+        self.txtResolution.setValidator(QIntValidator(1, 100))
+        self.txtResolution.setEnabled(False)
+        lblResolution = QLabel("(nm)")
+        boxResolution = QHBoxLayout()
+        boxResolution.addWidget(self.txtResolution)
+        boxResolution.addWidget(lblResolution, 0, Qt.AlignRight)
+        grpResolution = QGroupBox("Spectrum Resolution:", self)
+        grpResolution.setLayout(boxResolution)
+
+        # add other options
+        boxStuffOptions = QHBoxLayout()
+        boxStuffOptions.addWidget(grpHDR)
+        boxStuffOptions.addWidget(grpExposure)
+        boxStuffOptions.addWidget(grpResolution, 1)
+        boxStuffOptions.setContentsMargins(0, 0, 0, 0)
+        pnlStuffOptions = QWidget()
+        pnlStuffOptions.setLayout(boxStuffOptions)
+        layout.addWidget(pnlStuffOptions, 0, Qt.AlignTop)
 
         # accept/decline buttons
         boxButtons = QDialogButtonBox()
@@ -179,19 +201,36 @@ class DialogConverter(QDialog):
 
         self.txtFile.setText(filename)
 
+    def pixRegCalcChanged(self, int):
+        if self.chxPixRegCalc.isChecked():
+            self.cbxPixRegFixed.setEnabled(False)
+        else:
+            self.cbxPixRegFixed.setEnabled(True)
+
+    def isHDRChanged(self, int):
+        if self.chxHDR.isChecked():
+            self.cbxExposure.setEnabled(False)
+        else:
+            self.cbxExposure.setEnabled(True)
+
     def attributeSelected(self, item):
         enabled = False
         if item.checkState() > 0:
             enabled = True
 
         if item == self.itmPixelRegion:
-            self.cbxPixelRegion.setEnabled(enabled)
+            self.chxPixRegCalc.setEnabled(enabled)
+            if not self.chxPixRegCalc.isChecked():
+                self.cbxPixRegFixed.setEnabled(enabled)
         elif item == self.itmPixelWeighting:
             self.radPixelMean.setEnabled(enabled)
             self.radPixelMedian.setEnabled(enabled)
             self.radPixelGaussian.setEnabled(enabled)
         elif item == self.itmExposure:
-            self.cbxExposure.setEnabled(enabled)
+            if not self.chxHDR.isChecked():
+                self.cbxExposure.setEnabled(enabled)
+        elif item == self.itmRadiance:
+            self.txtResolution.setEnabled(enabled)
 
     def convertPressed(self):
         # validate dataset before proceeding
@@ -206,8 +245,8 @@ class DialogConverter(QDialog):
         self.convertOptions["Filename"] = self.txtFile.text()
 
         # save pixel options
-        self.convertOptions["IsHDR"] = self.chxHDR.isChecked()
-        self.convertOptions["PixelRegion"] = int(self.cbxPixelRegion.currentText())
+        self.convertOptions["ComputePixelRegion"] = self.chxPixRegCalc.isChecked()
+        self.convertOptions["PixelRegion"] = int(self.cbxPixRegFixed.currentText())
         if self.radPixelMean.isChecked():
             self.convertOptions["PixelWeighting"] = common.PixelWeighting.Mean.value
         elif self.radPixelMedian.isChecked():
@@ -215,8 +254,10 @@ class DialogConverter(QDialog):
         elif self.radPixelGaussian.isChecked():
             self.convertOptions["PixelWeighting"] = common.PixelWeighting.Gaussian.value
 
-        # save spectrum options
-        self.convertOptions["SpectrumResolution"] = int(self.txtResolution.text())
+        # save other options
+        self.convertOptions["IsHDR"] = self.chxHDR.isChecked()
+        if self.itmRadiance.checkState() > 0:
+            self.convertOptions["SpectrumResolution"] = int(self.txtResolution.text())
 
         # save exposure
         self.convertOptions["Exposure"] = float(self.cbxExposure.currentText())
