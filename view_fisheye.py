@@ -92,21 +92,16 @@ class ViewFisheye(QWidget):
         self.fontBounds = 50
         self.iconWarning = self.style().standardIcon(QStyle.SP_MessageBoxWarning).pixmap(ViewFisheye.SelectedPixelBox / 2)
 
-        # init
+    def dataLoaded(self):
+        # this stuff only runs once the data directory has been loaded
         self.setMouseTracking(True)
         color = QColor(255, 255, 255)
-        for t,p in common.SamplingPattern:
+        for t, p in common.SamplingPattern:
             self.sampleBoundsVisible.append(QRect(0, 0, 0, 0))  # these will need to be recomputed as photo scales
             self.sampleAreaVisible.append([])
-            self.samplePointsInFile.append((0, 0))              # these only need to be computed once per photo
-            color.setHsv(t, int(utility.normalize(p, 0, 90)*127+128), 255)
+            self.samplePointsInFile.append((0, 0))  # these only need to be computed once per photo
+            color.setHsv(t, int(utility.normalize(p, 0, 90) * 127 + 128), 255)
             self.penSelected.append(QPen(color, 3, Qt.SolidLine))
-
-    def getSamplePatternRGB(self, index):
-        if index < 0 or index >= len(common.SamplingPattern):
-            return (0,0,0)
-        color = self.penSelected[index].color()
-        return (color.red(), color.green(), color.blue())
 
     def setPhoto(self, path, exif=None):
         # if photo is valid
@@ -122,6 +117,7 @@ class ViewFisheye(QWidget):
                 self.myPhotoTime = utility_data.imageEXIFDateTime(path)
 
             # cache each sample's coordinate in the photo
+            # note: technically doesn't need to be recalculated if all photos have same resolution!
             self.samplePointsInFile = utility_data.computePointsInImage(path, common.SamplingPattern)
 
             # keep a copy the image's pixels in memory (used later for exporting, etc.)
@@ -160,6 +156,12 @@ class ViewFisheye(QWidget):
 
     def setSkycover(self, sc):
         self.skyCover = sc
+
+    def getSamplePatternRGB(self, index):
+        if index < 0 or index >= len(common.SamplingPattern):
+            return (0,0,0)
+        color = self.penSelected[index].color()
+        return (color.red(), color.green(), color.blue())
 
     def resetRotation(self, angles=0):
         self.myPhotoRotation = angles

@@ -28,43 +28,38 @@
 from enum import Enum
 
 
-# sky sampling pattern (azimuth, altitude)
+# sky sampling pattern coordinates (azimuth, altitude)
 SamplingPattern = []
 SamplingPatternRads = []
-SamplingPatternAlts = []  # a unique set of the altitudes
+SamplingPatternAlts = []  # a unique set of all the altitudes
+SamplingPatternFile = "sampling.csv"
 
-# exposure times of the HDR data (in seconds)
-Exposures = [
-    0.000125,
-    0.001000,
-    0.008000,
-    0.066000,
-    0.033000,
-    0.250000,
-    1.000000,
-    2.000000,
-    4.000000,
-]
-ExposureIdxMap = {Exposures[i]: i for i in range(0, len(Exposures))}
+# photo capture exposure times (in seconds)
+Exposures = []
+ExposureIdxMap = {}
+ExposuresFile = "exposure.csv"
 
-# sky cover categories
+# SPA (sun positioning algorithm) site data
+SPASiteData = None
+SPASiteFile = "spa.csv"
+
+# sky cover mappings
+SkyCoverData = []
 SkyCover = Enum('SkyCover', 'UNK CLR SCT OVC')
 SkyCoverStrMap = {e.name: e for e in SkyCover}
 SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "Scattered", SkyCover.OVC: "Overcast"}
+SkyCoverFile = "skycover.csv"
 
-# pixel region and weighting settings
+# pixel region/kernel, convolution weighting, and color model settings
 PixelRegionMin = 1
 PixelRegionMax = 51
-PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')
+PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')  # used during pixel convolution
+ColorModel = Enum('ColorModel', 'RGB LAB HSV')  # used to store pixel color components
 
-# field of view used when measuring radiance with spectroradiometer
-RadianceFOV = 1  # degrees
-
-# max acceptable time delta between measurements of the same capture timestamp
-CaptureEpsilon = 60  # seconds
-
-# types of RAW data
-HDRRawExts = ['.cr2', '.raw', '.dng']
+# other constants
+RadianceFOV = 1  # (degrees) field of view used when measuring radiance with spectroradiometer
+CaptureEpsilon = 60  # (seconds) max acceptable time delta between measurements of the same capture timestamp
+HDRRawExts = ['.cr2', '.raw', '.dng']  # types of RAW data
 
 # sample export features
 SampleFeatures = [
@@ -82,8 +77,9 @@ SampleFeatures = [
     ("SunPointAngle",       "Sun Point Angle (SPA)"),
     ("PixelRegion",         "Sample Pixel Region/Kernel (n x n)"),
     ("PixelWeighting",      "Sample Pixel Weighting Algorithm"),
+    ("ColorModel",          "Sample Pixel Color Model"),
     ("Exposure",            "Photo Exposure Time (s)"),
-    ("PixelRGB",            "Sample Pixel RGB Channels"),
+    ("PixelColor",          "Sample Pixel Color Components"),
     ("Radiance",            "Sample Radiance (W/m²/sr/nm) (350-2500nm)"),
 ]
 SampleFeatureIdxMap = {SampleFeatures[i][0]: i for i in range(0, len(SampleFeatures))}
@@ -96,8 +92,9 @@ DefExportOptions = {
     "ComputePixelRegion": True,
     "PixelRegion": PixelRegionMin,
     "PixelWeighting": PixelWeighting.Mean.value,
+    "ColorModel": ColorModel.RGB.value,
     "SpectrumResolution": 1,
-    "Features": [0, 1, 2, 3, 5, 6, 7, 8, 10, 11]
+    "Features": [i for i in range(0, len(SampleFeatures))]
 }
 
 # default application settings
@@ -112,11 +109,11 @@ DefAppSettings = {
     "VertSplitBottom": -1,
     "ShowMask": True,
     "ShowHUD": True,
-    "ShowCompass": False,
+    "ShowCompass": True,
     "ShowLensWarp": False,
     "ShowSunPath": False,
     "ShowSamples": False,
-    "ShowShadows": False,
+    "ShowShadows": True,
     "ShowUVGrid": False,
     "ShowEXIF": True,
     "ShowStatusBar": True,
@@ -128,5 +125,5 @@ DefAppSettings = {
 }
 DefAppSettings.update({"ExportOptions": dict(DefExportOptions)})
 
-# application settings
+# main program application settings variable!
 AppSettings = dict(DefAppSettings)

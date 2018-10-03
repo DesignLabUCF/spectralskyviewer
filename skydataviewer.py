@@ -55,8 +55,6 @@ class SkyDataViewer(QMainWindow):
         self.captureTimeHDRDirs = []   # some number of these per day
         self.captureTimeASDFiles = []  # length should be equal to sampling pattern length
         self.exposure = 0
-        self.spaData = spa.spa_data()
-        self.skyData = []
         self.dontSaveSettings = False
 
         # load settings
@@ -71,11 +69,6 @@ class SkyDataViewer(QMainWindow):
         common.AppSettings["ExportOptions"]["Features"].sort()
         if len(common.AppSettings["DataDirectory"]) > 0 and not os.path.exists(common.AppSettings["DataDirectory"]):
             common.AppSettings["DataDirectory"] = ""
-
-        # load sampling pattern
-        common.SamplingPattern = utility_data.loadSamplingPattern(common.AppSettings["DataDirectory"])
-        common.SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in common.SamplingPattern]
-        common.SamplingPatternAlts = list(set([s[1] for s in common.SamplingPattern]))
 
         # init
         QToolTip.setFont(QFont('SansSerif', 8))
@@ -416,25 +409,6 @@ class SkyDataViewer(QMainWindow):
         pnlMain.setLayout(gridMain)
         self.setCentralWidget(pnlMain)
 
-    def resetAll(self):
-        self.captureTimeHDRDirs = []
-        self.captureTimeASDFiles = []
-        self.lblData.clear()
-        self.cbxDate.clear()
-        self.cbxDate.addItem("-date-")
-        self.cbxTime.clear()
-        self.cbxTime.addItem("-time-")
-        self.cbxExposure.clear()
-        self.cbxExposure.addItem("-exposure-")
-        self.cbxExposure.addItems([str(x) for x in common.Exposures])
-        self.exposure = -1
-        self.sldTime.setRange(0, 0)
-        self.tblEXIF.clearContents()
-        self.wgtFisheye.setPhoto(None)
-        self.wgtFisheye.repaint()
-        self.wgtGraph.clear()
-        self.resetGraph()
-
     def resetDay(self):
         self.captureTimeHDRDirs = []
         self.captureTimeASDFiles = []
@@ -472,19 +446,41 @@ class SkyDataViewer(QMainWindow):
         self.wgtGraph.getPlotItem().getAxis('bottom').enableAutoSIPrefix(enable=False)
         #self.wgtGraph.setAspectLocked(True, None)
 
-    def browseForData(self):
-        directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', common.AppSettings["DataDirectory"])
-        directory = QDir.toNativeSeparators(directory)
-        if directory is not None and len(directory) > 0 and directory != common.AppSettings["DataDirectory"]:
-            common.AppSettings["DataDirectory"] = directory
-            self.loadData()
-
     def loadData(self):
         if len(common.AppSettings["DataDirectory"]) <= 0 or not os.path.exists(common.AppSettings["DataDirectory"]):
             return
 
-        # GUI
-        self.resetAll()
+        # reset GUI
+        self.captureTimeHDRDirs = []
+        self.captureTimeASDFiles = []
+        self.lblData.clear()
+        self.cbxDate.clear()
+        self.cbxDate.addItem("-date-")
+        self.cbxTime.clear()
+        self.cbxTime.addItem("-time-")
+        self.cbxExposure.clear()
+        self.cbxExposure.addItem("-exposure-")
+        self.exposure = -1
+        self.sldTime.setRange(0, 0)
+        self.tblEXIF.clearContents()
+        self.wgtGraph.clear()
+        self.resetGraph()
+
+        # load sampling pattern
+        common.SamplingPattern = utility_data.loadSamplingPattern(common.AppSettings["DataDirectory"])
+        common.SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in common.SamplingPattern]
+        common.SamplingPatternAlts = list(set([s[1] for s in common.SamplingPattern]))
+
+        # load exposures
+        common.Exposures = utility_data.loadExposures(common.AppSettings["DataDirectory"])
+        common.ExposureIdxMap = {common.Exposures[i]: i for i in range(0, len(common.Exposures))}
+        self.cbxExposure.addItems([str(x) for x in common.Exposures])
+
+        # load site data
+        common.SPASiteData = utility_data.loadSPASiteData(common.AppSettings["DataDirectory"])
+
+        # load sky cover data
+        common.SkyCoverData = utility_data.loadSkyCoverData(common.AppSettings["DataDirectory"])
 
         # find capture dates
         captureDateDirs = utility.findFiles(common.AppSettings["DataDirectory"], mode=2)
@@ -493,9 +489,17 @@ class SkyDataViewer(QMainWindow):
         if len(captureDates) > 0:
             self.cbxDate.addItems(captureDates)
 
-        # load site info for SPA calculations
-        self.spaData = utility_data.loadSPASiteData(common.AppSettings["DataDirectory"])
-        self.skyData = utility_data.loadSkyCoverData(common.AppSettings["DataDirectory"])
+        # init view widgets
+        self.wgtFisheye.dataLoaded()
+        self.wgtFisheye.setPhoto(None)
+        self.wgtFisheye.repaint()
+
+    def browseForData(self):
+        directory = QFileDialog.getExistingDirectory(self, 'Select Data Directory', common.AppSettings["DataDirectory"])
+        directory = QDir.toNativeSeparators(directory)
+        if directory is not None and len(directory) > 0 and directory != common.AppSettings["DataDirectory"]:
+            common.AppSettings["DataDirectory"] = directory
+            self.loadData()
 
     def dateSelected(self, index):
         if index < 0 or index >= self.cbxDate.count():
@@ -528,9 +532,9 @@ class SkyDataViewer(QMainWindow):
         # compute and apply sun path
         data = utility_data.loadSPASiteData(pathDate) # reload site info per date directory if exists
         if data != None:
-            self.spaData = data
-        utility_data.fillSPADateTime(self.spaData, self.capture)
-        sunpath = utility_data.computeSunPath(self.spaData)
+            common.SPASiteData = data
+        utility_data.fillSPADateTime(common.SPASiteData, self.capture)
+        sunpath = utility_data.computeSunPath(common.SPASiteData)
         self.wgtFisheye.setSunPath(sunpath)
 
         # update datetime panel
@@ -620,11 +624,11 @@ class SkyDataViewer(QMainWindow):
         self.tblEXIF.resizeColumnToContents(0)
 
         # render pane
-        utility_data.fillSPADateTime(self.spaData, self.capture)
-        sunpos = utility_data.computeSunPosition(self.spaData)
+        utility_data.fillSPADateTime(common.SPASiteData, self.capture)
+        sunpos = utility_data.computeSunPosition(common.SPASiteData)
         self.wgtFisheye.setSunPosition(sunpos)
         self.wgtFisheye.setPhoto(photos[self.exposure], exif=exif)
-        self.wgtFisheye.setSkycover(utility_data.findCaptureSkyCover(self.capture, self.skyData))
+        self.wgtFisheye.setSkycover(utility_data.findCaptureSkyCover(self.capture, common.SkyCoverData))
         self.wgtFisheye.repaint()
 
         # find ASD data path
@@ -727,8 +731,8 @@ class SkyDataViewer(QMainWindow):
         # init / pre-compute
         sampleidx = 0
         delimiter = xoptions["Delimiter"]
-        sunpos = utility_data.computeSunPosition(self.spaData)
-        skycover = utility_data.findCaptureSkyCover(self.capture, self.skyData)
+        sunpos = utility_data.computeSunPosition(common.SPASiteData)
+        skycover = utility_data.findCaptureSkyCover(self.capture, common.SkyCoverData)
         resolution = xoptions["SpectrumResolution"]
         coords = [common.SamplingPattern[i] for i in self.wgtFisheye.samplesSelected]
         points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
@@ -740,6 +744,7 @@ class SkyDataViewer(QMainWindow):
         else:
             reg = xoptions["PixelRegion"]
             pixregions = [reg for i in range(0, len(points))]
+        expcount = len(common.Exposures) if xoptions["IsHDR"] else 1
         pixels = utility_data.collectPixels(points, pixregions, pixels=self.wgtFisheye.myPhotoPixels, weighting=pixweight)
 
         # create file if not exists
@@ -749,16 +754,26 @@ class SkyDataViewer(QMainWindow):
                 os.makedirs(os.path.dirname(xoptions["Filename"]))
             # write header
             with open(xoptions["Filename"], "w") as file:
-                for i in range(0, len(xoptions["Features"])):
-                    attr = DialogExport.attributeFromIndex(xoptions["Features"][i])
-                    if attr == "PixelRGB":
-                        file.write("Red" + delimiter + "Green" + delimiter + "Blue" + delimiter)
-                    elif attr == "Radiance":
+                for fidx in xoptions["Features"]:
+                    feature = DialogExport.attributeFromIndex(fidx)
+                    if feature == "Exposure":
+                        if xoptions["IsHDR"]:
+                            for j in range(0, len(common.Exposures)):
+                                file.write("Exposure" + str(j+1) + delimiter)
+                        else:
+                            file.write("Exposure" + delimiter)
+                    elif feature == "PixelColor":
+                        if xoptions["IsHDR"]:
+                            for j in range(0, len(common.Exposures)):
+                                file.write("ColorA" + str(j+1) + delimiter + "ColorB" + str(j+1) + delimiter + "ColorC" + str(j+1) + delimiter)
+                        else:
+                            file.write("ColorA" + delimiter + "ColorB" + delimiter + "ColorC" + delimiter)
+                    elif feature == "Radiance":
                         file.write(str(350))  # first wavelength, no delimiter
                         for w in range(350 + resolution, 2501, resolution):
                             file.write(delimiter + str(w))  # delimiter plus next wavelength
                     else:
-                        file.write(attr)
+                        file.write(feature)
                         file.write(delimiter)
                 file.write("\n")
         # otherwise count existing samples
@@ -785,63 +800,69 @@ class SkyDataViewer(QMainWindow):
 
                 # export each optional attribute
                 for aIdx in xoptions["Features"]:
-                    attr = common.SampleFeatures[aIdx][0]
+                    feature = common.SampleFeatures[aIdx][0]
 
                     # export sun azimuth
-                    if attr == "SunAzimuth":
+                    if feature == "SunAzimuth":
                         file.write('{0:07.04f}'.format(sunpos[0]))
                         file.write(delimiter)
                     # export sun altitude
-                    elif attr == "SunAltitude":
+                    elif feature == "SunAltitude":
                         file.write('{0:07.04f}'.format(sunpos[1]))
                         file.write(delimiter)
                     # export sky cover
-                    elif attr == "SkyCover":
+                    elif feature == "SkyCover":
                         file.write(str(skycover.value))
                         file.write(delimiter)
                     # export index
-                    elif attr == "SamplePatternIndex":
+                    elif feature == "SamplePatternIndex":
                         file.write(str(sIdx))
                         file.write(delimiter)
                     # export sample azimuth
-                    elif attr == "SampleAzimuth":
+                    elif feature == "SampleAzimuth":
                         point = common.SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(point[0]))
                         file.write(delimiter)
                     # export sample altitude
-                    elif attr == "SampleAltitude":
+                    elif feature == "SampleAltitude":
                         point = common.SamplingPattern[sIdx]
                         file.write('{0:07.04f}'.format(point[1]))
                         file.write(delimiter)
                     # export sun point/sample angle
-                    elif attr == "SunPointAngle":
+                    elif feature == "SunPointAngle":
                         point = common.SamplingPattern[sIdx]
                         angle = utility_angles.CentralAngle(sunpos, point)
                         angle = math.degrees(angle)
                         file.write('{0:07.03f}'.format(angle))
                         file.write(delimiter)
                     # export pixel neighborhood
-                    elif (attr == "PixelRegion"):
+                    elif (feature == "PixelRegion"):
                         file.write(str(pixregions[i]))
                         file.write(delimiter)
                     # export pixel weighting method
-                    elif attr == "PixelWeighting":
+                    elif feature == "PixelWeighting":
                         file.write(str(pixweight.value))
                         file.write(delimiter)
-                    # export exposure time
-                    elif attr == "Exposure":
-                        file.write(str(common.Exposures[self.exposure]))
+                    # export pixel color model
+                    elif feature == "ColorModel":
+                        file.write(str(common.ColorModel.RGB.value))  # TODO: finish this!!
                         file.write(delimiter)
-                    # export pixel
-                    elif attr == "PixelRGB":
-                        file.write(str(pixels[i][0])) # red
-                        file.write(delimiter)
-                        file.write(str(pixels[i][1])) # green
-                        file.write(delimiter)
-                        file.write(str(pixels[i][2])) # blue
-                        file.write(delimiter)
+                    # export photo exposure time(s)
+                    elif feature == "Exposure":
+                        for _omg_ in range(0, expcount):
+                            file.write(str(common.Exposures[self.exposure]))
+                            file.write(delimiter)
+                    # export sample pixel color(s)
+                    elif feature == "PixelColor":
+                        for _omg_ in range(0, expcount):
+                            file.write(str(pixels[i][0]))  # color component 1
+                            file.write(delimiter)
+                            file.write(str(pixels[i][1]))  # color component 2
+                            file.write(delimiter)
+                            file.write(str(pixels[i][2]))  # color component 3
+                            file.write(delimiter)
                     # export spectral radiance
-                    elif attr == "Radiance":
+                    elif feature == "Radiance":
                         xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[sIdx])
                         count = len(xs)
                         file.write(str(max(ys[0],0)))  # first wavelength, no delimiter

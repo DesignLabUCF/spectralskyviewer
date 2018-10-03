@@ -43,9 +43,9 @@ GaussianKernels = {}
 
 
 
-# - Datasets ------------------------------------------------------------------
-# - Datasets ------------------------------------------------------------------
-# - Datasets ------------------------------------------------------------------
+# - datasets ------------------------------------------------------------------
+# - datasets ------------------------------------------------------------------
+# - datasets ------------------------------------------------------------------
 
 '''
 Function to find the delimiter that occurs the most (on the first line). Datasets support different delimiters.
@@ -365,14 +365,14 @@ def loadASDFile(filepath, step=1):
 
 '''
 Function to load a file with data with capture dates+times and sky cover assessment at those times.
-:param filepath: Path to file with sky cover data
-:param isDir: If filepath specified is a directory, then filename is assumed to be 'skycover.csv'
+:param filepath: Path to file with sky cover data.
+:param isDir: If filepath is directory, load default filename.
 :note: File format should be a CSV with the following columns: Date, TimeStart, TimeEnd, Sky.
 :return: A list of (datetime, datetime, skycover) for each capture timespan accounted for. 
 '''
 def loadSkyCoverData(filepath, isDir=True):
     if isDir:
-        filepath = os.path.join(filepath, 'skycover.csv') # assumes this filename if dir specified
+        filepath = os.path.join(filepath, common.SkyCoverFile)
     if not os.path.exists(filepath):
         return []
 
@@ -419,16 +419,16 @@ def findCaptureSkyCover(capture, skycovers):
 
 '''
 Function to load a file with a sky sampling pattern.
-:param filepath: Path to file
-:param isDir: If filepath specified is a directory, then filename is assumed to be 'sampling.csv'
+:param filepath: Path to file.
+:param isDir: If filepath is directory, load default filename.
 :note: File format should be a CSV with the following columns: azimuth, altitude.
-:return: A list of (azimuth, altitude) coordinates in degrees. And a list in radians.
+:return: A list of (azimuth, altitude) coordinates in degrees.
 '''
 def loadSamplingPattern(filepath, isDir=True):
     if isDir:
-        filepath = os.path.join(filepath, 'sampling.csv') # assumes this filename if dir specified
+        filepath = os.path.join(filepath, common.SamplingPatternFile)
     if not os.path.exists(filepath):
-        return [], []
+        return []
 
     # list of (azimuth, altitude)
     patternDegs = []
@@ -447,14 +447,48 @@ def loadSamplingPattern(filepath, isDir=True):
 
     return patternDegs
 
+# - exposure ------------------------------------------------------------------
+# - exposure ------------------------------------------------------------------
+# - exposure ------------------------------------------------------------------
+
+'''
+Function to load a file with list of exposure times (seconds) of photos in the data directory.
+:param filepath: Path to file.
+:param isDir: If filepath is directory, load default filename.
+:note: File format should be a CSV with the following columns: exposure
+:return: A list of exposure times.
+:note: The application will assume all of these exposures exist for each capture. If not, results are undefined.
+'''
+def loadExposures(filepath, isDir=True):
+    if isDir:
+        filepath = os.path.join(filepath, common.ExposuresFile)
+    if not os.path.exists(filepath):
+        return []
+
+    exposures = []
+
+    # loop through each row of the file
+    with open(filepath, 'r') as f:
+        reader = csv.reader(f, delimiter=',')
+        next(reader, None)  # ignore header
+        for row in reader:
+            if (len(row) < 1):
+                continue
+            try:
+                exposures.append(float(row[0]))
+            except ValueError or IndexError:
+                continue
+
+    return exposures
+
 # - SPA -----------------------------------------------------------------------
 # - SPA -----------------------------------------------------------------------
 # - SPA -----------------------------------------------------------------------
 
 '''
 Function to load a file with data used for NREL SPA's algorithm.
-:param filepath: Path to file with SPA data
-:param isDir: If filepath specified is a directory, then filename is assumed to be 'spa.csv'
+:param filepath: Path to file with SPA data.
+:param isDir: If filepath is directory, load default filename.
 :note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
 :note: File format should be a CSV with the following columns: key, value, min, max, units, description.
        Each key is a field needed to compute SPA.
@@ -462,7 +496,7 @@ Function to load a file with data used for NREL SPA's algorithm.
 '''
 def loadSPASiteData(filepath, isDir=True):
     if isDir:
-        filepath = os.path.join(filepath, 'spa.csv') # assumes this filename if dir specified
+        filepath = os.path.join(filepath, common.SPASiteFile)
     if not os.path.exists(filepath):
         return None
 
@@ -610,8 +644,8 @@ def computeSunPath(spadata):
 
 '''
 Function to load a solar position (sunpath) file exported from NREL's SPA calculator online.
-:param filepath: Path to file with SPA data
-:param isDir: If filepath specified is a directory, then filename is assumed to be 'spa.csv'
+:param filepath: Path to file with SPA data.
+:param isDir: If filepath is directory, load default filename.
 :note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
 :note: File format should be a CSV with the following columns:
        Date, Time, Topocentric zenith angle, Topocentric azimuth angle (eastward from N)
@@ -619,10 +653,12 @@ Function to load a solar position (sunpath) file exported from NREL's SPA calcul
 '''
 def loadSunPath(filepath, isDir=True):
     if isDir:
-        filepath = os.path.join(filepath, 'spa.csv')  # assumes this filename if dir specified
+        filepath = os.path.join(filepath, common.SPASiteFile)
     if not os.path.exists(filepath):
         return []
+
     sunpath = []
+
     with open(filepath, 'r') as f:
         reader = csv.reader(f, delimiter=',')
         next(reader, None)
@@ -640,4 +676,5 @@ def loadSunPath(filepath, isDir=True):
             # we only care about altitude when sun is visible (not on other side of Earth)
             if point[1] >=0 and point[1] <= 90:
                 sunpath.append(point)
+
     return sunpath
