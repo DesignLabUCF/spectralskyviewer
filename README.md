@@ -8,24 +8,32 @@ The original viewer was [clearskydataviewer](https://github.com/ProgramofCompute
 
 The software developed in Python on a Windows box and intended to be cross-platform.  
 Python modules required (version used at time of development):  
+```
 Python    (3.5.2)  
 PyQt5     (5.11.2)  
 pandas    (0.21.0)  
-numpy     (1.14.2)  
-pyqtgraph (0.10.0)  
-Pillow    (5.2.0)  
+numpy     (1.14.2)   
+Pillow    (5.2.0)   
+pyqtgraph (0.10.0)  # used to plot spectral radiance data
+colormath (3.0.0)   # used only for color model conversions  
+networkx  (2.2.0)   # used only for color model conversions  
+decorator (4.3.0)   # used only for color model conversions
+```  
 
 ### Instructions
 
+Install Python and modules above.  
 Run the application.  
 Select a data directory (which must have data organized in a specific way).  
-Use the combobox dropdowns and sliders to select the capture date and exposure desired.  
+Use the dropdowns and sliders to select desired capture date and time and exposure.    
 Click and drag to select sampling pattern coordinates.  
 View corresponding radiance measurements below.  
 
 Right-click (mouse-secondary) on canvas for more selection and HUD options.  
 
-To export, first run `Setup Export File` to specify parameters. Exports after that will be appended to the same file.  
+To export, first run `Setup Export File` to specify parameters and output file. Exports will then be appended to the same file.
+
+To make your own data directory, follow the format of the example public data linked below.      
 
 ### Controls
 
@@ -42,8 +50,8 @@ To export, first run `Setup Export File` to specify parameters. Exports after th
 
 ### Notes
 
-Your Data Directory must be organized in a very specific way for the photos and radiance values to be correlated.  
-[Here are real sky photos with radiance measurements organized and ready to use](https://spectralskylight.github.io/RadianceEstimationData)
+Your Data Directory must be organized in a very specific way for the photos and radiance values to be correlated.    
+[Correlated sky photos and spectral radiance measurements organized and ready to use.](https://spectralskylight.github.io/RadianceEstimationData)
 
 Context menu -> `Graph Resolution` can be used to optimize plotting of radiance curves. (1 = every wavelength, 2 = every other wavelength, etc.) Adjusting this can significantly improve application performance.  
 
