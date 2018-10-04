@@ -16,7 +16,6 @@ from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import *
 import pyqtgraph as pg
 import common
-import spa
 import utility
 import utility_data
 import utility_angles
@@ -427,6 +426,7 @@ class SkyDataViewer(QMainWindow):
         #self.wgtGraph.setAspectLocked(True, None)
 
     def loadData(self):
+        # only if user set a valid data directory
         if len(common.AppSettings["DataDirectory"]) <= 0 or not os.path.exists(common.AppSettings["DataDirectory"]):
             return
 
@@ -724,8 +724,18 @@ class SkyDataViewer(QMainWindow):
         else:
             reg = xoptions["PixelRegion"]
             pixregions = [reg for i in range(0, len(points))]
-        expcount = len(common.Exposures) if xoptions["IsHDR"] else 1
-        pixels = utility_data.collectPixels(points, pixregions, pixels=self.wgtFisheye.myPhotoPixels, weighting=pixweight)
+
+        # single exposure or HDR?
+        exposures = []  # list of exposures to export
+        pixels = []     # list of lists of pixels to export per exposure
+        if xoptions["IsHDR"]:
+            for exp in common.Exposures:
+                exposures.append(exp)
+                photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], self.capture, exp)
+                pixels.append(utility_data.collectPixels(points, pixregions, file=photo, weighting=pixweight))
+        else:
+            exposures.append(common.Exposures[self.exposure])
+            pixels.append(utility_data.collectPixels(points, pixregions, pixels=self.wgtFisheye.myPhotoPixels, weighting=pixweight))
 
         # create file if not exists
         if not os.path.exists(xoptions["Filename"]):
@@ -829,17 +839,17 @@ class SkyDataViewer(QMainWindow):
                         file.write(delimiter)
                     # export photo exposure time(s)
                     elif feature == "Exposure":
-                        for _omg_ in range(0, expcount):
-                            file.write(str(common.Exposures[self.exposure]))
+                        for exp in exposures:
+                            file.write(str(exp))
                             file.write(delimiter)
                     # export sample pixel color(s)
                     elif feature == "PixelColor":
-                        for _omg_ in range(0, expcount):
-                            file.write(str(pixels[i][0]))  # color component 1
+                        for pix in pixels:
+                            file.write(str(pix[i][0]))  # color component 1
                             file.write(delimiter)
-                            file.write(str(pixels[i][1]))  # color component 2
+                            file.write(str(pix[i][1]))  # color component 2
                             file.write(delimiter)
-                            file.write(str(pixels[i][2]))  # color component 3
+                            file.write(str(pix[i][2]))  # color component 3
                             file.write(delimiter)
                     # export spectral radiance
                     elif feature == "Radiance":
