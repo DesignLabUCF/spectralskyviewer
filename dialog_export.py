@@ -144,6 +144,15 @@ class DialogExport(QDialog):
         grpHDR = QGroupBox("HDR", self)
         grpHDR.setLayout(boxHDR)
 
+        # color model
+        self.cbxColorModel = QComboBox()
+        self.cbxColorModel.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.cbxColorModel.addItems([str(cm.name) for cm in common.ColorModel])
+        boxColor = QHBoxLayout()
+        boxColor.addWidget(self.cbxColorModel)
+        grpColor = QGroupBox("Color Model:", self)
+        grpColor.setLayout(boxColor)
+
         # spectrum resolution
         self.txtResolution = QLineEdit()
         self.txtResolution.setValidator(QIntValidator(1, 100))
@@ -154,9 +163,10 @@ class DialogExport(QDialog):
         grpResolution = QGroupBox("Spectrum Resolution:", self)
         grpResolution.setLayout(boxResolution)
 
-        # add HDR and spectrum options
+        # add final row of options
         boxStuffOptions = QHBoxLayout()
-        boxStuffOptions.addWidget(grpHDR, 0, Qt.AlignLeft)
+        boxStuffOptions.addWidget(grpHDR)
+        boxStuffOptions.addWidget(grpColor)
         boxStuffOptions.addWidget(grpResolution, 1)
         boxStuffOptions.setContentsMargins(0, 0, 0, 0)
         pnlStuffOptions = QWidget()
@@ -252,6 +262,7 @@ class DialogExport(QDialog):
 
         # save other options
         self.exportOptions["IsHDR"] = self.chxHDR.isChecked()
+        self.exportOptions["ColorModel"] = common.ColorModel[self.cbxColorModel.currentText()].value
         self.exportOptions["SpectrumResolution"] = int(self.txtResolution.text())
 
         # save selected sample features

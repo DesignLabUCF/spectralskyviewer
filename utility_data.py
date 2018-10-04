@@ -371,7 +371,7 @@ def loadSkyCoverData(filepath, isDir=True):
                 skycover.append((
                     datetime.strptime(row[0] + " " + row[1], dtfmtstr),
                     datetime.strptime(row[0] + " " + row[2], dtfmtstr),
-                    common.SkyCoverStrMap[row[3]]
+                    common.SkyCover[row[3]]
                 ))
             except ValueError or IndexError:
                 continue

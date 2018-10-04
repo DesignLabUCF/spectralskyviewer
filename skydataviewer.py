@@ -15,6 +15,8 @@ from PyQt5.QtCore import Qt, QDir
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import *
 import pyqtgraph as pg
+from colormath.color_objects import sRGBColor, HSVColor, LabColor
+from colormath.color_conversions import convert_color
 import common
 import utility
 import utility_data
@@ -717,6 +719,7 @@ class SkyDataViewer(QMainWindow):
         coords = [common.SamplingPattern[i] for i in self.wgtFisheye.samplesSelected]
         points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
         pixweight = common.PixelWeighting(xoptions["PixelWeighting"])
+
         if xoptions["ComputePixelRegion"]:
             # TODO: this is hardcoded to our sampling pattern. compute it properly!!
             altitudeRegionMap = {90:1, 71.9187:3, 53.3665:5, 33.749:7, 12.1151:9}
@@ -724,18 +727,33 @@ class SkyDataViewer(QMainWindow):
         else:
             reg = xoptions["PixelRegion"]
             pixregions = [reg for i in range(0, len(points))]
-
         # single exposure or HDR?
         exposures = []  # list of exposures to export
-        pixels = []     # list of lists of pixels to export per exposure
+        exppixels = []  # list of lists of pixels per exposure
         if xoptions["IsHDR"]:
             for exp in common.Exposures:
                 exposures.append(exp)
                 photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], self.capture, exp)
-                pixels.append(utility_data.collectPixels(points, pixregions, file=photo, weighting=pixweight))
+                exppixels.append(utility_data.collectPixels(points, pixregions, file=photo, weighting=pixweight))
         else:
             exposures.append(common.Exposures[self.exposure])
-            pixels.append(utility_data.collectPixels(points, pixregions, pixels=self.wgtFisheye.myPhotoPixels, weighting=pixweight))
+            exppixels.append(utility_data.collectPixels(points, pixregions, pixels=self.wgtFisheye.myPhotoPixels, weighting=pixweight))
+        # color model?
+        color = common.ColorModel(xoptions["ColorModel"])
+        if color == common.ColorModel.HSV:
+            for pixels in exppixels:
+                for i in range(0, len(self.wgtFisheye.samplesSelected)):
+                    rgb = sRGBColor(pixels[i][0], pixels[i][1], pixels[i][2], is_upscaled=True)
+                    hsv = convert_color(rgb, HSVColor)
+                    pixels[i] = hsv.get_value_tuple()
+        elif color == common.ColorModel.LAB:
+            for pixels in exppixels:
+                for i in range(0, len(self.wgtFisheye.samplesSelected)):
+                    rgb = sRGBColor(pixels[i][0], pixels[i][1], pixels[i][2], is_upscaled=True)
+                    lab = convert_color(rgb, LabColor)
+                    pixels[i] = lab.get_value_tuple()
+
+        #sRGBColor, HSVColor,
 
         # create file if not exists
         if not os.path.exists(xoptions["Filename"]):
@@ -835,7 +853,7 @@ class SkyDataViewer(QMainWindow):
                         file.write(delimiter)
                     # export pixel color model
                     elif feature == "ColorModel":
-                        file.write(str(common.ColorModel.RGB.value))  # TODO: finish this!!
+                        file.write(str(color.value))
                         file.write(delimiter)
                     # export photo exposure time(s)
                     elif feature == "Exposure":
@@ -844,12 +862,12 @@ class SkyDataViewer(QMainWindow):
                             file.write(delimiter)
                     # export sample pixel color(s)
                     elif feature == "PixelColor":
-                        for pix in pixels:
-                            file.write(str(pix[i][0]))  # color component 1
+                        for pixels in exppixels:
+                            file.write(str(pixels[i][0]))  # color component 1
                             file.write(delimiter)
-                            file.write(str(pix[i][1]))  # color component 2
+                            file.write(str(pixels[i][1]))  # color component 2
                             file.write(delimiter)
-                            file.write(str(pix[i][2]))  # color component 3
+                            file.write(str(pixels[i][2]))  # color component 3
                             file.write(delimiter)
                     # export spectral radiance
                     elif feature == "Radiance":
@@ -880,6 +898,7 @@ class SkyDataViewer(QMainWindow):
         numrows = 0
         pixregion = common.PixelRegionMin
         pixweight = common.PixelWeighting.Mean
+        colormodel = common.ColorModel.RGB
         resolution = 1
         delimiter = utility_data.discoverDatasetDelimiter(fnamein)
 
@@ -907,6 +926,12 @@ class SkyDataViewer(QMainWindow):
                     pixweight = common.PixelWeighting(int(firstrow[mapping["PixelWeighting"]]))
                 if "PixelWeighting" in dialog.convertOptions:  # overwrite with desired conversion
                     pixweight = common.PixelWeighting(dialog.convertOptions["PixelWeighting"])
+
+                # what color model to use?
+                if "ColorModel" in mapping:  # overwrite with value in file if exists
+                    colormodel = common.ColorModel(int(firstrow[mapping["ColorModel"]]))
+                if "ColorModel" in dialog.convertOptions:  # overwrite with desired conversion
+                    colormodel = common.ColorModel(dialog.convertOptions["ColorModel"])
 
                 # what spectrum resolution to use?
                 prevrez = int(((2500-350)+1) / (len(header) - mapping["350"]))
@@ -952,14 +977,26 @@ class SkyDataViewer(QMainWindow):
                                 pixregions = [pixregion for i in range(0, len(currcoords))]
                             points = utility_data.computePointsInImage(currHDRfile, currcoords)
                             pixels = utility_data.collectPixels(points, pixregions, file=currHDRfile, weighting=pixweight)
+                            if colormodel == common.ColorModel.HSV:
+                                for i, p in enumerate(pixels):
+                                    rgb = sRGBColor(p[0], p[1], p[2], is_upscaled=True)
+                                    hsv = convert_color(rgb, HSVColor)
+                                    pixels[i] = hsv.get_value_tuple()
+                            elif colormodel == common.ColorModel.LAB:
+                                for i, p in enumerate(pixels):
+                                    for i, p in enumerate(pixels):
+                                        rgb = sRGBColor(p[0], p[1], p[2], is_upscaled=True)
+                                        lab = convert_color(rgb, LabColor)
+                                        pixels[i] = lab.get_value_tuple()
                             # update cached row with new values and write to convert file
                             for i in range(0, len(currrows)):
                                 # update
                                 currrows[i][mapping["PixelRegion"]] = pixregions[i]
                                 currrows[i][mapping["PixelWeighting"]] = pixweight.value
-                                currrows[i][mapping["Red"]] = pixels[i][0]
-                                currrows[i][mapping["Green"]] = pixels[i][1]
-                                currrows[i][mapping["Blue"]] = pixels[i][2]
+                                currrows[i][mapping["ColorModel"]] = colormodel.value
+                                currrows[i][mapping["ColorA"]] = pixels[i][0]
+                                currrows[i][mapping["ColorB"]] = pixels[i][1]
+                                currrows[i][mapping["ColorC"]] = pixels[i][2]
                                 # write
                                 writer.writerow(currrows[i])
                                 numrows += 1
@@ -993,14 +1030,26 @@ class SkyDataViewer(QMainWindow):
                         pixregions = [pixregion for i in range(0, len(currcoords))]
                     points = utility_data.computePointsInImage(currHDRfile, currcoords)
                     pixels = utility_data.collectPixels(points, pixregions, file=currHDRfile, weighting=pixweight)
+                    if colormodel == common.ColorModel.HSV:
+                        for i, p in enumerate(pixels):
+                            rgb = sRGBColor(p[0], p[1], p[2], is_upscaled=True)
+                            hsv = convert_color(rgb, HSVColor)
+                            pixels[i] = hsv.get_value_tuple()
+                    elif colormodel == common.ColorModel.LAB:
+                        for i, p in enumerate(pixels):
+                            for i, p in enumerate(pixels):
+                                rgb = sRGBColor(p[0], p[1], p[2], is_upscaled=True)
+                                lab = convert_color(rgb, LabColor)
+                                pixels[i] = lab.get_value_tuple()
                     # update cached row with new values and write to convert file
                     for i in range(0, len(currrows)):
                         # update
                         currrows[i][mapping["PixelRegion"]] = pixregions[i]
                         currrows[i][mapping["PixelWeighting"]] = pixweight.value
-                        currrows[i][mapping["Red"]] = pixels[i][0]
-                        currrows[i][mapping["Green"]] = pixels[i][1]
-                        currrows[i][mapping["Blue"]] = pixels[i][2]
+                        currrows[i][mapping["ColorModel"]] = colormodel.value
+                        currrows[i][mapping["ColorA"]] = pixels[i][0]
+                        currrows[i][mapping["ColorB"]] = pixels[i][1]
+                        currrows[i][mapping["ColorC"]] = pixels[i][2]
                         # write
                         writer.writerow(currrows[i])
                         numrows += 1

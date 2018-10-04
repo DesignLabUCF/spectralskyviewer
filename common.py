@@ -26,7 +26,6 @@ SPASiteFile = "spa.csv"
 # sky cover mappings
 SkyCoverData = []
 SkyCover = Enum('SkyCover', 'UNK CLR SCT OVC')
-SkyCoverStrMap = {e.name: e for e in SkyCover}
 SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "Scattered", SkyCover.OVC: "Overcast"}
 SkyCoverFile = "skycover.csv"
 
@@ -34,7 +33,7 @@ SkyCoverFile = "skycover.csv"
 PixelRegionMin = 1
 PixelRegionMax = 51
 PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')  # used during pixel convolution
-ColorModel = Enum('ColorModel', 'RGB LAB HSV')  # used to store pixel color components
+ColorModel = Enum('ColorModel', 'RGB HSV LAB')  # used to store pixel color components
 
 # other constants
 RadianceFOV = 1  # (degrees) field of view used when measuring radiance with spectroradiometer

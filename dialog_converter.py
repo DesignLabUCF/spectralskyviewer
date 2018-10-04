@@ -63,6 +63,11 @@ class DialogConverter(QDialog):
         self.itmPixelWeighting.setEditable(False)
         self.itmPixelWeighting.setCheckable(True)
         model.appendRow(self.itmPixelWeighting)
+        # color model
+        self.itmColor = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["ColorModel"]][1])
+        self.itmColor.setEditable(False)
+        self.itmColor.setCheckable(True)
+        model.appendRow(self.itmColor)
         # pixel exposure
         self.itmExposure = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["Exposure"]][1])
         self.itmExposure.setEditable(False)
@@ -142,6 +147,15 @@ class DialogConverter(QDialog):
         grpExposure = QGroupBox("Photo Exposure:", self)
         grpExposure.setLayout(boxExposure)
 
+        # color model
+        self.cbxColorModel = QComboBox()
+        self.cbxColorModel.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.cbxColorModel.addItems([str(cm.name) for cm in common.ColorModel])
+        boxColor = QHBoxLayout()
+        boxColor.addWidget(self.cbxColorModel)
+        grpColor = QGroupBox("Color Model:", self)
+        grpColor.setLayout(boxColor)
+
         # spectrum resolution
         self.txtResolution = QLineEdit()
         self.txtResolution.setText("1")
@@ -154,10 +168,11 @@ class DialogConverter(QDialog):
         grpResolution = QGroupBox("Spectrum Resolution:", self)
         grpResolution.setLayout(boxResolution)
 
-        # add other options
+        # add final row of options
         boxStuffOptions = QHBoxLayout()
         boxStuffOptions.addWidget(grpHDR)
         boxStuffOptions.addWidget(grpExposure)
+        boxStuffOptions.addWidget(grpColor)
         boxStuffOptions.addWidget(grpResolution, 1)
         boxStuffOptions.setContentsMargins(0, 0, 0, 0)
         pnlStuffOptions = QWidget()
@@ -206,6 +221,8 @@ class DialogConverter(QDialog):
             self.radPixelMean.setEnabled(enabled)
             self.radPixelMedian.setEnabled(enabled)
             self.radPixelGaussian.setEnabled(enabled)
+        elif item == self.itmColor:
+            self.cbxColorModel.setEnabled(enabled)
         elif item == self.itmExposure:
             if not self.chxHDR.isChecked():
                 self.cbxExposure.setEnabled(enabled)
@@ -236,6 +253,8 @@ class DialogConverter(QDialog):
 
         # save other options
         self.convertOptions["IsHDR"] = self.chxHDR.isChecked()
+        if self.itmColor.checkState() > 0:
+            self.convertOptions["ColorModel"] = common.ColorModel[self.cbxColorModel.currentText()].value
         if self.itmRadiance.checkState() > 0:
             self.convertOptions["SpectrumResolution"] = int(self.txtResolution.text())
 
