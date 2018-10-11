@@ -236,7 +236,7 @@ def gaussianKernel(width):
     kernel = np.zeros(shape=(width,width,1), dtype=np.float32)
     radius = int(width/2)
     # sigma = 1.0
-    sigma = radius/2.0 # for [-2*sigma, 2*sigma]
+    sigma = radius/2.0  # for [-2*sigma, 2*sigma]
     total = 0.0
     # gaussian function
     #gaussian = lambda x: x + 1
@@ -427,16 +427,16 @@ def loadSamplingPattern(filepath, isDir=True):
 
     return patternDegs
 
-# - exposure ------------------------------------------------------------------
-# - exposure ------------------------------------------------------------------
-# - exposure ------------------------------------------------------------------
+# - camera --------------------------------------------------------------------
+# - camera --------------------------------------------------------------------
+# - camera --------------------------------------------------------------------
 
 '''
 Function to load a file with list of exposure times (seconds) of photos in the data directory.
 :param filepath: Path to file.
 :param isDir: If filepath is directory, load default filename.
-:note: File format should be a CSV with the following columns: exposure
 :return: A list of exposure times.
+:note: File format should be a CSV with the following columns: exposure
 :note: The application will assume all of these exposures exist for each capture. If not, results are undefined.
 '''
 def loadExposures(filepath, isDir=True):
@@ -460,6 +460,35 @@ def loadExposures(filepath, isDir=True):
                 continue
 
     return exposures
+
+'''
+Function to load camera lens warp/linearity constants used to correct sky coordinates when transforming to fisheye uv.
+:param filepath: Path to file.
+:param isDir: If filepath is directory, load default filename.
+:return: A tuple of float constants.
+:note: File format should be a CSV with the following columns: name, x1, x2, x3, x4
+:note: Only the first non-header row is used.
+http://paulbourke.net/dome/fisheyecorrect/
+http://michel.thoby.free.fr/Fisheye_history_short/Projections/Models_of_classical_projections.html
+'''
+def loadLensWarp(filepath, isDir=True):
+    if isDir:
+        filepath = os.path.join(filepath, common.LensWarpFile)
+    if not os.path.exists(filepath):
+        return []
+
+    lenswarp = []
+
+    with open(filepath, 'r') as f:
+        reader = csv.reader(f, delimiter=',')
+        next(reader, None)  # ignore header
+        row = next(reader, None)  # read first line of file
+        try:
+            lenswarp = (float(row[1]), float(row[2]), float(row[3]), float(row[4]))
+        except ValueError or IndexError:
+            pass
+
+    return lenswarp
 
 # - SPA -----------------------------------------------------------------------
 # - SPA -----------------------------------------------------------------------

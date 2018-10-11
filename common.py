@@ -19,6 +19,10 @@ Exposures = []
 ExposureIdxMap = {}
 ExposuresFile = "exposure.csv"
 
+# camera lens warp/linearity constants used to correct sky coordinates when transforming to fisheye uv
+LensWarp = ()
+LensWarpFile = "lens.csv"
+
 # SPA (sun positioning algorithm) site data
 SPASiteData = None
 SPASiteFile = "spa.csv"

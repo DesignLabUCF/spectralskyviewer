@@ -458,6 +458,9 @@ class SkyDataViewer(QMainWindow):
         common.ExposureIdxMap = {common.Exposures[i]: i for i in range(0, len(common.Exposures))}
         self.cbxExposure.addItems([str(x) for x in common.Exposures])
 
+        # load lens warp data
+        common.LensWarp = utility_data.loadLensWarp(common.AppSettings["DataDirectory"])
+
         # load site data
         common.SPASiteData = utility_data.loadSPASiteData(common.AppSettings["DataDirectory"])
 
