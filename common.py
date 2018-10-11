@@ -42,6 +42,8 @@ ColorModel = Enum('ColorModel', 'RGB HSV LAB')  # used to store pixel color comp
 # other constants
 RadianceFOV = 1  # (degrees) field of view used when measuring radiance with spectroradiometer
 CaptureEpsilon = 60  # (seconds) max acceptable time delta between measurements of the same capture timestamp
+HUDTextScaleMin = 20
+HUDTextScaleMax = 80
 HDRRawExts = ['.cr2', '.raw', '.dng']  # types of RAW data
 
 # sample export features
@@ -105,6 +107,7 @@ DefAppSettings = {
     "AvoidSunAngle": 0,
     "GraphResolution": 5,
     "GraphLineThickness": 1,
+    "HUDTextScale": 60,
 }
 DefAppSettings.update({"ExportOptions": dict(DefExportOptions)})
 

@@ -24,6 +24,7 @@ import utility_angles
 from view_fisheye import ViewFisheye
 from dialog_export import DialogExport
 from dialog_converter import DialogConverter
+from dialog_slider import DialogSlider
 
 
 class SkyDataViewer(QMainWindow):
@@ -132,15 +133,9 @@ class SkyDataViewer(QMainWindow):
         self.actUVGrid.setChecked(common.AppSettings["ShowUVGrid"])
         self.actUVGrid.setStatusTip('Toggle display of UV grid')
         self.actUVGrid.triggered.connect(lambda: self.toggleHUDView(self.actUVGrid))
-        self.actPixel1 = QAction(QIcon(), '1 Pixel', self)
-        self.actPixel1.setStatusTip('Use a single pixel as region')
-        self.actPixel1.triggered.connect(lambda: self.togglePixelOptions(self.actPixel1))
-        self.actPixelnxn = QAction(QIcon(), '(n x n) Pixels', self)
-        self.actPixelnxn.setStatusTip('Use an (n x n) pixel region')
-        self.actPixelnxn.triggered.connect(lambda: self.togglePixelOptions(self.actPixelnxn))
-        self.actPixel1deg = QAction(QIcon(), '1° Steridian Pixels', self)
-        self.actPixel1deg.setStatusTip('Use a 1° steridian pixel region')
-        self.actPixel1deg.triggered.connect(lambda: self.togglePixelOptions(self.actPixel1deg))
+        self.actPixelRegion = QAction(QIcon(), 'Pixel (n x n) Region', self)
+        self.actPixelRegion.setStatusTip('Use an (n x n) pixel region')
+        self.actPixelRegion.triggered.connect(lambda: self.togglePixelOptions(self.actPixelRegion))
         self.actPixelMean = QAction(QIcon(), 'Mean Weighting', self)
         self.actPixelMean.setCheckable(True)
         self.actPixelMean.setStatusTip('Apply mean weighting to pixels')
@@ -161,7 +156,7 @@ class SkyDataViewer(QMainWindow):
         self.actGraphLine.triggered.connect(lambda: self.toggleGraphOptions(self.actGraphLine))
         self.actHUDTextScale = QAction(QIcon(), 'HUD Text Scale', self)
         self.actHUDTextScale.setStatusTip('Adjust scale of HUD text')
-        self.actHUDTextScale.triggered.connect(lambda: self.toggleGraphOptions(self.actGraphLine))
+        self.actHUDTextScale.triggered.connect(self.toggleHUDTextScale)
         pixWeightGroup = QActionGroup(self)
         pixWeightGroup.addAction(self.actPixelMean)
         pixWeightGroup.addAction(self.actPixelMedian)
@@ -230,10 +225,7 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actShadows)
         menu.addAction(self.actUVGrid)
         menu.addSeparator()
-        submenu = menu.addMenu('Pixel Region')
-        submenu.addAction(self.actPixel1)
-        submenu.addAction(self.actPixelnxn)
-        submenu.addAction(self.actPixel1deg)
+        menu.addAction(self.actPixelRegion)
         submenu = menu.addMenu('Pixel Weighting')
         submenu.addAction(self.actPixelMean)
         submenu.addAction(self.actPixelMedian)
@@ -1137,19 +1129,13 @@ class SkyDataViewer(QMainWindow):
 
     def togglePixelOptions(self, action):
         # pixel region
-        if action == self.actPixel1 or action == self.actPixelnxn or action == self.actPixel1deg:
+        if action == self.actPixelRegion:
             region = common.PixelRegionMin  # n for (n x n) pixel region
             ok = True
-
-            if action == self.actPixel1:
-                region = 1
-            elif action == self.actPixelnxn:
-                region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, common.PixelRegionMin, common.PixelRegionMax, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
-                if not ok or region % 2 == 0:
-                    QMessageBox.warning(self, "Input Validation", "Pixel Region must be an odd positive number.", QMessageBox.Ok)
-            elif action == self.actPixel1deg:
-                region = 9
-
+            region, ok = QInputDialog.getInt(self, "Pixel Region", "Input n for (n x n) region:", 5, common.PixelRegionMin, common.PixelRegionMax, 2, Qt.WindowSystemMenuHint | Qt.WindowTitleHint)
+            if not ok or region % 2 == 0:
+                QMessageBox.warning(self, "Input Validation", "Pixel Region must be an odd positive number.", QMessageBox.Ok)
+                return
             common.AppSettings["PixelRegion"] = region
 
         # pixel weighting
@@ -1160,8 +1146,6 @@ class SkyDataViewer(QMainWindow):
                 common.AppSettings["PixelWeighting"] = common.PixelWeighting.Median.value
             elif action == self.actPixelGaussian:
                 common.AppSettings["PixelWeighting"] = common.PixelWeighting.Gaussian.value
-
-        # self.wgtFisheye.repaint()
 
     def toggleGraphOptions(self, action):
         ok = True
@@ -1190,6 +1174,17 @@ class SkyDataViewer(QMainWindow):
             #self.wgtFisheye.repaint()
         else:
             QMessageBox.warning(self, "Input Validation", "Circumsolar angle must be 0-180°.", QMessageBox.Ok)
+
+    def toggleHUDTextScale(self):
+        dialog = DialogSlider(self, "HUD Text Scale", "Select scale:", common.AppSettings["HUDTextScale"], common.HUDTextScaleMin, common.HUDTextScaleMax, 2)
+        dialog.slider.valueChanged.connect(lambda: self.textScaleChanged(dialog.slider.value()))
+        dialog.show()
+        #self.slider.valueChanged.connect(self.timeSelected)
+
+    def textScaleChanged(self, value):
+        common.AppSettings["HUDTextScale"] = value
+        self.wgtFisheye.computeBounds()
+        self.wgtFisheye.repaint()
 
     def toggleDontSave(self, state):
         self.dontSaveSettings = state

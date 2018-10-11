@@ -398,7 +398,7 @@ class ViewFisheye(QWidget):
         self.myPhotoRadius = self.myPhotoDestRect.height() / 2
 
         # compute new scaled font size
-        self.fontScaled = QFont('Courier New', self.myPhotoRadius / 40)
+        self.fontScaled = QFont('Courier New', self.myPhotoRadius * (1/(101-common.AppSettings["HUDTextScale"])))
 
         # compute sampling pattern collision bounds
         photoDiameter = self.myPhotoRadius * 2
