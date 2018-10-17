@@ -18,6 +18,7 @@
 #  Not for commercial use. Do not redistribute without permission.
 # ====================================================================
 import math
+import numpy as np
 import common
 
 
@@ -36,23 +37,25 @@ def SkyCoord2FisheyeUV(azimuth, altitude, lenswarp=True):
     # convert altitude to zenith
     zenith = (90 - altitude)
 
-    # convert to radians
-    zenith = zenith * math.pi / 180.0
+    # convert from angles to radians
     azimuth = azimuth * math.pi / 180.0
+    zenith = zenith * math.pi / 180.0
 
-    # use actual lens - account for non-linearity/warp
-    if lenswarp and len(common.LensWarp) == 4:
-        radius = (common.LensWarp[0] * zenith) + \
-                 (common.LensWarp[1] * zenith * zenith) - \
-                 (common.LensWarp[2] * zenith * zenith * zenith) - \
-                 (common.LensWarp[3] * zenith * zenith * zenith * zenith)
+    # compute radius
+    # account for non-linearity/warp of actual lens
+    if lenswarp and len(common.LensWarp) > 0:
+        radius = np.polyval(common.LensWarp, zenith)
     # use ideal lens
     else:
         radius = zenith / (math.pi / 2.0)
 
     # compute UVs
-    u = 0.5 * (radius * math.cos(azimuth) + 1)
-    v = 0.5 * (radius * math.sin(azimuth) + 1)
+    u = radius * math.cos(azimuth)
+    v = radius * math.sin(azimuth)
+
+    # adjust to [0, 1] range
+    u = 0.5 * u + 0.5
+    v = 0.5 * v + 0.5
 
     return u, v
 
@@ -60,21 +63,41 @@ def SkyCoord2FisheyeUV(azimuth, altitude, lenswarp=True):
 Convert a fisheye UV coordinate (0-1, 0-1) to a sky coordinate (azimuth, altitude).
 '''
 def FisheyeUV2SkyCoord(u, v, lenswarp=True):
-    radius = math.sqrt((u - 0.5) * (u - 0.5) + (v - 0.5) * (v - 0.5))
-
-    # account for lens warp
-    #if lenswarp:
-    #    radius = (0.7189 * radius) + (0.00079342 * radius * radius) - (0.0289 * radius * radius * radius) - (0.001 * radius * radius * radius * radius)
-
+    # adjust to [-0.5, 0.5] range
     u = u - 0.5
     v = v - 0.5
 
-    azimuth = math.atan2(u, v)
-    zenith = radius * math.pi / 2.0
+    radius = math.sqrt((u * u) + (v * v))
 
-    # convert radians to angles
-    # convert zenith back to altitude
-    return (int((azimuth * 180.0 / math.pi + 360) % 360), int(90 - 2 * zenith * 180.0 / math.pi))
+    # compute azimuth
+    azimuth = math.atan2(u, v)
+    # rotate azimuth so that position of North is pointing directly down
+    azimuth = (azimuth + 2*math.pi) % (2*math.pi)
+
+    # compute zenith
+    # account for non-linearity/warp of actual lens
+    if lenswarp and len(common.LensWarp) == 4:
+        zenith = radius * math.pi / 2.0
+    # use ideal lens
+    else:
+        zenith = radius * math.pi / 2.0
+
+    # convert zenith to altitude
+    altitude = ((math.pi/2) - 2 * zenith)
+
+    # convert from radians to angles
+    azimuth = azimuth * 180.0 / math.pi
+    altitude = altitude * 180.0 / math.pi
+
+    return azimuth, altitude
+
+'''
+Convert an image pixel coordinate to a fisheye UV coordinate (0-1, 0-1).
+'''
+def Pixel2FisheyeUV(x, y, width, height):
+    u = (x - (int(width/2) - int(height/2))) / height
+    v = y / height
+    return u, v
 
 '''
 Take in a pair of (azimuth, altitude) sky coordintes and return the corresponding central angle between them.

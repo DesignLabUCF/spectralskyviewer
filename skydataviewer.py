@@ -623,7 +623,7 @@ class SkyDataViewer(QMainWindow):
 
         # find an ASD capture time within small threshold of HDR capture time
         asdTime = None
-        threshold = common.CaptureEpsilon  # seconds
+        threshold = common.DataConfig["CaptureEpsilon"]  # seconds
         for dir in captureTimeASDDirs:
             timestr = str(self.capture.date()) + " " + os.path.basename(dir)
             time = datetime.strptime(timestr, "%Y-%m-%d %H.%M.%S")
@@ -1230,9 +1230,7 @@ class SkyDataViewer(QMainWindow):
 
 
 if __name__ == '__main__':
-    #os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     app = QApplication(sys.argv)
-    #app.setAttribute(Qt.AA_DisableHighDpiScaling)
 
     w = SkyDataViewer()
     w.center()

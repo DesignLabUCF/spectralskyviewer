@@ -10,7 +10,7 @@ import math
 from enum import Enum
 from datetime import datetime
 from PyQt5.QtCore import Qt, QRect, QPoint, QPointF, QLine, QLineF
-from PyQt5.QtGui import QFont, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QColor
+from PyQt5.QtGui import QFont, QFontMetrics, QPainter, QPen, QBrush, QImage, QPixmap, QPainterPath, QTransform, QColor
 from PyQt5.QtWidgets import QWidget, QStyle
 import numpy as np
 import common
@@ -70,7 +70,7 @@ class ViewFisheye(QWidget):
         self.penShadowSelected = QPen(Qt.black, 3, Qt.SolidLine)
         self.fontFixed = QFont('Courier New', 8)
         self.fontScaled = QFont('Courier New', 8)
-        self.fontBounds = 50
+        self.fontMetrics = QFontMetrics(self.fontScaled)
         self.iconWarning = self.style().standardIcon(QStyle.SP_MessageBoxWarning).pixmap(ViewFisheye.SelectedPixelBox / 2)
 
     def dataLoaded(self):
@@ -399,13 +399,14 @@ class ViewFisheye(QWidget):
 
         # compute new scaled font size
         self.fontScaled = QFont('Courier New', self.myPhotoRadius * (1/(101-common.AppSettings["HUDTextScale"])))
+        self.fontMetrics = QFontMetrics(self.fontScaled)
 
         # compute sampling pattern collision bounds
         photoDiameter = self.myPhotoRadius * 2
         sampleRadius = self.myPhotoRadius / 50
         sampleDiameter = sampleRadius * 2
         ViewFisheye.SelectionRectMin = sampleDiameter  # minimum selection rect is based on this
-        hFOV = common.RadianceFOV / 2
+        hFOV = common.DataConfig["RadianceFOV"] / 2
         for i in range(0, len(common.SamplingPattern)):
             # compute sampling pattern collision bounds
             u, v = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0], common.SamplingPattern[i][1])
@@ -430,8 +431,6 @@ class ViewFisheye(QWidget):
         # compute compass lines
         self.compassTicks.clear()
         tickLength = self.myPhotoRadius / 90
-        fontSize = self.fontScaled.pointSizeF()
-        labelOffset = self.myPhotoRadius / 15
         for angle in range(0, 360, 10):
             theta = 360 - ((angle + 270) % 360)  # angles eastward from North, North facing down
             rads = theta * math.pi / 180.0
@@ -439,23 +438,24 @@ class ViewFisheye(QWidget):
             cy1 = math.sin(rads) * (self.myPhotoRadius - tickLength) + self.viewCenter[1]
             cx2 = math.cos(rads) * self.myPhotoRadius + self.viewCenter[0]
             cy2 = math.sin(rads) * self.myPhotoRadius + self.viewCenter[1]
-            lx1 = math.cos(rads) * (self.myPhotoRadius - labelOffset) + self.viewCenter[0] - (len(str(angle)) / 2.0 * fontSize)
-            ly1 = math.sin(rads) * (self.myPhotoRadius - labelOffset) + self.viewCenter[1] - fontSize
+            lx1 = (math.cos(rads) * (self.myPhotoRadius - tickLength*4)) + self.viewCenter[0] - self.fontMetrics.width(str(angle))/2
+            ly1 = (math.sin(rads) * (self.myPhotoRadius - tickLength*4)) + self.viewCenter[1] - self.fontMetrics.height()/2
             self.compassTicks.append([cx1, cy1, cx2, cy2, lx1, ly1, angle])  # x1, y1, x2, y2, x1lbl, y1lbl, angle
 
-        # compute lens (ideal and actual) radii for ellipses at various altitudes
+        # compute lens (ideal and actual) radii for drawn latitude ellipses along zenith
         self.lensIdealRadii.clear()
         self.lensRealRadii.clear()
-        # ideal lens latitudes along zenith
         for alt in common.SamplingPatternAlts:
+            # ideal lens
             u, v = utility_angles.SkyCoord2FisheyeUV(90, alt, lenswarp=False)
             x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
-            self.lensIdealRadii.append(x - self.viewCenter[0])
-        # warped lens latitudes along zenith
-        for alt in common.SamplingPatternAlts:
+            r = x - self.viewCenter[0]
+            self.lensIdealRadii.append((r, alt))  # (radius, altitude)
+            # warped lens
             u, v = utility_angles.SkyCoord2FisheyeUV(90, alt)
             x = (self.viewCenter[0] - self.myPhotoRadius) + (u * photoDiameter)
-            self.lensRealRadii.append(x - self.viewCenter[0])
+            r = x - self.viewCenter[0]
+            self.lensRealRadii.append((r, alt))   # (radius, altitude)
 
         # compute sun path screen points
         self.pathSun = QPainterPath()
@@ -515,10 +515,8 @@ class ViewFisheye(QWidget):
             # useful local vars
             centerPoint = QPoint(self.viewCenter[0], self.viewCenter[1])
             diameter = self.myPhotoRadius * 2
-            destRect = QRect(0, 0, self.fontBounds, self.fontBounds)
-            fontHalf = self.fontScaled.pointSizeF() / 2
-            fontDouble = self.fontScaled.pointSizeF() * 2
-            fontTriple = self.fontScaled.pointSizeF() * 3
+            destRect = QRect(0, 0, self.myPhotoDestRect.width(), self.myPhotoDestRect.height())
+            fontWidth = self.fontMetrics.width("X")
 
             # mask
             if common.AppSettings["ShowMask"]:
@@ -551,16 +549,26 @@ class ViewFisheye(QWidget):
                     painter.drawLine(self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius,
                                      self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1] + self.myPhotoRadius)
                     # crosshairs
-                    painter.drawLine(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1], self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1])
-                    painter.drawLine(self.viewCenter[0], self.viewCenter[1] - self.myPhotoRadius, self.viewCenter[0], self.viewCenter[1] + self.myPhotoRadius)
+                    painter.drawLine(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1],
+                                     self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1])
+                    painter.drawLine(self.viewCenter[0], self.viewCenter[1] - self.myPhotoRadius,
+                                     self.viewCenter[0], self.viewCenter[1] + self.myPhotoRadius)
                     # labels
-                    destRect.moveTo(self.viewCenter[0] - self.myPhotoRadius + self.fontScaled.pointSizeF(), self.viewCenter[1] - self.myPhotoRadius + self.fontScaled.pointSizeF())
+                    destRect.setCoords(self.viewCenter[0] - self.myPhotoRadius + 4,
+                                       self.viewCenter[1] - self.myPhotoRadius + 4,
+                                       self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
-                    destRect.moveTo(self.viewCenter[0] + self.myPhotoRadius - fontDouble, self.viewCenter[1] - self.myPhotoRadius + self.fontScaled.pointSizeF())
+                    destRect.setCoords(self.viewCenter[0] + self.myPhotoRadius - (fontWidth+4),
+                                       self.viewCenter[1] - self.myPhotoRadius + 4,
+                                       self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
-                    destRect.moveTo(self.viewCenter[0] - self.myPhotoRadius + self.fontScaled.pointSizeF(), self.viewCenter[1] + self.myPhotoRadius - fontTriple)
+                    destRect.setCoords(self.viewCenter[0] - self.myPhotoRadius + 3,
+                                       self.viewCenter[1] + self.myPhotoRadius - (self.fontMetrics.height()+3),
+                                       self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
-                    destRect.moveTo(self.viewCenter[0] + self.myPhotoRadius - fontDouble, self.viewCenter[1] + self.myPhotoRadius - fontTriple)
+                    destRect.setCoords(self.viewCenter[0] + self.myPhotoRadius - (fontWidth+3),
+                                       self.viewCenter[1] + self.myPhotoRadius - (self.fontMetrics.height()+3),
+                                       self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
 
                 # draw lens warp
@@ -572,12 +580,14 @@ class ViewFisheye(QWidget):
                         p2 = QPoint(self.compassTicks[i+18][2], self.compassTicks[i+18][3])  # tick opposite 180 degrees
                         painter.drawLine(p1, p2)
                     # ideal lens latitudes along zenith
-                    for r in self.lensIdealRadii:
+                    for r, alt in self.lensIdealRadii:
                         painter.drawEllipse(centerPoint, r, r)
                     # actual/warped lens latitudes along zenith
                     painter.setPen(self.penLens)
-                    for r in self.lensRealRadii:
+                    for r, alt in self.lensRealRadii:
                         painter.drawEllipse(centerPoint, r, r)
+                        destRect.setCoords(self.viewCenter[0] + r + 3, self.viewCenter[1] - (self.fontMetrics.height() + 3), self.width(), self.height())
+                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "{0:d}°".format(int(alt)))
 
                 # draw compass
                 if common.AppSettings["ShowCompass"]:
@@ -585,25 +595,25 @@ class ViewFisheye(QWidget):
                     if common.AppSettings["ShowShadows"]:
                         painter.setPen(self.penShadowText)
                         for tick in self.compassTicks:
-                            destRect.moveTo(tick[4] + 1, tick[5] + 1)
-                            painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(tick[6]))  # + "°"
+                            destRect.setCoords(tick[4] + 1, tick[5] + 1, self.width(), self.height())
+                            painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(tick[6])+"°")
                     # compass ticks text
                     painter.setPen(self.penText)
                     for tick in self.compassTicks:
                         painter.drawLine(tick[0], tick[1], tick[2], tick[3])
-                        destRect.moveTo(tick[4], tick[5])
-                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(tick[6]))  # + "°"
+                        destRect.setCoords(tick[4], tick[5], self.width(), self.height())
+                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(tick[6])+"°")
                     # photo radius
                     #painter.drawEllipse(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius, diameter, diameter)
                     painter.drawEllipse(centerPoint, self.myPhotoRadius, self.myPhotoRadius)
                     # cardinal directions
-                    destRect.moveTo(self.viewCenter[0] - self.myPhotoRadius - fontTriple, self.viewCenter[1] - fontHalf * 2)
+                    destRect.setCoords(self.viewCenter[0] - self.myPhotoRadius - (fontWidth+4), self.viewCenter[1] - self.fontMetrics.height()/2, self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "W")
-                    destRect.moveTo(self.viewCenter[0] + self.myPhotoRadius + self.fontScaled.pointSizeF(), self.viewCenter[1] - fontHalf * 2)
+                    destRect.setCoords(self.viewCenter[0] + self.myPhotoRadius + 4, self.viewCenter[1] - self.fontMetrics.height()/2, self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "E")
-                    destRect.moveTo(self.viewCenter[0] - fontHalf, self.viewCenter[1] - self.myPhotoRadius - fontTriple)
+                    destRect.setCoords(self.viewCenter[0] - fontWidth/2, self.viewCenter[1] - self.myPhotoRadius - (self.fontMetrics.height()+3), self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "S")
-                    destRect.moveTo(self.viewCenter[0] - fontHalf, self.viewCenter[1] + self.myPhotoRadius + self.fontScaled.pointSizeF())
+                    destRect.setCoords(self.viewCenter[0] - fontWidth/2, self.viewCenter[1] + self.myPhotoRadius + 3, self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "N")
 
                 # draw sampling pattern
@@ -632,9 +642,9 @@ class ViewFisheye(QWidget):
                         self.pathSun.translate(-1.0, -1.0)
                         for i in range(0, self.pathSun.elementCount()):
                             e = self.pathSun.elementAt(i)
-                            destRect.moveTo(e.x, e.y + self.fontScaled.pointSizeF() + 1)
-                            painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft,
-                                             str(self.sunPathPoints[i][2].hour))
+                            destRect.setCoords(e.x, e.y + self.fontMetrics.height()/2 + 1,
+                                               self.myPhotoDestRect.width(), self.myPhotoDestRect.height())
+                            painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.sunPathPoints[i][2].hour))
                     # sun, path, hours
                     painter.setPen(self.penSun)
                     painter.drawEllipse(self.sunPositionVisible[0] - sunradius / 2,
@@ -642,9 +652,9 @@ class ViewFisheye(QWidget):
                     painter.drawPath(self.pathSun)
                     for i in range(0, self.pathSun.elementCount()):
                         e = self.pathSun.elementAt(i)
-                        destRect.moveTo(e.x, e.y + self.fontScaled.pointSizeF())
-                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft,
-                                         str(self.sunPathPoints[i][2].hour))
+                        destRect.setCoords(e.x, e.y + self.fontMetrics.height() / 2,
+                                           self.myPhotoDestRect.width(), self.myPhotoDestRect.height())
+                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.sunPathPoints[i][2].hour))
 
                 # draw selected samples (ALWAYS)
                 r = QRect()
@@ -666,17 +676,33 @@ class ViewFisheye(QWidget):
                     painter.setPen(self.penSelectRect)
                     painter.drawRect(self.dragSelectRect)
 
+
+
+                # # TESTING TESTING TESTING TESTING TESTING TESTING
+                #
+                # for alt in common.SamplingPatternAlts:
+                #     u, v = utility_angles.SkyCoord2FisheyeUV(90, alt)
+                #     x = (self.viewCenter[0] - self.myPhotoRadius) + (u * diameter)
+                #     y = (self.viewCenter[1] - self.myPhotoRadius) + (v * diameter)
+                #     painter.setPen(self.penLens)
+                #     painter.drawEllipse(QPoint(x, y), 10, 10)
+                #     #t, p = utility_angles.FisheyeUV2SkyCoord(u, v)
+                #
+                # # TESTING TESTING TESTING TESTING TESTING TESTING
+
+
+
                 # draw timestamp
                 painter.setPen(self.penText)
                 painter.setFont(self.fontFixed)
                 destRect.setCoords(10, 10, self.width() / 2, 50)
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTime))
                 # draw sky cover assessment
-                destRect.moveTo(10, 25)
+                destRect.setCoords(10, 25, self.myPhotoDestRect.width(), self.myPhotoDestRect.height())
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, self.skyCover.name + "/" + common.SkyCoverDesc[self.skyCover])
                 # draw photo rotation
                 if self.myPhotoRotation != 0:
-                    destRect.moveTo(10, self.height()-25)
+                    destRect.setCoords(10, self.height()-25, self.myPhotoDestRect.width(), self.myPhotoDestRect.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "Rotation: " + str(self.myPhotoRotation) + "°")
 
                 # information we are interested in displaying

@@ -12,17 +12,15 @@ from enum import Enum
 # constants -------------------------------------------------------------------
 # constants -------------------------------------------------------------------
 
-ColorModel = Enum('ColorModel', 'RGB HSV LAB')  # used to store pixel color components
+ColorModel = Enum('ColorModel', 'RGB HSV LAB')                   # used to store pixel color components
 PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')  # used during pixel convolution
 SkyCover = Enum('SkyCover', 'UNK CLR SCT OVC')
 SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "Scattered", SkyCover.OVC: "Overcast"}
 HDRRawExts = ['.cr2', '.raw', '.dng']  # types of RAW data
-PixelRegionMin = 1
-PixelRegionMax = 51
-RadianceFOV = 1
-CaptureEpsilon = 60
-HUDTextScaleMin = 20
-HUDTextScaleMax = 80
+PixelRegionMin = 1     # used during pixel convolution
+PixelRegionMax = 63    # used during pixel convolution
+HUDTextScaleMin = 10   # used for font resizing
+HUDTextScaleMax = 100  # used for font resizing
 
 # sample export features
 SampleFeatures = [
@@ -122,15 +120,11 @@ DefAppSettings = {
     "ShowEXIF": True,
     "ShowStatusBar": True,
     "PixelRegion": 1,
-    "PixelRegionMin": 1,
-    "PixelRegionMax": 51,
     "PixelWeighting": PixelWeighting.Mean.value,
     "AvoidSunAngle": 0,
     "GraphResolution": 5,
     "GraphLineThickness": 1,
     "HUDTextScale": 60,
-    "HUDTextScaleMin": 20,
-    "HUDTextScaleMax": 80
 }
 DefAppSettings.update({"ExportOptions": dict(DefExportOptions)})
 
