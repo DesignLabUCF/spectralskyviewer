@@ -39,18 +39,8 @@ class SkyDataViewer(QMainWindow):
         self.exposure = 0
         self.dontSaveSettings = False
 
-        # load settings
-        if os.path.exists(common.AppSettings["Filename"]):
-            loaded = []
-            with open(common.AppSettings["Filename"], 'r') as file:
-                loaded = json.load(file)
-            for key in loaded:
-                if (key in common.AppSettings):
-                    common.AppSettings.update({key: loaded[key]})
-        # validate settings
-        common.AppSettings["ExportOptions"]["Features"].sort()
-        if len(common.AppSettings["DataDirectory"]) > 0 and not os.path.exists(common.AppSettings["DataDirectory"]):
-            common.AppSettings["DataDirectory"] = ""
+        # load application settings
+        utility_data.loadAppSettings()
 
         # init
         QToolTip.setFont(QFont('SansSerif', 8))
@@ -440,24 +430,31 @@ class SkyDataViewer(QMainWindow):
         self.wgtGraph.clear()
         self.resetGraph()
 
-        # load sampling pattern
-        common.SamplingPattern = utility_data.loadSamplingPattern(common.AppSettings["DataDirectory"])
-        common.SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in common.SamplingPattern]
-        common.SamplingPatternAlts = list(set([s[1] for s in common.SamplingPattern]))
+        # load data directory configuration
+        utility_data.loadDataConfig()
 
-        # load exposures
-        common.Exposures = utility_data.loadExposures(common.AppSettings["DataDirectory"])
-        common.ExposureIdxMap = {common.Exposures[i]: i for i in range(0, len(common.Exposures))}
+        # # load sampling pattern
+        # common.SamplingPattern = utility_data.loadSamplingPattern(common.AppSettings["DataDirectory"])
+        # common.SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in common.SamplingPattern]
+        # common.SamplingPatternAlts = list(set([s[1] for s in common.SamplingPattern]))
+        # common.SamplingPatternAlts = sorted(common.SamplingPatternAlts)
+        #
+        # # load exposures
+        # common.Exposures = utility_data.loadExposures(common.AppSettings["DataDirectory"])
+        # common.ExposureIdxMap = {common.Exposures[i]: i for i in range(0, len(common.Exposures))}
+        # self.cbxExposure.addItems([str(x) for x in common.Exposures])
+        #
+        # # load lens warp data
+        # common.LensWarp = utility_data.loadLensWarp(common.AppSettings["DataDirectory"])
+        #
+        # # load site data
+        # common.SPASiteData = utility_data.loadSPASiteData(common.AppSettings["DataDirectory"])
+        #
+        # # load sky cover data
+        # common.SkyCoverData = utility_data.loadSkyCoverData(common.AppSettings["DataDirectory"])
+
+        # add exposures
         self.cbxExposure.addItems([str(x) for x in common.Exposures])
-
-        # load lens warp data
-        common.LensWarp = utility_data.loadLensWarp(common.AppSettings["DataDirectory"])
-
-        # load site data
-        common.SPASiteData = utility_data.loadSPASiteData(common.AppSettings["DataDirectory"])
-
-        # load sky cover data
-        common.SkyCoverData = utility_data.loadSkyCoverData(common.AppSettings["DataDirectory"])
 
         # find capture dates
         captureDateDirs = utility.findFiles(common.AppSettings["DataDirectory"], mode=2)
@@ -507,9 +504,9 @@ class SkyDataViewer(QMainWindow):
         # print("date: " + str(self.capture))
 
         # compute and apply sun path
-        data = utility_data.loadSPASiteData(pathDate) # reload site info per date directory if exists
-        if data != None:
-            common.SPASiteData = data
+        #data = utility_data.loadSPASiteData(pathDate) # reload site info per date directory if exists
+        #if data != None:
+        #    common.SPASiteData = data
         utility_data.fillSPADateTime(common.SPASiteData, self.capture)
         sunpath = utility_data.computeSunPath(common.SPASiteData)
         self.wgtFisheye.setSunPath(sunpath)
@@ -1233,7 +1230,9 @@ class SkyDataViewer(QMainWindow):
 
 
 if __name__ == '__main__':
+    #os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     app = QApplication(sys.argv)
+    #app.setAttribute(Qt.AA_DisableHighDpiScaling)
 
     w = SkyDataViewer()
     w.center()

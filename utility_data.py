@@ -7,7 +7,7 @@
 # ====================================================================
 import math
 import os
-import csv
+import json
 import itertools
 from datetime import datetime
 import numpy as np
@@ -22,75 +22,110 @@ import utility_angles
 GaussianKernels = {}
 
 
+# - configuration -------------------------------------------------------------
+# - configuration -------------------------------------------------------------
+# - configuration -------------------------------------------------------------
 
-# - datasets ------------------------------------------------------------------
-# - datasets ------------------------------------------------------------------
-# - datasets ------------------------------------------------------------------
+def loadAppSettings():
+    if os.path.exists(common.AppSettings["Filename"]):
+        loaded = []
+        with open(common.AppSettings["Filename"], 'r') as file:
+            loaded = json.load(file)
+        for key in loaded:
+            if (key in common.AppSettings):
+                common.AppSettings.update({key: loaded[key]})
 
-'''
-Function to find the delimiter that occurs the most (on the first line). Datasets support different delimiters.
-:param fname: Filename of file to operate on.
-'''
-def discoverDatasetDelimiter(fname):
-    with open(fname, 'r') as file:
-        firstline = file.readline().strip()
+    # validate settings
+    common.AppSettings["ExportOptions"]["Features"].sort()
+    if len(common.AppSettings["DataDirectory"]) > 0 and not os.path.exists(common.AppSettings["DataDirectory"]):
+        common.AppSettings["DataDirectory"] = ""
+        return False
 
-    # find delimiter character that occurs the most
-    delimiter = ''
-    most = 0
-    ntabs = firstline.count('\t')
-    ncommas = firstline.count(',')
-    nspaces = firstline.count(' ')
-    if ncommas > most:
-        delimiter = ','
-        most = ncommas
-    if ntabs > most:
-        delimiter = '\t'
-        most = ntabs
-    if nspaces > most:
-        delimiter = ' '
-        most = nspaces
-
-    return delimiter
-
-
-# - EXIF ----------------------------------------------------------------------
-# - EXIF ----------------------------------------------------------------------
-# - EXIF ----------------------------------------------------------------------
+    return True
 
 '''
-Function to extract the "DateTimeOriginal" EXIF value of an image.
-:param filepath: Path to image
+Function to load data directory configuration. Contains all information about the data capture.
 '''
-def imageEXIFDateTime(filepath):
-    strDateTime = imageEXIFTag(filepath, "EXIF DateTimeOriginal")
-    if strDateTime is None or len(strDateTime) <= 0:
-        return datetime.min
-    return datetime.strptime(strDateTime, '%Y:%m:%d %H:%M:%S')
+def loadDataConfig():
+    # config file must be in root of data directory
+    cfgFile = os.path.join(common.AppSettings["DataDirectory"], common.DefDataConfig["Filename"])
+    if not os.path.exists(cfgFile):
+        return False
 
-'''
-Function to extract the EXIF value of a particular tag.
-:param filepath: Path to image
-:param tag: EXIF tagname (not code) provided by module exifread
-'''
-def imageEXIFTag(filepath, tag):
-    result = None
-    with open(filepath, 'rb') as f:
-        tags = exifread.process_file(f, details=False, stop_tag=tag)
-        if tag in tags.keys():
-            result = tags[tag]
-    return str(result) if result is not None else None
+    # load
+    loaded = []
+    with open(cfgFile, 'r') as file:
+        loaded = json.load(file)
+    if not loaded or len(loaded) <= 0:
+        return False
 
-'''
-Function to extract all important EXIF data from an image.
-:param filepath: Path to image
-:return: A dict of key,value pairs for each EXIF metadata tag
-'''
-def imageEXIF(filepath):
-    data = {}
-    with open(filepath, 'rb') as f:
-        data = exifread.process_file(f, details=False)
-    return data
+    # update in memory collection with loaded config
+    for key in loaded:
+        if (key in common.DataConfig):
+            common.DataConfig.update({key: loaded[key]})
+
+    # collect sampling pattern
+    common.SamplingPattern[:] = [(float(azi), float(alt)) for [azi, alt] in common.DataConfig["SamplingPattern"]]
+    common.SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in common.SamplingPattern]
+    common.SamplingPatternAlts = list(set([s[1] for s in common.SamplingPattern]))
+    common.SamplingPatternAlts = sorted(common.SamplingPatternAlts)
+
+    # collect exposures
+    common.Exposures[:] = [float(e) for e in common.DataConfig["Exposures"]]
+    common.ExposureIdxMap = {common.Exposures[i]: i for i in range(0, len(common.Exposures))}
+
+    # collect lens warp/linearity data
+    common.LensWarp = tuple(common.DataConfig["Lens"]["Linearity"])
+
+    # collect sky cover data
+    dtfmtstr = "%m/%d/%Y %H:%M"
+    common.SkyCoverData.clear()
+    for sc in common.DataConfig["SkyCover"]:
+        try:
+            common.SkyCoverData.append((
+                datetime.strptime(sc[0] + " " + sc[1], dtfmtstr),
+                datetime.strptime(sc[0] + " " + sc[2], dtfmtstr),
+                common.SkyCover[sc[3]]
+            ))
+        except ValueError or IndexError:
+            return False
+
+    # collect SPA data
+    # create spa data and fill with default values from their example
+    data = spa.spa_data()
+    data.year = 2003
+    data.month = 10
+    data.day = 17
+    data.hour = 12
+    data.minute = 30
+    data.second = 30
+    data.time_zone = -7.0
+    data.delta_ut1 = 0
+    data.delta_t = 67
+    data.longitude = -105.1786
+    data.latitude = 39.742476
+    data.elevation = 1830.14
+    data.pressure = 820
+    data.temperature = 11
+    data.slope = 30
+    data.azm_rotation = -10
+    data.atmos_refract = 0.5667
+    data.function = spa.SPA_ZA
+    # overwrite with config values
+    data.time_zone = float(common.DataConfig["SPA"]["time_zone"])
+    data.delta_ut1 = float(common.DataConfig["SPA"]["delta_ut1"])
+    data.delta_t = float(common.DataConfig["SPA"]["delta_t"])
+    data.longitude = float(common.DataConfig["SPA"]["longitude"])
+    data.latitude = float(common.DataConfig["SPA"]["latitude"])
+    data.elevation = float(common.DataConfig["SPA"]["elevation"])
+    data.pressure = float(common.DataConfig["SPA"]["pressure"])
+    data.temperature = float(common.DataConfig["SPA"]["temperature"])
+    data.slope = float(common.DataConfig["SPA"]["slope"])
+    data.azm_rotation = float(common.DataConfig["SPA"]["azm_rotation"])
+    data.atmos_refract = float(common.DataConfig["SPA"]["atmos_refract"])
+    common.SPASiteData = data
+
+    return True
 
 # - HDR -----------------------------------------------------------------------
 # - HDR -----------------------------------------------------------------------
@@ -344,41 +379,6 @@ def loadASDFile(filepath, step=1):
 # - sky cover -----------------------------------------------------------------
 
 '''
-Function to load a file with data with capture dates+times and sky cover assessment at those times.
-:param filepath: Path to file with sky cover data.
-:param isDir: If filepath is directory, load default filename.
-:note: File format should be a CSV with the following columns: Date, TimeStart, TimeEnd, Sky.
-:return: A list of (datetime, datetime, skycover) for each capture timespan accounted for. 
-'''
-def loadSkyCoverData(filepath, isDir=True):
-    if isDir:
-        filepath = os.path.join(filepath, common.SkyCoverFile)
-    if not os.path.exists(filepath):
-        return []
-
-    # (datetime, datetime, skycover)
-    skycover = []
-    dtfmtstr = "%m/%d/%Y %H:%M"
-
-    # loop through each row of the file
-    with open(filepath, 'r') as f:
-        reader = csv.reader(f, delimiter=',')
-        next(reader, None)  # ignore header
-        for row in reader:
-            if len(row) < 4:
-                continue
-            try:
-                skycover.append((
-                    datetime.strptime(row[0] + " " + row[1], dtfmtstr),
-                    datetime.strptime(row[0] + " " + row[2], dtfmtstr),
-                    common.SkyCover[row[3]]
-                ))
-            except ValueError or IndexError:
-                continue
-
-    return skycover
-
-'''
 Function to find the first instance found of sky cover assessment of a particular capture time.
 :param capture: Capture (datetime) timestamp.
 :param skycovers: List of SkyCover conditions.
@@ -393,172 +393,9 @@ def findCaptureSkyCover(capture, skycovers):
             break
     return sky
 
-# - sampling ------------------------------------------------------------------
-# - sampling ------------------------------------------------------------------
-# - sampling ------------------------------------------------------------------
-
-'''
-Function to load a file with a sky sampling pattern.
-:param filepath: Path to file.
-:param isDir: If filepath is directory, load default filename.
-:note: File format should be a CSV with the following columns: azimuth, altitude.
-:return: A list of (azimuth, altitude) coordinates in degrees.
-'''
-def loadSamplingPattern(filepath, isDir=True):
-    if isDir:
-        filepath = os.path.join(filepath, common.SamplingPatternFile)
-    if not os.path.exists(filepath):
-        return []
-
-    # list of (azimuth, altitude)
-    patternDegs = []
-
-    # loop through each row of the file
-    with open(filepath, 'r') as f:
-        reader = csv.reader(f, delimiter=',')
-        next(reader, None)  # ignore header
-        for row in reader:
-            if (len(row) < 2):
-                continue
-            try:
-                patternDegs.append((float(row[0]), float(row[1])))
-            except ValueError or IndexError:
-                continue
-
-    return patternDegs
-
-# - camera --------------------------------------------------------------------
-# - camera --------------------------------------------------------------------
-# - camera --------------------------------------------------------------------
-
-'''
-Function to load a file with list of exposure times (seconds) of photos in the data directory.
-:param filepath: Path to file.
-:param isDir: If filepath is directory, load default filename.
-:return: A list of exposure times.
-:note: File format should be a CSV with the following columns: exposure
-:note: The application will assume all of these exposures exist for each capture. If not, results are undefined.
-'''
-def loadExposures(filepath, isDir=True):
-    if isDir:
-        filepath = os.path.join(filepath, common.ExposuresFile)
-    if not os.path.exists(filepath):
-        return []
-
-    exposures = []
-
-    # loop through each row of the file
-    with open(filepath, 'r') as f:
-        reader = csv.reader(f, delimiter=',')
-        next(reader, None)  # ignore header
-        for row in reader:
-            if (len(row) < 1):
-                continue
-            try:
-                exposures.append(float(row[0]))
-            except ValueError or IndexError:
-                continue
-
-    return exposures
-
-'''
-Function to load camera lens warp/linearity constants used to correct sky coordinates when transforming to fisheye uv.
-:param filepath: Path to file.
-:param isDir: If filepath is directory, load default filename.
-:return: A tuple of float constants.
-:note: File format should be a CSV with the following columns: name, x1, x2, x3, x4
-:note: Only the first non-header row is used.
-http://paulbourke.net/dome/fisheyecorrect/
-http://michel.thoby.free.fr/Fisheye_history_short/Projections/Models_of_classical_projections.html
-'''
-def loadLensWarp(filepath, isDir=True):
-    if isDir:
-        filepath = os.path.join(filepath, common.LensWarpFile)
-    if not os.path.exists(filepath):
-        return []
-
-    lenswarp = []
-
-    with open(filepath, 'r') as f:
-        reader = csv.reader(f, delimiter=',')
-        next(reader, None)  # ignore header
-        row = next(reader, None)  # read first line of file
-        try:
-            lenswarp = (float(row[1]), float(row[2]), float(row[3]), float(row[4]))
-        except ValueError or IndexError:
-            pass
-
-    return lenswarp
-
 # - SPA -----------------------------------------------------------------------
 # - SPA -----------------------------------------------------------------------
 # - SPA -----------------------------------------------------------------------
-
-'''
-Function to load a file with data used for NREL SPA's algorithm.
-:param filepath: Path to file with SPA data.
-:param isDir: If filepath is directory, load default filename.
-:note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
-:note: File format should be a CSV with the following columns: key, value, min, max, units, description.
-       Each key is a field needed to compute SPA.
-:return: A filled in spa.spa_data object.
-'''
-def loadSPASiteData(filepath, isDir=True):
-    if isDir:
-        filepath = os.path.join(filepath, common.SPASiteFile)
-    if not os.path.exists(filepath):
-        return None
-
-    # create spa data and fill with default values from their example
-    data = spa.spa_data()
-    data.year = 2003
-    data.month = 10
-    data.day = 17
-    data.hour = 12
-    data.minute = 30
-    data.second = 30
-    data.time_zone = -7.0
-    data.delta_ut1 = 0
-    data.delta_t = 67
-    data.longitude = -105.1786
-    data.latitude = 39.742476
-    data.elevation = 1830.14
-    data.pressure = 820
-    data.temperature = 11
-    data.slope = 30
-    data.azm_rotation = -10
-    data.atmos_refract = 0.5667
-    data.function = spa.SPA_ZA
-
-    # overwrite with values read from spa site info
-    with open(filepath, 'r') as f:
-        reader = csv.reader(f, delimiter=',')
-        next(reader, None) # ignore header
-        for row in reader:
-            if row[0].lower() == "time_zone":
-                data.time_zone = float(row[1])
-            elif row[0].lower() == "delta_ut1":
-                data.delta_ut1 = float(row[1])
-            elif row[0].lower() == "delta_t":
-                data.delta_t = float(row[1])
-            elif row[0].lower() == "longitude":
-                data.longitude = float(row[1])
-            elif row[0].lower() == "latitude":
-                data.latitude = float(row[1])
-            elif row[0].lower() == "elevation":
-                data.elevation = float(row[1])
-            elif row[0].lower() == "pressure":
-                data.pressure = float(row[1])
-            elif row[0].lower() == "temperature":
-                data.temperature = float(row[1])
-            elif row[0].lower() == "slope":
-                data.slope = float(row[1])
-            elif row[0].lower() == "azm_rotation":
-                data.azm_rotation = float(row[1])
-            elif row[0].lower() == "atmos_refract":
-                data.atmos_refract = float(row[1])
-
-    return data
 
 '''
 Function to deep copy a spa_data object. This function is useful because SWIG didn't create pickling code for deep copy.
@@ -651,39 +488,70 @@ def computeSunPath(spadata):
             sunpath.append((spadata2.azimuth, altitude, dt))
     return sunpath
 
+# - EXIF ----------------------------------------------------------------------
+# - EXIF ----------------------------------------------------------------------
+# - EXIF ----------------------------------------------------------------------
+
 '''
-Function to load a solar position (sunpath) file exported from NREL's SPA calculator online.
-:param filepath: Path to file with SPA data.
-:param isDir: If filepath is directory, load default filename.
-:note: NREL SPA can be found at https://midcdmz.nrel.gov/spa/
-:note: File format should be a CSV with the following columns:
-       Date, Time, Topocentric zenith angle, Topocentric azimuth angle (eastward from N)
-:return: A list of (azimuth, altitude, datetime) tuples with solar position and timestamp
+Function to extract the "DateTimeOriginal" EXIF value of an image.
+:param filepath: Path to image
 '''
-def loadSunPath(filepath, isDir=True):
-    if isDir:
-        filepath = os.path.join(filepath, common.SPASiteFile)
-    if not os.path.exists(filepath):
-        return []
+def imageEXIFDateTime(filepath):
+    strDateTime = imageEXIFTag(filepath, "EXIF DateTimeOriginal")
+    if strDateTime is None or len(strDateTime) <= 0:
+        return datetime.min
+    return datetime.strptime(strDateTime, '%Y:%m:%d %H:%M:%S')
 
-    sunpath = []
+'''
+Function to extract the EXIF value of a particular tag.
+:param filepath: Path to image
+:param tag: EXIF tagname (not code) provided by module exifread
+'''
+def imageEXIFTag(filepath, tag):
+    result = None
+    with open(filepath, 'rb') as f:
+        tags = exifread.process_file(f, details=False, stop_tag=tag)
+        if tag in tags.keys():
+            result = tags[tag]
+    return str(result) if result is not None else None
 
-    with open(filepath, 'r') as f:
-        reader = csv.reader(f, delimiter=',')
-        next(reader, None)
-        for row in reader:
-            # we only care about rows with a valid timestamp
-            dt = datetime.min
-            try:
-                dts = row[0] + " " + row[1]
-                dt = datetime.strptime(dts, "%m/%d/%Y %H:%M:%S")
-            except ValueError:
-                continue
-            # swap the order of (zenith, azimuth) to (azimuth, zenith) for consistency throughout application
-            # this application uses altitude (90 - zenith)
-            point = (float(row[3]), 90-float(row[2]), dt)
-            # we only care about altitude when sun is visible (not on other side of Earth)
-            if point[1] >=0 and point[1] <= 90:
-                sunpath.append(point)
+'''
+Function to extract all important EXIF data from an image.
+:param filepath: Path to image
+:return: A dict of key,value pairs for each EXIF metadata tag
+'''
+def imageEXIF(filepath):
+    data = {}
+    with open(filepath, 'rb') as f:
+        data = exifread.process_file(f, details=False)
+    return data
 
-    return sunpath
+# - exports -------------------------------------------------------------------
+# - exports -------------------------------------------------------------------
+# - exports -------------------------------------------------------------------
+
+'''
+Function to find the delimiter that occurs the most (on the first line). Datasets support different delimiters.
+:param fname: Filename of file to operate on.
+'''
+def discoverDatasetDelimiter(fname):
+    with open(fname, 'r') as file:
+        firstline = file.readline().strip()
+
+    # find delimiter character that occurs the most
+    delimiter = ''
+    most = 0
+    ntabs = firstline.count('\t')
+    ncommas = firstline.count(',')
+    nspaces = firstline.count(' ')
+    if ncommas > most:
+        delimiter = ','
+        most = ncommas
+    if ntabs > most:
+        delimiter = '\t'
+        most = ntabs
+    if nspaces > most:
+        delimiter = ' '
+        most = nspaces
+
+    return delimiter
