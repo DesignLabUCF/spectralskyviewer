@@ -642,8 +642,7 @@ class ViewFisheye(QWidget):
                         self.pathSun.translate(-1.0, -1.0)
                         for i in range(0, self.pathSun.elementCount()):
                             e = self.pathSun.elementAt(i)
-                            destRect.setCoords(e.x, e.y + self.fontMetrics.height()/2 + 1,
-                                               self.myPhotoDestRect.width(), self.myPhotoDestRect.height())
+                            destRect.setCoords(e.x, e.y + self.fontMetrics.height()/2 + 1, self.width(), self.height())
                             painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.sunPathPoints[i][2].hour))
                     # sun, path, hours
                     painter.setPen(self.penSun)
@@ -652,8 +651,7 @@ class ViewFisheye(QWidget):
                     painter.drawPath(self.pathSun)
                     for i in range(0, self.pathSun.elementCount()):
                         e = self.pathSun.elementAt(i)
-                        destRect.setCoords(e.x, e.y + self.fontMetrics.height() / 2,
-                                           self.myPhotoDestRect.width(), self.myPhotoDestRect.height())
+                        destRect.setCoords(e.x, e.y + self.fontMetrics.height() / 2, self.width(), self.height())
                         painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.sunPathPoints[i][2].hour))
 
                 # draw selected samples (ALWAYS)
@@ -686,7 +684,9 @@ class ViewFisheye(QWidget):
                 #     y = (self.viewCenter[1] - self.myPhotoRadius) + (v * diameter)
                 #     painter.setPen(self.penLens)
                 #     painter.drawEllipse(QPoint(x, y), 10, 10)
-                #     #t, p = utility_angles.FisheyeUV2SkyCoord(u, v)
+                #     t, p = utility_angles.FisheyeUV2SkyCoord(u, v)
+                #     destRect.setCoords(x + 3, y - 50, self.width(), self.height())
+                #     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "{0:0.2f}".format(p))
                 #
                 # # TESTING TESTING TESTING TESTING TESTING TESTING
 
@@ -698,11 +698,11 @@ class ViewFisheye(QWidget):
                 destRect.setCoords(10, 10, self.width() / 2, 50)
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.myPhotoTime))
                 # draw sky cover assessment
-                destRect.setCoords(10, 25, self.myPhotoDestRect.width(), self.myPhotoDestRect.height())
+                destRect.setCoords(10, 25, self.width(), self.height())
                 painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, self.skyCover.name + "/" + common.SkyCoverDesc[self.skyCover])
                 # draw photo rotation
                 if self.myPhotoRotation != 0:
-                    destRect.setCoords(10, self.height()-25, self.myPhotoDestRect.width(), self.myPhotoDestRect.height())
+                    destRect.setCoords(10, self.height()-25, self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "Rotation: " + str(self.myPhotoRotation) + "°")
 
                 # information we are interested in displaying

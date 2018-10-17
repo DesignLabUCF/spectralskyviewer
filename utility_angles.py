@@ -76,8 +76,8 @@ def FisheyeUV2SkyCoord(u, v, lenswarp=True):
 
     # compute zenith
     # account for non-linearity/warp of actual lens
-    if lenswarp and len(common.LensWarp) == 4:
-        zenith = radius * math.pi / 2.0
+    if lenswarp and len(common.LensWarpInv) > 0:
+        zenith = np.polyval(common.LensWarpInv, radius)
     # use ideal lens
     else:
         zenith = radius * math.pi / 2.0

@@ -76,6 +76,7 @@ def loadDataConfig():
 
     # collect lens warp/linearity data
     common.LensWarp = tuple(common.DataConfig["Lens"]["Linearity"])
+    common.LensWarpInv = tuple(common.DataConfig["Lens"]["Inverse"])
 
     # collect sky cover data
     dtfmtstr = "%m/%d/%Y %H:%M"

@@ -140,7 +140,8 @@ AppSettings = dict(DefAppSettings)
 
 Exposures = []            # photo capture exposure times (in seconds)
 ExposureIdxMap = {}       # for convenience
-LensWarp = ()             # camera lens warp/linearity constants used to correct sky coordinates when transforming to fisheye uv
+LensWarp = ()             # camera lens warp/linearity 4^th degree poly coefficients (used for sky to fisheye coords)
+LensWarpInv = ()          # inverse of polynomial above (used for fisheye to sky coords)
 SPASiteData = None        # SPA (sun positioning algorithm) site data
 SamplingPattern = []      # sky sampling pattern coordinates (azimuth, altitude)
 SamplingPatternRads = []  # for convenience
