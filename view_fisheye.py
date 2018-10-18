@@ -589,6 +589,20 @@ class ViewFisheye(QWidget):
                         destRect.setCoords(self.viewCenter[0] + r + 3, self.viewCenter[1] - (self.fontMetrics.height() + 3), self.width(), self.height())
                         painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "{0:d}°".format(int(alt)))
 
+                    # # TESTING TESTING TESTING TESTING TESTING TESTING
+                    #
+                    # for alt in common.SamplingPatternAlts:
+                    #     u, v = utility_angles.SkyCoord2FisheyeUV(90, alt)
+                    #     x = (self.viewCenter[0] - self.myPhotoRadius) + (u * diameter)
+                    #     y = (self.viewCenter[1] - self.myPhotoRadius) + (v * diameter)
+                    #     painter.setPen(self.penLens)
+                    #     painter.drawEllipse(QPoint(x, y), 10, 10)
+                    #     t, p = utility_angles.FisheyeUV2SkyCoord(u, v)
+                    #     destRect.setCoords(x + 3, y - 50, self.width(), self.height())
+                    #     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "{0:0.2f}".format(p))
+                    #
+                    # # TESTING TESTING TESTING TESTING TESTING TESTING
+
                 # draw compass
                 if common.AppSettings["ShowCompass"]:
                     # compass ticks text shadows
@@ -673,24 +687,6 @@ class ViewFisheye(QWidget):
                     abs(self.dragSelectRect.bottom()-self.dragSelectRect.top()) >= ViewFisheye.SelectionRectMin):
                     painter.setPen(self.penSelectRect)
                     painter.drawRect(self.dragSelectRect)
-
-
-
-                # # TESTING TESTING TESTING TESTING TESTING TESTING
-                #
-                # for alt in common.SamplingPatternAlts:
-                #     u, v = utility_angles.SkyCoord2FisheyeUV(90, alt)
-                #     x = (self.viewCenter[0] - self.myPhotoRadius) + (u * diameter)
-                #     y = (self.viewCenter[1] - self.myPhotoRadius) + (v * diameter)
-                #     painter.setPen(self.penLens)
-                #     painter.drawEllipse(QPoint(x, y), 10, 10)
-                #     t, p = utility_angles.FisheyeUV2SkyCoord(u, v)
-                #     destRect.setCoords(x + 3, y - 50, self.width(), self.height())
-                #     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "{0:0.2f}".format(p))
-                #
-                # # TESTING TESTING TESTING TESTING TESTING TESTING
-
-
 
                 # draw timestamp
                 painter.setPen(self.penText)
