@@ -634,7 +634,7 @@ class ViewFisheye(QWidget):
                     for i in range(0, len(self.samplePoints)):
                         p = self.samplePoints[i]
                         painter.drawEllipse(QPoint(p[0],p[1]), ViewFisheye.SampleRadius, ViewFisheye.SampleRadius)
-                        painter.drawText(p[0] - ViewFisheye.SampleRadius, p[1], str(i))
+                        painter.drawText(p[0] + ViewFisheye.SampleRadius, p[1], str(i))
 
                 # draw sun path
                 if common.AppSettings["ShowSunPath"]:
