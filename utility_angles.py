@@ -4,7 +4,8 @@
 # @author: Joe Del Rocco
 # @since: 11/02/2017
 # @summary: A module with angle and coordinate transformations.
-# @note: Parts of this file came from angle_utilities.py written by Dan Knowlton - redistributed with permission.
+# @note: Parts of this file came from angle_utilities.py written by Dan Knowlton of PCG at Cornell.
+# Redistributed with permission.
 # ====================================================================
 # Provides functionality to convert between UV coordinates and angles as well
 #   as other useful angle utilities.
@@ -63,9 +64,9 @@ def SkyCoord2FisheyeUV(azimuth, altitude, lenswarp=True):
 Convert a fisheye UV coordinate (0-1, 0-1) to a sky coordinate (azimuth, altitude).
 '''
 def FisheyeUV2SkyCoord(u, v, lenswarp=True):
-    # adjust to [-0.5, 0.5] range
-    u = u - 0.5
-    v = v - 0.5
+    # adjust to [-1, 1] range
+    u = (u - 0.5) * 2
+    v = (v - 0.5) * 2
 
     radius = math.sqrt((u * u) + (v * v))
 
@@ -83,7 +84,7 @@ def FisheyeUV2SkyCoord(u, v, lenswarp=True):
         zenith = radius * math.pi / 2.0
 
     # convert zenith to altitude
-    altitude = ((math.pi/2) - 2 * zenith)
+    altitude = (math.pi / 2) - zenith
 
     # convert from radians to angles
     azimuth = azimuth * 180.0 / math.pi
