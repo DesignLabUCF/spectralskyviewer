@@ -52,7 +52,6 @@ class ViewFisheye(QWidget):
         self.lensIdealRadii = []         # list of radii for ideal lens latitudes to draw
         self.lensRealRadii = []          # list of radii for real/warped lens latitudes to draw
         self.samplePoints = []           # (x,y) coords of all samples on the photo rendered on screen (scaled)
-        #self.samplePointsInv = []
         self.sampleAreaVisible = []      # area of 4 points for each sample rendered on screen (scaled)
         self.samplePointsInFile = []     # points (x,y) of all samples in the photo on file
         self.samplesSelected = []        # indices of selected samples
@@ -88,7 +87,6 @@ class ViewFisheye(QWidget):
 
         for t, p in common.SamplingPattern:
             self.samplePoints.append((0, 0))  # these will need to be recomputed as photo scales
-            #self.samplePointsInv.append((0, 0))
             self.samplePointsInFile.append((0, 0))  # these only need to be computed once per photo
             self.sampleAreaVisible.append([])
             color.setHsv(t, int(utility.normalize(p, 0, 90) * 127 + 128), 255)
@@ -376,7 +374,6 @@ class ViewFisheye(QWidget):
             self.myPhotoRadius = 0
             for i in range(0, len(common.SamplingPattern)):
                 self.samplePoints[i] = (0, 0)
-                #self.samplePointsInv[i] = (0, 0)
                 self.sampleAreaVisible[i] = []
             return
 
@@ -423,12 +420,6 @@ class ViewFisheye(QWidget):
             x = (u * myPhotoDiameter) + (self.viewCenter[0] - self.myPhotoRadius)
             y = (v * myPhotoDiameter) + (self.viewCenter[1] - self.myPhotoRadius)
             self.samplePoints[i] = (x, y)
-            # # compute sample bounds (inverse coordinates)
-            # t, p = utility_angles.FisheyeUV2SkyCoord(u, v)
-            # u, v = utility_angles.SkyCoord2FisheyeUV(t, p)
-            # x = (u * myPhotoDiameter) + (self.viewCenter[0] - self.myPhotoRadius)
-            # y = (v * myPhotoDiameter) + (self.viewCenter[1] - self.myPhotoRadius)
-            # self.samplePointsInv[i] = (x, y)
             # compute sampling pattern actual sampling areas (projected differential angle area)
             p1 = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0] - hFOV, common.SamplingPattern[i][1] - hFOV)
             p2 = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0] - hFOV, common.SamplingPattern[i][1] + hFOV)
@@ -644,8 +635,6 @@ class ViewFisheye(QWidget):
                         p = self.samplePoints[i]
                         painter.drawEllipse(QPoint(p[0],p[1]), ViewFisheye.SampleRadius, ViewFisheye.SampleRadius)
                         painter.drawText(p[0] - ViewFisheye.SampleRadius, p[1], str(i))
-                        #p = self.samplePointsInv[i]
-                        #painter.drawEllipse(QPoint(p[0], p[1]), ViewFisheye.SampleRadius, ViewFisheye.SampleRadius)
 
                 # draw sun path
                 if common.AppSettings["ShowSunPath"]:

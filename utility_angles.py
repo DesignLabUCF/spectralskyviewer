@@ -48,7 +48,7 @@ def SkyCoord2FisheyeUV(azimuth, altitude, lenswarp=True):
         radius = np.polyval(common.LensWarp, zenith)
     # use ideal lens
     else:
-        radius = zenith / (math.pi / 2.0)
+        radius = np.polyval(common.LensIdeal, zenith)
 
     # compute UVs
     u = radius * math.cos(azimuth)
@@ -81,7 +81,7 @@ def FisheyeUV2SkyCoord(u, v, lenswarp=True):
         zenith = np.polyval(common.LensWarpInv, radius)
     # use ideal lens
     else:
-        zenith = radius * math.pi / 2.0
+        zenith = np.polyval(common.LensIdealInv, radius)
 
     # convert zenith to altitude
     altitude = (math.pi / 2) - zenith

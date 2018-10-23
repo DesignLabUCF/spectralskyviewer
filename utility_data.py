@@ -75,6 +75,8 @@ def loadDataConfig():
     common.ExposureIdxMap = {common.Exposures[i]: i for i in range(0, len(common.Exposures))}
 
     # collect lens warp/linearity data
+    common.LensIdeal = tuple([0,0,0,1/(math.pi/2.0),0])
+    common.LensIdealInv = tuple([0,0,0,(math.pi/2.0),0])
     common.LensWarp = tuple(common.DataConfig["Lens"]["Linearity"])
     common.LensWarpInv = tuple(common.DataConfig["Lens"]["Inverse"])
 
