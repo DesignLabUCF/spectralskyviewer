@@ -187,8 +187,8 @@ def computePointsInImage(imgfile, coords):
     # load image and retrieve stats
     image = Image.open(imgfile)
     center = (int(image.width / 2), int(image.height / 2))
-    radius = image.height / 2
-    diameter = radius * 2
+    diameter = image.height
+    radius = diameter / 2
     image.close()
 
     # compute each coordinate in the image

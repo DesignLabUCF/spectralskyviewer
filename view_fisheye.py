@@ -372,12 +372,13 @@ class ViewFisheye(QWidget):
             self.myPhotoDestRect = QRect(0, 0, self.width(), self.height())
             self.viewCenter = (self.width() / 2, self.height() / 2)
             self.myPhotoRadius = 0
+            self.myPhotoDiameter = 0
             for i in range(0, len(common.SamplingPattern)):
                 self.samplePoints[i] = (0, 0)
                 self.sampleAreaVisible[i] = []
             return
 
-        # scale the photo dest rect
+        # scale photo destination rect to fit photo on screen
         # scale by the scaling factor that requires the most scaling ( - 2 to fit in border )
         wRatio = self.width() / self.myPhoto.width()
         hRatio = self.height() / self.myPhoto.height()
@@ -392,20 +393,11 @@ class ViewFisheye(QWidget):
         self.myPhotoDestRect.moveTo(self.width() / 2 - self.myPhotoDestRect.width() / 2,
                                     self.height() / 2 - self.myPhotoDestRect.height() / 2)
 
-        # compute plotting center and radius
-        self.viewCenter = (self.myPhotoDestRect.x() + self.myPhotoDestRect.width() / 2,
-                          self.myPhotoDestRect.y() + self.myPhotoDestRect.height() / 2)
+        # NOTE - THESE ARE THE MOST IMPORTANT COMPUTATIONS FROM WHICH EVERYTHING ELSE IS PLOTTED
+        self.viewCenter = (self.width() / 2, self.height() / 2)
         self.myPhotoRadius = self.myPhotoDestRect.height() / 2
-        # debug - hardcoded image center and radius for 8/30/2013 0900
-        # wr = 2182.0 / self.myPhoto.width()
-        # hr = 1448.0 / self.myPhoto.height()
-        # rr = 1436.0 / self.myPhoto.height()
-        # sw = (self.myPhotoDestRect.width() * wr) + self.myPhotoDestRect.x()
-        # sh = (self.myPhotoDestRect.height() * hr) + self.myPhotoDestRect.y()
-        # sr = (self.myPhotoDestRect.height() * rr)
-        # self.viewCenter = (int(sw), int(sh))
-        # self.myPhotoRadius = int(sr)
-        myPhotoDiameter = self.myPhotoRadius * 2
+        self.myPhotoDiameter = self.myPhotoRadius * 2
+        self.myPhotoTopLeft = ((self.viewCenter[0] - self.myPhotoRadius), (self.viewCenter[1] - self.myPhotoRadius))
 
         # compute new scaled font size
         self.fontScaled = QFont('Courier New', self.myPhotoRadius * (1/(101-common.AppSettings["HUDTextScale"])))
@@ -417,22 +409,18 @@ class ViewFisheye(QWidget):
         for i in range(0, len(common.SamplingPattern)):
             # compute sample bounds
             u, v = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0], common.SamplingPattern[i][1])
-            x = (u * myPhotoDiameter) + (self.viewCenter[0] - self.myPhotoRadius)
-            y = (v * myPhotoDiameter) + (self.viewCenter[1] - self.myPhotoRadius)
+            x = self.myPhotoTopLeft[0] + (u * self.myPhotoDiameter)
+            y = self.myPhotoTopLeft[1] + (v * self.myPhotoDiameter)
             self.samplePoints[i] = (x, y)
             # compute sampling pattern actual sampling areas (projected differential angle area)
             p1 = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0] - hFOV, common.SamplingPattern[i][1] - hFOV)
             p2 = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0] - hFOV, common.SamplingPattern[i][1] + hFOV)
             p3 = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0] + hFOV, common.SamplingPattern[i][1] + hFOV)
             p4 = utility_angles.SkyCoord2FisheyeUV(common.SamplingPattern[i][0] + hFOV, common.SamplingPattern[i][1] - hFOV)
-            p1 = QPoint((self.viewCenter[0] - self.myPhotoRadius) + (p1[0] * myPhotoDiameter),
-                        (self.viewCenter[1] - self.myPhotoRadius) + (p1[1] * myPhotoDiameter))
-            p2 = QPoint((self.viewCenter[0] - self.myPhotoRadius) + (p2[0] * myPhotoDiameter),
-                        (self.viewCenter[1] - self.myPhotoRadius) + (p2[1] * myPhotoDiameter))
-            p3 = QPoint((self.viewCenter[0] - self.myPhotoRadius) + (p3[0] * myPhotoDiameter),
-                        (self.viewCenter[1] - self.myPhotoRadius) + (p3[1] * myPhotoDiameter))
-            p4 = QPoint((self.viewCenter[0] - self.myPhotoRadius) + (p4[0] * myPhotoDiameter),
-                        (self.viewCenter[1] - self.myPhotoRadius) + (p4[1] * myPhotoDiameter))
+            p1 = QPoint(self.myPhotoTopLeft[0] + (p1[0] * self.myPhotoDiameter), self.myPhotoTopLeft[1] + (p1[1] * self.myPhotoDiameter))
+            p2 = QPoint(self.myPhotoTopLeft[0] + (p2[0] * self.myPhotoDiameter), self.myPhotoTopLeft[1] + (p2[1] * self.myPhotoDiameter))
+            p3 = QPoint(self.myPhotoTopLeft[0] + (p3[0] * self.myPhotoDiameter), self.myPhotoTopLeft[1] + (p3[1] * self.myPhotoDiameter))
+            p4 = QPoint(self.myPhotoTopLeft[0] + (p4[0] * self.myPhotoDiameter), self.myPhotoTopLeft[1] + (p4[1] * self.myPhotoDiameter))
             self.sampleAreaVisible[i] = [p1, p2, p3, p4]
 
         # compute compass lines
@@ -441,10 +429,10 @@ class ViewFisheye(QWidget):
         for angle in range(0, 360, 10):
             theta = 360 - ((angle + 270) % 360)  # angles eastward from North, North facing down
             rads = theta * math.pi / 180.0
-            cx1 = math.cos(rads) * (self.myPhotoRadius - tickLength) + self.viewCenter[0]
-            cy1 = math.sin(rads) * (self.myPhotoRadius - tickLength) + self.viewCenter[1]
-            cx2 = math.cos(rads) * self.myPhotoRadius + self.viewCenter[0]
-            cy2 = math.sin(rads) * self.myPhotoRadius + self.viewCenter[1]
+            cx1 = (math.cos(rads) * (self.myPhotoRadius - tickLength)) + self.viewCenter[0]
+            cy1 = (math.sin(rads) * (self.myPhotoRadius - tickLength)) + self.viewCenter[1]
+            cx2 = (math.cos(rads) * self.myPhotoRadius) + self.viewCenter[0]
+            cy2 = (math.sin(rads) * self.myPhotoRadius) + self.viewCenter[1]
             lx1 = (math.cos(rads) * (self.myPhotoRadius - tickLength*4)) + self.viewCenter[0] - self.fontMetrics.width(str(angle))/2
             ly1 = (math.sin(rads) * (self.myPhotoRadius - tickLength*4)) + self.viewCenter[1] - self.fontMetrics.height()/2
             self.compassTicks.append([cx1, cy1, cx2, cy2, lx1, ly1, angle])  # x1, y1, x2, y2, x1lbl, y1lbl, angle
@@ -455,12 +443,12 @@ class ViewFisheye(QWidget):
         for alt in common.SamplingPatternAlts:
             # ideal lens
             u, v = utility_angles.SkyCoord2FisheyeUV(90, alt, lenswarp=False)
-            x = (self.viewCenter[0] - self.myPhotoRadius) + (u * myPhotoDiameter)
+            x = self.myPhotoTopLeft[0] + (u * self.myPhotoDiameter)
             r = x - self.viewCenter[0]
             self.lensIdealRadii.append((r, alt))  # (radius, altitude)
             # warped lens
             u, v = utility_angles.SkyCoord2FisheyeUV(90, alt)
-            x = (self.viewCenter[0] - self.myPhotoRadius) + (u * myPhotoDiameter)
+            x = self.myPhotoTopLeft[0] + (u * self.myPhotoDiameter)
             r = x - self.viewCenter[0]
             self.lensRealRadii.append((r, alt))   # (radius, altitude)
 
@@ -469,20 +457,20 @@ class ViewFisheye(QWidget):
         if len(self.sunPathPoints) > 0:
             azi, alt, dt = self.sunPathPoints[0]
             u, v = utility_angles.SkyCoord2FisheyeUV(azi, alt)
-            x = (u * myPhotoDiameter) + (self.viewCenter[0] - self.myPhotoRadius)
-            y = (v * myPhotoDiameter) + (self.viewCenter[1] - self.myPhotoRadius)
+            x = self.myPhotoTopLeft[0] + (u * self.myPhotoDiameter)
+            y = self.myPhotoTopLeft[1] + (v * self.myPhotoDiameter)
             self.pathSun.moveTo(x, y)
             for i in range(1, len(self.sunPathPoints)):
                 azi, alt, dt = self.sunPathPoints[i]
                 u, v = utility_angles.SkyCoord2FisheyeUV(azi, alt)
-                x = (u * myPhotoDiameter) + (self.viewCenter[0] - self.myPhotoRadius)
-                y = (v * myPhotoDiameter) + (self.viewCenter[1] - self.myPhotoRadius)
+                x = self.myPhotoTopLeft[0] + (u * self.myPhotoDiameter)
+                y = self.myPhotoTopLeft[1] + (v * self.myPhotoDiameter)
                 self.pathSun.lineTo(x, y)
 
         # compute sun position screen point
         u, v = utility_angles.SkyCoord2FisheyeUV(self.sunPosition[0], self.sunPosition[1])
-        x = (u * myPhotoDiameter) + (self.viewCenter[0] - self.myPhotoRadius)
-        y = (v * myPhotoDiameter) + (self.viewCenter[1] - self.myPhotoRadius)
+        x = self.myPhotoTopLeft[0] + (u * self.myPhotoDiameter)
+        y = self.myPhotoTopLeft[1] + (v * self.myPhotoDiameter)
         self.sunPositionVisible = (x, y)
 
         # compute new mask
@@ -521,7 +509,6 @@ class ViewFisheye(QWidget):
 
             # useful local vars
             centerPoint = QPoint(self.viewCenter[0], self.viewCenter[1])
-            diameter = self.myPhotoRadius * 2
             destRect = QRect(0, 0, self.myPhotoDestRect.width(), self.myPhotoDestRect.height())
             fontWidth = self.fontMetrics.width("X")
 
@@ -530,7 +517,7 @@ class ViewFisheye(QWidget):
                 maskPainter = QPainter()
                 maskPainter.begin(self.mask)
                 maskPainter.setBrush(QBrush(Qt.magenta, Qt.SolidPattern))
-                maskPainter.drawEllipse(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius, diameter, diameter)
+                maskPainter.drawEllipse(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius, self.myPhotoDiameter, self.myPhotoDiameter)
                 maskPainter.end()
                 painter.setCompositionMode(QPainter.CompositionMode_DestinationIn)
                 painter.drawImage(0, 0, self.mask)
@@ -611,7 +598,7 @@ class ViewFisheye(QWidget):
                         destRect.setCoords(tick[4], tick[5], self.width(), self.height())
                         painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(tick[6])+"°")
                     # photo radius
-                    #painter.drawEllipse(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius, diameter, diameter)
+                    #painter.drawEllipse(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius, self.myPhotoDiameter, self.myPhotoDiameter)
                     painter.drawEllipse(centerPoint, self.myPhotoRadius, self.myPhotoRadius)
                     # cardinal directions
                     destRect.setCoords(self.viewCenter[0] - self.myPhotoRadius - (fontWidth+4), self.viewCenter[1] - self.fontMetrics.height()/2, self.width(), self.height())
@@ -695,38 +682,48 @@ class ViewFisheye(QWidget):
                     destRect.setCoords(10, self.height()-25, self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "Rotation: " + str(self.myPhotoRotation) + "°")
 
-                # information we are interested in displaying
-                #self.coordsMouse   # x,y of this widget
-                coordsxy = (-1, -1) # x,y over photo as scaled/rendered on this widget
-                coordsXY = (-1, -1) # x,y over actual original photo on disk
-                coordsUC = (-1, -1) # unit circle coords [0-1] from center of photo to edge of fisheye radius
-                coordsUV = (-1, -1) # u,v coords of fisheye portion of photo w/ 0,0 top left and 1,1 bottom right
-                coordsTP = (-1, -1) # theta,phi polar coordinates
-                distance = math.inf # distance from center of fisheye to mouse in unit circle
+                # where is the mouse relative to the center?
+                # this is used as an optimization to only display information when mouse is in fisheye portion
+                dx = self.coordsMouse[0] - self.viewCenter[0]
+                dy = self.coordsMouse[1] - self.viewCenter[1]
+                distance = math.sqrt((dx * dx) + (dy * dy))  # distance from mouse to view center
+
+                # coordinates we are interested in
+                #self.coordsMouse    # x,y of this widget
+                coordsxy = (-1, -1)  # x,y over photo as scaled/rendered on this widget
+                coordsXY = (-1, -1)  # x,y over actual original photo on disk
+                coordsUV = (-1, -1)  # u,v coords of fisheye portion of photo w/ 0,0 top left and 1,1 bottom right
+                coordsTP = (-1, -1)  # theta,phi polar coordinates
+                # text
+                textxy = "-1, -1 xy"
+                textXY = "-1, -1 xy"
+                textUV = "-1, -1 uv"
+                textTP = "-1, -1 θφ"
+                textPX = "0 0 0 px"
 
                 # compute all relevant information only when mouse is within fisheye portion of photo
-                if (self.coordsMouse[0] >= self.myPhotoDestRect.x() and
-                    self.coordsMouse[1] >= self.myPhotoDestRect.y() and
-                    self.coordsMouse[0] < self.myPhotoDestRect.x() + self.myPhotoDestRect.width() and
-                    self.coordsMouse[1] < self.myPhotoDestRect.y() + self.myPhotoDestRect.height()):
+                if distance < self.myPhotoRadius:
                     coordsxy = (self.coordsMouse[0] - self.myPhotoDestRect.x(),
                                 self.coordsMouse[1] - self.myPhotoDestRect.y())
-                    coordsUC = ((coordsxy[0] - self.myPhotoDestRect.width()/2) / self.myPhotoRadius,
-                                (coordsxy[1] - self.myPhotoDestRect.height()/2) / self.myPhotoRadius)
                     coordsXY = (int(coordsxy[0] / self.myPhotoDestRect.width() * self.myPhoto.width()),
                                 int(coordsxy[1] / self.myPhotoDestRect.height() * self.myPhoto.height()))
-                    coordsUV = ((coordsUC[0] + 1) / 2, (coordsUC[1] + 1) / 2)
+                    coordsUV = ((self.coordsMouse[0] - self.myPhotoTopLeft[0]) / self.myPhotoDiameter,
+                                (self.coordsMouse[1] - self.myPhotoTopLeft[1]) / self.myPhotoDiameter)
                     coordsTP = utility_angles.FisheyeUV2SkyCoord(coordsUV[0], coordsUV[1])
-                    distance = math.sqrt((coordsUC[0] * coordsUC[0]) + (coordsUC[1] * coordsUC[1]))
+                    # text
+                    textxy = str(coordsxy[0]) + ", " + str(coordsxy[1]) + " xy"
+                    textXY = str(coordsXY[0]) + ", " + str(coordsXY[1]) + " xy"
+                    textUV = "{:.2f}".format(coordsUV[0]) + ", " + "{:.2f}".format(coordsUV[1]) + " uv"
+                    textTP = "{:.2f}".format(coordsTP[0]) + ", " + "{:.2f}".format(coordsTP[1]) + " θφ"
 
                 # pixels colors
                 pixreg = common.AppSettings["PixelRegion"]
                 colorsRegion = np.zeros((pixreg, pixreg, 4))
                 colorFinal = colorsRegion[0,0]  # RGBA of pixel under mouse of photo on disk
                 # colorFinal = self.myPhoto.pixelColor(coordsXY[0], coordsXY[1])
-                if distance <= 1.0:
+                if distance < self.myPhotoRadius:
                     halfdim = int(pixreg / 2)
-                    rstart = coordsXY[1] - halfdim
+                    rstart = coordsXY[1]-halfdim
                     rstop = coordsXY[1]+halfdim+1
                     cstart = coordsXY[0]-halfdim
                     cstop = coordsXY[0]+halfdim+1
@@ -734,40 +731,24 @@ class ViewFisheye(QWidget):
                         cstart >= 0 and cstop<=self.myPhotoPixels.shape[1]):
                         colorsRegion = self.myPhotoPixels[rstart:rstop, cstart:cstop]
                         colorFinal = colorsRegion[halfdim, halfdim]
-                        # pixel color weighting
-                        if pixreg > 1:
+                        if pixreg > 1:  # with pixel weighting
                             colorFinal = utility_data.collectPixels([coordsXY], [pixreg], pixels=self.myPhotoPixels, weighting=common.PixelWeighting(common.AppSettings["PixelWeighting"]))[0]
-
-                # text strings for information we want to display on HUD
-                textxy = "-1, -1 xy"
-                textXY = "-1, -1 xy"
-                textUC = "-1, -1 uc"
-                textUV = "-1, -1 uv"
-                textTP = "-1, -1 θφ"
-                textPX = "0 0 0 px"
-                if distance <= 1.0:
-                    textxy = str(coordsxy[0]) + ", " + str(coordsxy[1]) + " xy"
-                    textXY = str(coordsXY[0]) + ", " + str(coordsXY[1]) + " xy"
-                    textUC = "{:.2f}".format(coordsUC[0]) + ", " + "{:.2f}".format(coordsUC[1]) + " uc"
-                    textUV = "{:.2f}".format(coordsUV[0]) + ", " + "{:.2f}".format(coordsUV[1]) + " uv"
-                    textTP = "{:.2f}".format(coordsTP[0]) + ", " + "{:.2f}".format(coordsTP[1]) + " θφ"
                     textPX = str(colorFinal[0]) + " " + str(colorFinal[1]) + " " + str(colorFinal[2]) + " px"
-                # draw x,y coords
-                destRect.setCoords(10, 10, self.width()-10, self.height()- 134)
+
+                # draw HUD text strings
+                # x,y coords
+                destRect.setCoords(10, 10, self.width()-10, self.height()- 124)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textxy)
-                # draw u,v coords
-                destRect.setCoords(10, 10, self.width() - 10, self.height() - 124)
-                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textXY)
-                # draw unit circle coords
+                # X,Y coords
                 destRect.setCoords(10, 10, self.width() - 10, self.height() - 114)
-                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textUC)
-                # draw fractional coords
+                painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textXY)
+                # u,v coords
                 destRect.setCoords(10, 10, self.width() - 10, self.height() - 104)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textUV)
-                # draw t,p coords
+                # t,p coords
                 destRect.setCoords(10, 10, self.width() - 10, self.height() - 94)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textTP)
-                # draw pixel color
+                # pixel color
                 destRect.setCoords(10, 10, self.width() - 10, self.height() - 84)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textPX)
 
@@ -779,9 +760,9 @@ class ViewFisheye(QWidget):
                 pixelsWeightedX = self.width() - ViewFisheye.SelectedPixelBox - 10
                 pixelsWeightedY = self.height() - 10 - ViewFisheye.SelectedPixelBox
 
-                # draw cursor visual indicators - fills (if cursor is within fisheye radius)
+                # draw pixel visualization - fills
                 pixreg = common.AppSettings["PixelRegion"]
-                if distance <= 1.0:
+                if distance < self.myPhotoRadius:
                     painter.setPen(Qt.NoPen)
                     # pixel region
                     pixdim = ViewFisheye.SelectedPixelBox / pixreg
@@ -799,7 +780,7 @@ class ViewFisheye(QWidget):
                     painter.drawEllipse(cx - 5, cy - 5, 10, 10)
                     painter.drawRect(pixelsWeightedX, pixelsWeightedY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
 
-                # draw cursor visual indicators - outlines
+                # draw pixel visualization - outlines
                 painter.setPen(self.penText)
                 painter.setBrush(Qt.NoBrush)
                 painter.drawEllipse(circleX, circleY, ViewFisheye.SelectedPixelBox, ViewFisheye.SelectedPixelBox)
