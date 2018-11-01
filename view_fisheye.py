@@ -69,14 +69,14 @@ class ViewFisheye(QWidget):
         self.penShadowText = QPen(Qt.black, 1, Qt.SolidLine)
         self.penShadowSun = QPen(Qt.black, 2, Qt.SolidLine)
         self.penShadowSelected = QPen(Qt.black, 3, Qt.SolidLine)
+        self.brushGrid = QBrush(Qt.white, Qt.SolidPattern)
         self.fontFixed = QFont('Courier New', 8)
         self.fontScaled = QFont('Courier New', 8)
         self.fontMetrics = QFontMetrics(self.fontScaled)
         self.iconWarning = self.style().standardIcon(QStyle.SP_MessageBoxWarning).pixmap(ViewFisheye.SelectedPixelBox / 2)
 
     def dataLoaded(self):
-        # this stuff only runs once the data directory has been loaded
-
+        # Note - this function only runs once the data directory has been loaded
         self.setMouseTracking(True)
         color = QColor(255, 255, 255)
         self.samplesSelected.clear()
@@ -84,7 +84,6 @@ class ViewFisheye(QWidget):
         self.sampleAreaVisible.clear()
         self.samplePointsInFile.clear()
         self.penSelected.clear()
-
         for t, p in common.SamplingPattern:
             self.samplePoints.append((0, 0))  # these will need to be recomputed as photo scales
             self.samplePointsInFile.append((0, 0))  # these only need to be computed once per photo
@@ -437,6 +436,22 @@ class ViewFisheye(QWidget):
             ly1 = (math.sin(rads) * (self.myPhotoRadius - tickLength*4)) + self.viewCenter[1] - self.fontMetrics.height()/2
             self.compassTicks.append([cx1, cy1, cx2, cy2, lx1, ly1, angle])  # x1, y1, x2, y2, x1lbl, y1lbl, angle
 
+        # compute new grid for debugging coordinates
+        griddivs = 5
+        gridwidth = int(round(self.myPhotoDiameter / griddivs))
+        self.gridpoints = []
+        self.gridUVs = []
+        self.gridskycoords = []
+        for r in range(1, griddivs):
+            for c in range(1, griddivs):
+                point = (self.myPhotoTopLeft[0] + (c * gridwidth), self.myPhotoTopLeft[1] + (r * gridwidth))
+                self.gridpoints.append(point)
+                u = (point[0] - self.myPhotoTopLeft[0]) / self.myPhotoDiameter
+                v = (point[1] - self.myPhotoTopLeft[1]) / self.myPhotoDiameter
+                self.gridUVs.append((u, v))
+                t, p = utility_angles.FisheyeUV2SkyCoord(u, v)
+                self.gridskycoords.append((t, p))
+
         # compute lens (ideal and actual) radii for drawn latitude ellipses along zenith
         self.lensIdealRadii.clear()
         self.lensRealRadii.clear()
@@ -534,36 +549,43 @@ class ViewFisheye(QWidget):
                 if common.AppSettings["ShowUVGrid"]:
                     painter.setPen(self.penText)
                     # box
-                    painter.drawLine(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius,
-                                     self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius)
-                    painter.drawLine(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] + self.myPhotoRadius,
-                                     self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1] + self.myPhotoRadius)
-                    painter.drawLine(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius,
-                                     self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] + self.myPhotoRadius)
-                    painter.drawLine(self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius,
-                                     self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1] + self.myPhotoRadius)
+                    tl = self.myPhotoTopLeft
+                    tr = (self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1] - self.myPhotoRadius)
+                    bl = (self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1] + self.myPhotoRadius)
+                    br = (self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1] + self.myPhotoRadius)
+                    painter.drawLine(tl[0], tl[1], tr[0], tr[1])
+                    painter.drawLine(bl[0], bl[1], br[0], br[1])
+                    painter.drawLine(tl[0], tl[1], bl[0], bl[1])
+                    painter.drawLine(tr[0], tr[1], br[0], br[1])
                     # crosshairs
-                    painter.drawLine(self.viewCenter[0] - self.myPhotoRadius, self.viewCenter[1],
-                                     self.viewCenter[0] + self.myPhotoRadius, self.viewCenter[1])
-                    painter.drawLine(self.viewCenter[0], self.viewCenter[1] - self.myPhotoRadius,
-                                     self.viewCenter[0], self.viewCenter[1] + self.myPhotoRadius)
+                    painter.drawLine(tl[0], self.viewCenter[1], tr[0], self.viewCenter[1])
+                    painter.drawLine(self.viewCenter[0], tr[1], self.viewCenter[0], br[1])
                     # labels
-                    destRect.setCoords(self.viewCenter[0] - self.myPhotoRadius + 4,
-                                       self.viewCenter[1] - self.myPhotoRadius + 4,
-                                       self.width(), self.height())
+                    destRect.setCoords(tl[0] + 4, tl[1] + 4, self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "0")
-                    destRect.setCoords(self.viewCenter[0] + self.myPhotoRadius - (fontWidth+4),
-                                       self.viewCenter[1] - self.myPhotoRadius + 4,
-                                       self.width(), self.height())
+                    destRect.setCoords(tr[0] - (fontWidth+4), tr[1] + 4, self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
-                    destRect.setCoords(self.viewCenter[0] - self.myPhotoRadius + 3,
-                                       self.viewCenter[1] + self.myPhotoRadius - (self.fontMetrics.height()+3),
-                                       self.width(), self.height())
+                    destRect.setCoords(bl[0] + 3, bl[1] - (self.fontMetrics.height()+3), self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
-                    destRect.setCoords(self.viewCenter[0] + self.myPhotoRadius - (fontWidth+3),
-                                       self.viewCenter[1] + self.myPhotoRadius - (self.fontMetrics.height()+3),
-                                       self.width(), self.height())
+                    destRect.setCoords(br[0] - (fontWidth+3), br[1] - (self.fontMetrics.height()+3), self.width(), self.height())
                     painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, "1")
+                    # grid coordinates
+                    gpntrad = self.myPhotoRadius * 0.005
+                    painter.setPen(self.penText)
+                    painter.setBrush(self.brushGrid)
+                    painter.setFont(self.fontScaled)
+                    for i in range(0, len(self.gridpoints)):
+                        point = self.gridpoints[i]
+                        u, v = self.gridUVs[i]
+                        t, p = self.gridskycoords[i]
+                        painter.drawEllipse(QPoint(point[0], point[1]), gpntrad, gpntrad)
+                        destRect.setCoords(point[0]+fontWidth/2, point[1]-self.fontMetrics.height(), self.width(), self.height())
+                        textuv = "{0:.1f}u, {1:.1f}v".format(round(u,1), round(v,1))
+                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, textuv)
+                        destRect.setCoords(point[0]+fontWidth/2, point[1], self.width(), self.height())
+                        textuv = "{0:d}°, {1:d}°".format(int(round(t)), int(round(p)))
+                        painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, textuv)
+                    painter.setBrush(Qt.NoBrush)
 
                 # draw lens warp
                 if common.AppSettings["ShowLensWarp"]:
@@ -629,9 +651,7 @@ class ViewFisheye(QWidget):
                     # shadows
                     painter.setPen(self.penShadowSun)
                     if common.AppSettings["ShowShadows"]:
-                        painter.drawEllipse(self.sunPositionVisible[0] - sunradius / 2 + 1,
-                                            self.sunPositionVisible[1] - sunradius / 2 + 1, sunradius,
-                                            sunradius)
+                        painter.drawEllipse(QPoint(self.sunPositionVisible[0]+1, self.sunPositionVisible[1]+1), sunradius, sunradius)
                         self.pathSun.translate(1.0, 1.0)
                         painter.drawPath(self.pathSun)
                         self.pathSun.translate(-1.0, -1.0)
@@ -641,8 +661,7 @@ class ViewFisheye(QWidget):
                             painter.drawText(destRect, Qt.AlignTop | Qt.AlignLeft, str(self.sunPathPoints[i][2].hour))
                     # sun, path, hours
                     painter.setPen(self.penSun)
-                    painter.drawEllipse(self.sunPositionVisible[0] - sunradius / 2,
-                                        self.sunPositionVisible[1] - sunradius / 2, sunradius, sunradius)
+                    painter.drawEllipse(QPoint(self.sunPositionVisible[0], self.sunPositionVisible[1]), sunradius, sunradius)
                     painter.drawPath(self.pathSun)
                     for i in range(0, self.pathSun.elementCount()):
                         e = self.pathSun.elementAt(i)
@@ -737,19 +756,19 @@ class ViewFisheye(QWidget):
 
                 # draw HUD text strings
                 # x,y coords
-                destRect.setCoords(10, 10, self.width()-10, self.height()- 124)
+                destRect.setCoords(0, 0, self.width() - 10, self.height()- 124)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textxy)
                 # X,Y coords
-                destRect.setCoords(10, 10, self.width() - 10, self.height() - 114)
+                destRect.setCoords(0, 0, self.width() - 10, self.height() - 114)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textXY)
                 # u,v coords
-                destRect.setCoords(10, 10, self.width() - 10, self.height() - 104)
+                destRect.setCoords(0, 0, self.width() - 10, self.height() - 104)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textUV)
                 # t,p coords
-                destRect.setCoords(10, 10, self.width() - 10, self.height() - 94)
+                destRect.setCoords(0, 0, self.width() - 10, self.height() - 94)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textTP)
                 # pixel color
-                destRect.setCoords(10, 10, self.width() - 10, self.height() - 84)
+                destRect.setCoords(0, 0, self.width() - 10, self.height() - 84)
                 painter.drawText(destRect, Qt.AlignBottom | Qt.AlignRight, textPX)
 
                 # compute pixel visualization coordinates
