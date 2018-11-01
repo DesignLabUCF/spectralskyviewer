@@ -65,7 +65,8 @@ def loadDataConfig():
             common.DataConfig.update({key: loaded[key]})
 
     # collect sampling pattern
-    common.SamplingPattern[:] = [(float(azi), float(alt)) for [azi, alt] in common.DataConfig["SamplingPattern"]]
+    # TODO: get rid of this inverse azimuth transformation by putting the constant in the sampling pattern itself
+    common.SamplingPattern[:] = [(float(360 - azi), float(alt)) for [azi, alt] in common.DataConfig["SamplingPattern"]]
     common.SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in common.SamplingPattern]
     common.SamplingPatternAlts = list(set([s[1] for s in common.SamplingPattern]))
     common.SamplingPatternAlts = sorted(common.SamplingPatternAlts)
