@@ -40,25 +40,16 @@ class DialogExport(QDialog):
         self.initWidgets()
         self.setWindowTitle("Sample Export Options")
         self.setWindowIcon(QIcon('res/icon.png'))
-        if self.exportOptions["Delimiter"] == "\t":
-            self.radTab.setChecked(True)
-        elif self.exportOptions["Delimiter"] == " ":
-            self.radSpace.setChecked(True)
-        else:
-            self.radCSV.setChecked(True)
+        self.chxHDR.setChecked(self.exportOptions["IsHDR"])
+        self.cbxColorModel.setCurrentText(common.ColorModel(self.exportOptions["ColorModel"]).name)
+        self.chxPixRegCalc.setChecked(self.exportOptions["ComputePixelRegion"])
+        self.cbxPixRegFixed.setEnabled(not self.exportOptions["ComputePixelRegion"])
         for i in range(0, self.cbxPixRegFixed.count()):
             if int(self.cbxPixRegFixed.itemText(i)) == self.exportOptions["PixelRegion"]:
                 self.cbxPixRegFixed.setCurrentIndex(i)
-        pw = common.PixelWeighting(self.exportOptions["PixelWeighting"])
-        if pw == common.PixelWeighting.Mean:
-            self.radPixelMean.setChecked(True)
-        elif pw == common.PixelWeighting.Median:
-            self.radPixelMedian.setChecked(True)
-        elif pw == common.PixelWeighting.Gaussian:
-            self.radPixelGaussian.setChecked(True)
-        self.chxPixRegCalc.setChecked(self.exportOptions["ComputePixelRegion"])
-        self.cbxPixRegFixed.setEnabled(not self.exportOptions["ComputePixelRegion"])
-        self.chxHDR.setChecked(self.exportOptions["IsHDR"])
+                break
+        self.cbxPixelWeighting.setCurrentText(common.PixelWeighting(self.exportOptions["PixelWeighting"]).name)
+        self.cbxCoords.setCurrentText(common.CoordSystem(self.exportOptions["CoordSystem"]).name)
         self.txtResolution.setText(str(self.exportOptions["SpectrumResolution"]))
 
     def initWidgets(self):
@@ -85,20 +76,44 @@ class DialogExport(QDialog):
         pnlFile.setLayout(boxFile)
         layout.addWidget(pnlFile, 0, Qt.AlignTop)
 
-        # file format
-        self.radCSV = QRadioButton("CSV")
-        self.radCSV.clicked.connect(lambda: self.formatPressed(self.radCSV))
-        self.radTab = QRadioButton("Tab")
-        self.radTab.clicked.connect(lambda: self.formatPressed(self.radTab))
-        self.radSpace = QRadioButton("Space")
-        self.radSpace.clicked.connect(lambda: self.formatPressed(self.radSpace))
-        boxFormat = QHBoxLayout()
-        boxFormat.addWidget(self.radCSV)
-        boxFormat.addWidget(self.radTab)
-        boxFormat.addWidget(self.radSpace)
-        grpFormat = QGroupBox("File Format:", self)
-        grpFormat.setLayout(boxFormat)
-        layout.addWidget(grpFormat, 0, Qt.AlignTop)
+        # sample features
+        self.lstSampleFeatures = QListView()
+        model = QStandardItemModel()
+        # optional attributes
+        for i in range(0, len(common.SampleFeatures)):
+            item = QStandardItem(common.SampleFeatures[i][1])
+            item.setEditable(False)
+            item.setCheckable(True)
+            # date, time, space - are required
+            if i < 3:
+                item.setCheckState(Qt.Checked)
+                item.setEnabled(False)
+            # everything else is optional
+            elif i in self.exportOptions["Features"]:
+                item.setCheckState(Qt.Checked)
+            model.appendRow(item)
+        self.lstSampleFeatures.setModel(model)
+        boxFeatures = QVBoxLayout()
+        boxFeatures.addWidget(self.lstSampleFeatures)
+        grpAttr = QGroupBox("Sample Features:", self)
+        grpAttr.setLayout(boxFeatures)
+        layout.addWidget(grpAttr, 1)
+
+        # HDR
+        self.chxHDR = QCheckBox()
+        boxHDR = QHBoxLayout()
+        boxHDR.addWidget(self.chxHDR)
+        grpHDR = QGroupBox("HDR", self)
+        grpHDR.setLayout(boxHDR)
+
+        # color model
+        self.cbxColorModel = QComboBox()
+        self.cbxColorModel.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.cbxColorModel.addItems([str(cm.name) for cm in common.ColorModel])
+        boxColor = QHBoxLayout()
+        boxColor.addWidget(self.cbxColorModel)
+        grpColor = QGroupBox("Color:", self)
+        grpColor.setLayout(boxColor)
 
         # pixel region
         self.chxPixRegCalc = QCheckBox()
@@ -118,18 +133,18 @@ class DialogExport(QDialog):
         grpPixelRegion.setLayout(boxPixelRegion)
 
         # pixel weighting
-        self.radPixelMean = QRadioButton("Mean")
-        self.radPixelMedian = QRadioButton("Median")
-        self.radPixelGaussian = QRadioButton("Gaussian")
+        self.cbxPixelWeighting = QComboBox()
+        self.cbxPixelWeighting.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.cbxPixelWeighting.addItems([str(pw.name) for pw in common.PixelWeighting])
         boxPixelWeighting = QHBoxLayout()
-        boxPixelWeighting.addWidget(self.radPixelMean)
-        boxPixelWeighting.addWidget(self.radPixelMedian)
-        boxPixelWeighting.addWidget(self.radPixelGaussian)
+        boxPixelWeighting.addWidget(self.cbxPixelWeighting)
         grpPixelWeighting = QGroupBox("Pixel Weighting:", self)
         grpPixelWeighting.setLayout(boxPixelWeighting)
 
         # add all pixel options to window
         boxPixelOptions = QHBoxLayout()
+        boxPixelOptions.addWidget(grpHDR, 0, Qt.AlignLeft)
+        boxPixelOptions.addWidget(grpColor, 0, Qt.AlignLeft)
         boxPixelOptions.addWidget(grpPixelRegion, 0, Qt.AlignLeft)
         boxPixelOptions.addWidget(grpPixelWeighting, 1)
         boxPixelOptions.setContentsMargins(0,0,0,0)
@@ -137,21 +152,14 @@ class DialogExport(QDialog):
         pnlPixelOptions.setLayout(boxPixelOptions)
         layout.addWidget(pnlPixelOptions, 0, Qt.AlignTop)
 
-        # HDR
-        self.chxHDR = QCheckBox()
-        boxHDR = QHBoxLayout()
-        boxHDR.addWidget(self.chxHDR)
-        grpHDR = QGroupBox("HDR", self)
-        grpHDR.setLayout(boxHDR)
-
         # color model
-        self.cbxColorModel = QComboBox()
-        self.cbxColorModel.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        self.cbxColorModel.addItems([str(cm.name) for cm in common.ColorModel])
-        boxColor = QHBoxLayout()
-        boxColor.addWidget(self.cbxColorModel)
-        grpColor = QGroupBox("Color Model:", self)
-        grpColor.setLayout(boxColor)
+        self.cbxCoords = QComboBox()
+        self.cbxCoords.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.cbxCoords.addItems([str(c.name) for c in common.CoordSystem])
+        boxCoords = QHBoxLayout()
+        boxCoords.addWidget(self.cbxCoords)
+        grpCoords = QGroupBox("Coordinates:", self)
+        grpCoords.setLayout(boxCoords)
 
         # spectrum resolution
         self.txtResolution = QLineEdit()
@@ -165,36 +173,12 @@ class DialogExport(QDialog):
 
         # add final row of options
         boxStuffOptions = QHBoxLayout()
-        boxStuffOptions.addWidget(grpHDR)
-        boxStuffOptions.addWidget(grpColor)
+        boxStuffOptions.addWidget(grpCoords, 0, Qt.AlignLeft)
         boxStuffOptions.addWidget(grpResolution, 1)
         boxStuffOptions.setContentsMargins(0, 0, 0, 0)
         pnlStuffOptions = QWidget()
         pnlStuffOptions.setLayout(boxStuffOptions)
         layout.addWidget(pnlStuffOptions, 0, Qt.AlignTop)
-
-        # sample features
-        self.lstSampleFeatures = QListView()
-        model = QStandardItemModel()
-        # optional attributes
-        for i in range(0, len(common.SampleFeatures)):
-            item = QStandardItem(common.SampleFeatures[i][1])
-            item.setEditable(False)
-            item.setCheckable(True)
-            # id, date, time - are required
-            if i <= 1:
-                item.setCheckState(Qt.Checked)
-                item.setEnabled(False)
-            # everything else is optional
-            elif i in self.exportOptions["Features"]:
-                item.setCheckState(Qt.Checked)
-            model.appendRow(item)
-        self.lstSampleFeatures.setModel(model)
-        boxFeatures = QVBoxLayout()
-        boxFeatures.addWidget(self.lstSampleFeatures)
-        grpAttr = QGroupBox("Sample Features:", self)
-        grpAttr.setLayout(boxFeatures)
-        layout.addWidget(grpAttr, 1)
 
         # accept/decline buttons
         boxButtons = QDialogButtonBox()
@@ -214,22 +198,9 @@ class DialogExport(QDialog):
         # apply default extension, if missing
         base, extension = os.path.splitext(filename)
         if extension is None or len(extension) <= 0:
-            if self.radCSV.isChecked():
-                extension = ".csv"
-            else:
-                extension = ".txt"
-        self.txtFile.setText(base + extension)
-
-    def formatPressed(self, button):
-        if self.txtFile.text() is None or len(self.txtFile.text()) <= 0:
-            return
-
-        # updated extension when format selected
-        base, extension = os.path.splitext(self.txtFile.text())
-        if button == self.radCSV:
             extension = ".csv"
-        else:
-            extension = ".txt"
+        elif extension.lower() != ".csv":
+            extension += ".csv"
         self.txtFile.setText(base + extension)
 
     def pixRegCalcChanged(self, int):
@@ -241,28 +212,29 @@ class DialogExport(QDialog):
     def savePressed(self):
         # validate the export before proceeding
         if self.txtFile.text() == None or len(self.txtFile.text()) <= 0:
-            QMessageBox.critical(self, "Error", "Invalid export filename!", QMessageBox.Ok)
+            QMessageBox.critical(self, "Error", "Invalid export filename.", QMessageBox.Ok)
             return
         if os.path.exists(self.txtFile.text()):
-            if QMessageBox.warning(self, "Warning", "Exported samples will be appended to existing file.\nAre you sure you want to do this?", QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            if QMessageBox.warning(self, "Warning", "Exported samples will be appended to an existing file.\nAre you sure you want to do this?", QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
                 return
+
+        # append .csv extension if not done already
+        base, extension = os.path.splitext(self.txtFile.text())
+        if extension.lower() != ".csv":
+            self.txtFile.setText(base + extension + ".csv")
 
         # save export file
         self.exportOptions["Filename"] = self.txtFile.text()
-        if self.radCSV.isChecked():     self.exportOptions["Delimiter"] = ","
-        elif self.radTab.isChecked():   self.exportOptions["Delimiter"] = "\t"
-        elif self.radSpace.isChecked(): self.exportOptions["Delimiter"] = " "
 
         # save pixel options
-        self.exportOptions["ComputePixelRegion"] = self.chxPixRegCalc.isChecked()
-        self.exportOptions["PixelRegion"]     = int(self.cbxPixRegFixed.currentText())
-        if self.radPixelMean.isChecked():       self.exportOptions["PixelWeighting"] = common.PixelWeighting.Mean.value
-        elif self.radPixelMedian.isChecked():   self.exportOptions["PixelWeighting"] = common.PixelWeighting.Median.value
-        elif self.radPixelGaussian.isChecked(): self.exportOptions["PixelWeighting"] = common.PixelWeighting.Gaussian.value
-
-        # save other options
         self.exportOptions["IsHDR"] = self.chxHDR.isChecked()
         self.exportOptions["ColorModel"] = common.ColorModel[self.cbxColorModel.currentText()].value
+        self.exportOptions["ComputePixelRegion"] = self.chxPixRegCalc.isChecked()
+        self.exportOptions["PixelRegion"] = int(self.cbxPixRegFixed.currentText())
+        self.exportOptions["PixelWeighting"] = common.PixelWeighting[self.cbxPixelWeighting.currentText()].value
+
+        # save other options
+        self.exportOptions["CoordSystem"] = common.CoordSystem[self.cbxCoords.currentText()].value
         self.exportOptions["SpectrumResolution"] = int(self.txtResolution.text())
 
         # save selected sample features

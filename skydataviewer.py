@@ -689,13 +689,13 @@ class SkyDataViewer(QMainWindow):
 
         # we shouldn't be here if export file hasn't been configured
         if len(xoptions["Filename"]) <= 0:
-            QMessageBox.critical(self, "Error", "Please configure export file first!", QMessageBox.Ok)
+            QMessageBox.critical(self, "Error", "Please configure export file first.", QMessageBox.Ok)
             return
 
         # nothing to export
-        if len(self.captureTimeHDRDirs) <= 0:   # no HDR photo
+        if len(self.captureTimeHDRDirs) <= 0:          # no HDR photo
             return
-        if len(self.captureTimeASDFiles) <= 0:  # no ASD files
+        if len(self.captureTimeASDFiles) <= 0:         # no ASD files
             return
         if len(self.wgtFisheye.samplesSelected) <= 0:  # nothing selected
             return
@@ -704,16 +704,17 @@ class SkyDataViewer(QMainWindow):
 
         # init / pre-compute
         sampleidx = 0
-        delimiter = xoptions["Delimiter"]
+        delimiter = ","
         sunpos = utility_data.computeSunPosition(common.SPASiteData)
         skycover = utility_data.findCaptureSkyCover(self.capture, common.SkyCoverData)
         resolution = xoptions["SpectrumResolution"]
+        coordsys = common.CoordSystem(xoptions["CoordSystem"])
         coords = [common.SamplingPattern[i] for i in self.wgtFisheye.samplesSelected]
         points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
         pixweight = common.PixelWeighting(xoptions["PixelWeighting"])
-
+        # pixels
         if xoptions["ComputePixelRegion"]:
-            # TODO: this is hardcoded to our sampling pattern. compute it properly!!
+            # TODO: this is hardcoded to our sampling pattern. compute it properly by projecting area and taking width and height!!
             altitudeRegionMap = {90:1, 71.9187:3, 53.3665:5, 33.749:7, 12.1151:9}
             pixregions = [altitudeRegionMap[c[1]] for c in coords]
         else:
@@ -730,7 +731,7 @@ class SkyDataViewer(QMainWindow):
         else:
             exposures.append(common.Exposures[self.exposure])
             exppixels.append(utility_data.collectPixels(points, pixregions, pixels=self.wgtFisheye.myPhotoPixels, weighting=pixweight))
-        # color model?
+        # color model
         color = common.ColorModel(xoptions["ColorModel"])
         if color == common.ColorModel.HSV:
             for pixels in exppixels:
@@ -744,8 +745,13 @@ class SkyDataViewer(QMainWindow):
                     rgb = sRGBColor(pixels[i][0], pixels[i][1], pixels[i][2], is_upscaled=True)
                     lab = convert_color(rgb, LabColor)
                     pixels[i] = lab.get_value_tuple()
-
-        #sRGBColor, HSVColor,
+        # UV coordinate system
+        if coordsys == common.CoordSystem.UV:
+            coordsfinal = [(utility_angles.SkyCoord2FisheyeUV(c[0], c[1])) for c in coords]
+            sunposfinal = (utility_angles.SkyCoord2FisheyeUV(sunpos[0], sunpos[1]))
+        else:
+            coordsfinal = coords
+            sunposfinal = sunpos
 
         # create file if not exists
         if not os.path.exists(xoptions["Filename"]):
@@ -785,10 +791,8 @@ class SkyDataViewer(QMainWindow):
 
         # append export to existing file
         with open(xoptions["Filename"], "a") as file:
-
             # export each selected sample
-            for i in range(0, len(self.wgtFisheye.samplesSelected)):
-                sIdx = self.wgtFisheye.samplesSelected[i]
+            for i, sIdx in enumerate(self.wgtFisheye.samplesSelected):
 
                 # export each required attribute
                 # date
@@ -797,6 +801,9 @@ class SkyDataViewer(QMainWindow):
                 # time
                 file.write(str(self.capture.time()))
                 file.write(delimiter)
+                # space
+                file.write(str(coordsys.value))
+                file.write(delimiter)
 
                 # export each optional attribute
                 for aIdx in xoptions["Features"]:
@@ -804,11 +811,11 @@ class SkyDataViewer(QMainWindow):
 
                     # export sun azimuth
                     if feature == "SunAzimuth":
-                        file.write('{0:07.04f}'.format(sunpos[0]))
+                        file.write('{0:07.04f}'.format(sunposfinal[0]))
                         file.write(delimiter)
                     # export sun altitude
                     elif feature == "SunAltitude":
-                        file.write('{0:07.04f}'.format(sunpos[1]))
+                        file.write('{0:07.04f}'.format(sunposfinal[1]))
                         file.write(delimiter)
                     # export sky cover
                     elif feature == "SkyCover":
@@ -820,18 +827,15 @@ class SkyDataViewer(QMainWindow):
                         file.write(delimiter)
                     # export sample azimuth
                     elif feature == "SampleAzimuth":
-                        point = common.SamplingPattern[sIdx]
-                        file.write('{0:07.04f}'.format(point[0]))
+                        file.write('{0:07.04f}'.format(coordsfinal[i][0]))
                         file.write(delimiter)
                     # export sample altitude
                     elif feature == "SampleAltitude":
-                        point = common.SamplingPattern[sIdx]
-                        file.write('{0:07.04f}'.format(point[1]))
+                        file.write('{0:07.04f}'.format(coordsfinal[i][1]))
                         file.write(delimiter)
                     # export sun point/sample angle
                     elif feature == "SunPointAngle":
-                        point = common.SamplingPattern[sIdx]
-                        angle = utility_angles.CentralAngle(sunpos, point)
+                        angle = utility_angles.CentralAngle(sunpos, coords[i])
                         angle = math.degrees(angle)
                         file.write('{0:07.03f}'.format(angle))
                         file.write(delimiter)
@@ -892,13 +896,12 @@ class SkyDataViewer(QMainWindow):
         pixweight = common.PixelWeighting.Mean
         colormodel = common.ColorModel.RGB
         resolution = 1
-        delimiter = utility_data.discoverDatasetDelimiter(fnamein)
 
         # open files
         with open(fnamein, 'r') as filein:
             with open(fnameout, 'w') as fileout:
-                reader = csv.reader(filein, delimiter=delimiter)
-                writer = csv.writer(fileout, delimiter=delimiter, lineterminator='\n')
+                reader = csv.reader(filein, delimiter=",")
+                writer = csv.writer(fileout, delimiter=",", lineterminator='\n')
 
                 # read header
                 header = next(reader, None)

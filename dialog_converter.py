@@ -82,7 +82,7 @@ class DialogConverter(QDialog):
         self.lstSampleFeatures.setModel(model)
         boxFeatures = QVBoxLayout()
         boxFeatures.addWidget(self.lstSampleFeatures)
-        grpFeatures = QGroupBox("Attributes To Convert:", self)
+        grpFeatures = QGroupBox("Sample Features To Convert:", self)
         grpFeatures.setLayout(boxFeatures)
         layout.addWidget(grpFeatures, 1)
 

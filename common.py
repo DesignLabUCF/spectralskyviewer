@@ -12,13 +12,14 @@ from enum import Enum
 # constants -------------------------------------------------------------------
 # constants -------------------------------------------------------------------
 
-ColorModel = Enum('ColorModel', 'RGB HSV LAB')                   # used to store pixel color components
+CoordSystem = Enum('CoordSystem', 'Polar UV')                    # used for sky coordinates
+ColorModel = Enum('ColorModel', 'RGB HSV LAB')                   # used for pixel color components
 PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')  # used during pixel convolution
 SkyCover = Enum('SkyCover', 'UNK CLR SCT OVC')
 SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "Scattered", SkyCover.OVC: "Overcast"}
 HDRRawExts = ['.cr2', '.raw', '.dng']  # types of RAW data
-PixelRegionMin = 1     # used during pixel convolution
-PixelRegionMax = 63    # used during pixel convolution
+PixelRegionMin = 1     # used for pixel convolution
+PixelRegionMax = 63    # used for pixel convolution
 HUDTextScaleMin = 10   # used for font resizing
 HUDTextScaleMax = 100  # used for font resizing
 
@@ -28,20 +29,21 @@ SampleFeatures = [
     # required ----------------------------------------------------------
     ("Date",                "Date of Capture"),
     ("Time",                "Time of Capture"),
+    ("Space",               "Coordinate System"),
     # optional ----------------------------------------------------------
-    ("SunAzimuth",          "Sun Azimuth (East from North)"),
-    ("SunAltitude",         "Sun Altitude (90 - Zenith)"),
+    ("SunAzimuth",          "Sun Azimuth"),
+    ("SunAltitude",         "Sun Altitude"),
     ("SkyCover",            "Sky Cover Assessment"),
     ("SamplePatternIndex",  "Sample Pattern Index"),
-    ("SampleAzimuth",       "Sample Azimuth (East from North)"),
-    ("SampleAltitude",      "Sample Altitude (90 - Zenith)"),
+    ("SampleAzimuth",       "Sample Azimuth"),
+    ("SampleAltitude",      "Sample Altitude"),
     ("SunPointAngle",       "Sun Point Angle (SPA)"),
     ("PixelRegion",         "Sample Pixel Region/Kernel (n x n)"),
     ("PixelWeighting",      "Sample Pixel Weighting Algorithm"),
     ("ColorModel",          "Sample Pixel Color Model"),
     ("Exposure",            "Photo Exposure Time (s)"),
     ("PixelColor",          "Sample Pixel Color Components"),
-    ("Radiance",            "Sample Radiance (W/m²/sr/nm) (350-2500nm)"),
+    ("Radiance",            "Sample Radiance (W/m²/sr/nm)"),
 ]
 SampleFeatureIdxMap = {SampleFeatures[i][0]: i for i in range(0, len(SampleFeatures))}
 
@@ -56,13 +58,20 @@ DefDataConfig = {
     "CaptureEpsilon": 60,         # (seconds) max acceptable time delta between measurements of same capture
     "Exposures": [1],             # (seconds) exposures of photos found in data directory
     "Lens": {                     # lens used during data capture
-        "Name": "Cannon 8mm",     # for identification
-        "Linearity": [            # read more here -> http://paulbourke.net/dome/fisheyecorrect/
-            -0.001,               # x^4 coefficient
-            -0.0289,              # x^3 coefficient
-            0.00079342,           # x^2 coefficient
-            0.7189,               # x^1 coefficient
+        "Name": "Sigma 8mm f/3.5",# for identification
+        "Linearity": [            # fisheye lens linearity polynomial (see http://paulbourke.net/dome/fisheyecorrect)
+            -0.0004325,           # x^4 coefficient
+            -0.0499,              # x^3 coefficient
+            0.0252,               # x^2 coefficient
+            0.7230,               # x^1 coefficient
             0                     # x^0 coefficient
+        ],
+        "Inverse": [              # inverse polynomial of one above
+            0.4171,
+            -0.3803,
+            0.1755,
+            1.3525,
+            0
         ]
     },
     "SPA": {                      # site data used for NREL SPA -> https://midcdmz.nrel.gov/solpos/spa.html
@@ -89,7 +98,7 @@ DefDataConfig = {
 # default export options
 DefExportOptions = {
     "Filename": "",
-    "Delimiter": ",",
+    "CoordSystem": CoordSystem.Polar.value,
     "IsHDR": False,
     "ComputePixelRegion": True,
     "PixelRegion": PixelRegionMin,
@@ -132,7 +141,7 @@ DefAppSettings.update({"ExportOptions": dict(DefExportOptions)})
 # globals ---------------------------------------------------------------------
 # globals ---------------------------------------------------------------------
 
-# main program data configuration!
+# main program data directory configuration!
 DataConfig = dict(DefDataConfig)
 
 # main program application settings!

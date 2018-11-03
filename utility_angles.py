@@ -32,10 +32,9 @@ http://paulbourke.net/dome/fisheyecorrect/
 http://michel.thoby.free.fr/Fisheye_history_short/Projections/Models_of_classical_projections.html
 '''
 def SkyCoord2FisheyeUV(azimuth, altitude, lenswarp=True):
-    # TODO: get rid of this azimuth rotational transformation by specifying a rotation in the config file
-    # rotate azimuth so that position of North is pointing directly down
+    # 1) sky photos were saved as (North down, South up), so rotate "North" to polar coordinate system (0 deg East)
+    # 2) inverse azimuth because photos are taken from inside skydome, so east and west are flipped!
     azimuth = 360 - ((azimuth + 270) % 360)
-    #azimuth = (azimuth + 90) % 360
 
     # convert altitude to zenith
     zenith = (90 - altitude)
@@ -74,7 +73,6 @@ def FisheyeUV2SkyCoord(u, v, lenswarp=True):
 
     # compute azimuth
     azimuth = math.atan2(u, v)
-    # TODO: get rid of this azimuth rotational transformation by specifying a rotation in the config file
     # rotate azimuth so that position of North is pointing directly down
     azimuth = (azimuth + 2*math.pi) % (2*math.pi)
 

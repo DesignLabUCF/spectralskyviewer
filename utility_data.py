@@ -65,8 +65,7 @@ def loadDataConfig():
             common.DataConfig.update({key: loaded[key]})
 
     # collect sampling pattern
-    # TODO: get rid of this inverse azimuth transformation by putting the constant in the sampling pattern itself
-    common.SamplingPattern[:] = [(float(360 - azi), float(alt)) for [azi, alt] in common.DataConfig["SamplingPattern"]]
+    common.SamplingPattern[:] = [(float(azi), float(alt)) for [azi, alt] in common.DataConfig["SamplingPattern"]]
     common.SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in common.SamplingPattern]
     common.SamplingPatternAlts = list(set([s[1] for s in common.SamplingPattern]))
     common.SamplingPatternAlts = sorted(common.SamplingPatternAlts)
@@ -463,8 +462,7 @@ Function to compute the (azimuth, altitude) position of the sun using NREL SPA.
 '''
 def computeSunPosition(spadata):
     spa.spa_calculate(spadata)
-    altitude = 90 - spadata.zenith  # this application uses altitude (90 - zenith)
-    #altitude = spadata.zenith
+    altitude = 90 - spadata.zenith   # this application uses altitude (90 - zenith)
     return (spadata.azimuth, altitude)
 
 '''
@@ -483,11 +481,9 @@ def computeSunPath(spadata):
     for i in range(0, 24):
         spadata2.hour = i
         spa.spa_calculate(spadata2)
-        altitude = 90 - spadata2.zenith  # this application uses altitude (90 - zenith)
-        #altitude = spadata.zenith
+        altitude = 90 - spadata2.zenith   # this application uses altitude (90 - zenith)
         # we only care about altitude when sun is visible (not on other side of Earth)
         if altitude >= 0 and altitude <= 90:
-        #if altitude <= 90:
             dt = datetime(spadata2.year, spadata2.month, spadata2.day, spadata2.hour, spadata2.minute, int(spadata2.second))
             sunpath.append((spadata2.azimuth, altitude, dt))
     return sunpath
@@ -529,33 +525,3 @@ def imageEXIF(filepath):
     with open(filepath, 'rb') as f:
         data = exifread.process_file(f, details=False)
     return data
-
-# - exports -------------------------------------------------------------------
-# - exports -------------------------------------------------------------------
-# - exports -------------------------------------------------------------------
-
-'''
-Function to find the delimiter that occurs the most (on the first line). Datasets support different delimiters.
-:param fname: Filename of file to operate on.
-'''
-def discoverDatasetDelimiter(fname):
-    with open(fname, 'r') as file:
-        firstline = file.readline().strip()
-
-    # find delimiter character that occurs the most
-    delimiter = ''
-    most = 0
-    ntabs = firstline.count('\t')
-    ncommas = firstline.count(',')
-    nspaces = firstline.count(' ')
-    if ncommas > most:
-        delimiter = ','
-        most = ncommas
-    if ntabs > most:
-        delimiter = '\t'
-        most = ntabs
-    if nspaces > most:
-        delimiter = ' '
-        most = nspaces
-
-    return delimiter
