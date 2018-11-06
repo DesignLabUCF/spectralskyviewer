@@ -694,11 +694,33 @@ class SkyDataViewer(QMainWindow):
 
         # nothing to export
         if len(self.captureTimeHDRDirs) <= 0:          # no HDR photo
+            self.log("Info: No HDR directories found. Nothing to export.")
             return
         if len(self.captureTimeASDFiles) <= 0:         # no ASD files
+            self.log("Info: No ASD files found. Nothing to export.")
             return
         if len(self.wgtFisheye.samplesSelected) <= 0:  # nothing selected
+            self.log("Info: No samples selected. Nothing to export.")
             return
+
+        # make sure there are photos for every exposure we intend to export
+        exposures = []  # list of exposures to export
+        expphotos = []  # list of photos per exposure
+        if not xoptions["IsHDR"]:
+            photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], self.capture, self.exposure)
+            if not photo or len(photo) <= 0:
+                self.log("Error: Photo for " + self.exposure + "s exposure not found. Export canceled.")
+                return
+            exposures.append(self.exposure)
+            expphotos.append(photo)
+        else:
+            for exp in common.Exposures:
+                photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], self.capture, exp)
+                if not photo or len(photo) <= 0:
+                    self.log("Error: Photo for exposure '" + str(exp) + "' not found. Canceled export.")
+                    return
+                exposures.append(exp)
+                expphotos.append(photo)
 
         self.log("Exporting... ")
 
@@ -712,7 +734,7 @@ class SkyDataViewer(QMainWindow):
         coords = [common.SamplingPattern[i] for i in self.wgtFisheye.samplesSelected]
         points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
         pixweight = common.PixelWeighting(xoptions["PixelWeighting"])
-        # pixels
+        # pixel regions
         if xoptions["ComputePixelRegion"]:
             # TODO: this is hardcoded to our sampling pattern. compute it properly by projecting area and taking width and height!!
             altitudeRegionMap = {90:1, 71.9187:3, 53.3665:5, 33.749:7, 12.1151:9}
@@ -720,17 +742,10 @@ class SkyDataViewer(QMainWindow):
         else:
             reg = xoptions["PixelRegion"]
             pixregions = [reg for i in range(0, len(points))]
-        # single exposure or HDR?
-        exposures = []  # list of exposures to export
+        # pixels
         exppixels = []  # list of lists of pixels per exposure
-        if xoptions["IsHDR"]:
-            for exp in common.Exposures:
-                exposures.append(exp)
-                photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], self.capture, exp)
-                exppixels.append(utility_data.collectPixels(points, pixregions, file=photo, weighting=pixweight))
-        else:
-            exposures.append(common.Exposures[self.exposure])
-            exppixels.append(utility_data.collectPixels(points, pixregions, pixels=self.wgtFisheye.myPhotoPixels, weighting=pixweight))
+        for i in range(0, len(exposures)):
+            exppixels.append(utility_data.collectPixels(points, pixregions, file=expphotos[i], weighting=pixweight))
         # color model
         color = common.ColorModel(xoptions["ColorModel"])
         if color == common.ColorModel.HSV:
