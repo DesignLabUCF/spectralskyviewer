@@ -52,35 +52,49 @@ def loadDataConfig():
     if not os.path.exists(cfgFile):
         return False
 
-    # load
+    # load config file
     loaded = []
     with open(cfgFile, 'r') as file:
         loaded = json.load(file)
     if not loaded or len(loaded) <= 0:
         return False
 
-    # update in memory collection with loaded config
+    # update in-memory collection with loaded config
     for key in loaded:
         if (key in common.DataConfig):
             common.DataConfig.update({key: loaded[key]})
 
-    # collect sampling pattern
+    # extract capture epsilon
+    common.CaptureEpsilon = common.DataConfig["CaptureEpsilon"]
+
+    # extract spectroradiometer spectral range
+    start = common.DataConfig["SpectrumStart"]
+    end = common.DataConfig["SpectrumEnd"]
+    common.SpectrumRange = (start, end)
+    if start > end:
+        return False
+
+    # extract sampling pattern
     common.SamplingPattern[:] = [(float(azi), float(alt)) for [azi, alt] in common.DataConfig["SamplingPattern"]]
     common.SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in common.SamplingPattern]
     common.SamplingPatternAlts = list(set([s[1] for s in common.SamplingPattern]))
     common.SamplingPatternAlts = sorted(common.SamplingPatternAlts)
+    if len(common.SamplingPattern) < 1:
+        return False
 
-    # collect exposures
+    # extract exposures
     common.Exposures[:] = [float(e) for e in common.DataConfig["Exposures"]]
     common.ExposureIdxMap = {common.Exposures[i]: i for i in range(0, len(common.Exposures))}
+    if len(common.Exposures) < 1:
+        return False
 
-    # collect lens warp/linearity data
+    # extract lens warp/linearity data
     common.LensIdeal = tuple([0,0,0,1/(math.pi/2.0),0])
     common.LensIdealInv = tuple([0,0,0,(math.pi/2.0),0])
     common.LensWarp = tuple(common.DataConfig["Lens"]["Linearity"])
     common.LensWarpInv = tuple(common.DataConfig["Lens"]["Inverse"])
 
-    # collect sky cover data
+    # extract sky cover data
     dtfmtstr = "%m/%d/%Y %H:%M"
     common.SkyCoverData.clear()
     for sc in common.DataConfig["SkyCover"]:
@@ -93,7 +107,7 @@ def loadDataConfig():
         except ValueError or IndexError:
             return False
 
-    # collect SPA data
+    # extract SPA data
     # create spa data and fill with default values from their example
     data = spa.spa_data()
     data.year = 2003
@@ -309,24 +323,23 @@ def isHDRRawAvailable(hdrImgPath):
 # - ASD -----------------------------------------------------------------------
 
 '''
-Function to search for and retrieve the filepath of the specified ASD file.
+Function to search for and retrieve the filepaths of ASD files, given capture timestamp.
 :param datadir: The data directory to search in.
 :param capture: The (datetime) capture timestamp.
-:param sampleidx: The sample pattern index of the sample in question.
-:return: A filepath of the specific ASD file.
+:return: A list of filepaths of the ASD files.
 '''
-def findASDFile(datadir, capture, sampleidx):
+def findASDFiles(datadir, capture):
     # find corresponding ASD dir
     datestr = datetime.strftime(capture, "%Y-%m-%d")
     pathASD = os.path.join(datadir, datestr, "ASD")
     if not os.path.exists(pathASD):
-        return ''
+        return []
 
     # find all capture time dirs
     captureDirs = utility.findFiles(pathASD, mode=2)
     captureDirs[:] = [dir for dir in captureDirs if utility.verifyDateTime(os.path.basename(dir), "%H.%M.%S")]
     if len(captureDirs) <= 0:
-        return ''
+        return []
 
     # find an ASD capture time within small threshold of HDR capture time
     pathCapture = None
@@ -338,11 +351,26 @@ def findASDFile(datadir, capture, sampleidx):
             pathCapture = os.path.join(pathASD, os.path.basename(dir))
             break
     if not os.path.exists(pathCapture):
-        return ''
+        return []
 
     # gather all .txt versions of ASD files taken at capture timestamp
-    asdfiles = utility.findFiles(pathCapture, mode=1, ext=["txt"])
-    if len(asdfiles) <= 0 or sampleidx >= len(asdfiles):
+    return utility.findFiles(pathCapture, mode=1, ext=["txt"])
+
+'''
+Function to search for and retrieve the filepath of the specified ASD file.
+:param datadir: The data directory to search in.
+:param capture: The (datetime) capture timestamp.
+:param sampleidx: The sample pattern index of the sample in question.
+:return: A filepath of the specific ASD file.
+'''
+def findASDFile(datadir, capture, sampleidx):
+    asdfiles = findASDFiles(datadir, capture)
+
+    # none found
+    if len(asdfiles) <= 0:
+        return ''
+    # number of files doesnt match sampling pattern... how can we index it with sample index?
+    if len(asdfiles) != len(common.SamplingPattern):
         return ''
 
     # find specific file by sample pattern index

@@ -38,7 +38,7 @@ class DialogExport(QDialog):
 
         # init
         self.initWidgets()
-        self.setWindowTitle("Sample Export Options")
+        self.setWindowTitle("Export Options")
         self.setWindowIcon(QIcon('res/icon.png'))
         self.chxHDR.setChecked(self.exportOptions["IsHDR"])
         self.cbxColorModel.setCurrentText(common.ColorModel(self.exportOptions["ColorModel"]).name)
@@ -50,6 +50,8 @@ class DialogExport(QDialog):
                 break
         self.cbxPixelWeighting.setCurrentText(common.PixelWeighting(self.exportOptions["PixelWeighting"]).name)
         self.cbxCoords.setCurrentText(common.CoordSystem(self.exportOptions["CoordSystem"]).name)
+        self.txtRangeStart.setText(str(self.exportOptions["SpectrumStart"]))
+        self.txtRangeEnd.setText(str(self.exportOptions["SpectrumEnd"]))
         self.txtResolution.setText(str(self.exportOptions["SpectrumResolution"]))
 
     def initWidgets(self):
@@ -152,7 +154,7 @@ class DialogExport(QDialog):
         pnlPixelOptions.setLayout(boxPixelOptions)
         layout.addWidget(pnlPixelOptions, 0, Qt.AlignTop)
 
-        # color model
+        # coordinate system
         self.cbxCoords = QComboBox()
         self.cbxCoords.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.cbxCoords.addItems([str(c.name) for c in common.CoordSystem])
@@ -161,19 +163,35 @@ class DialogExport(QDialog):
         grpCoords = QGroupBox("Coordinates:", self)
         grpCoords.setLayout(boxCoords)
 
+        # spectrum range
+        self.txtRangeStart = QLineEdit()
+        self.txtRangeStart.setFixedWidth(self.txtRangeStart.fontMetrics().width('0')*8)
+        self.txtRangeStart.setValidator(QIntValidator(common.SpectrumRange[0], common.SpectrumRange[1]))
+        self.txtRangeStart.setEnabled(False)
+        self.txtRangeEnd = QLineEdit()
+        self.txtRangeEnd.setFixedWidth(self.txtRangeEnd.fontMetrics().width('0')*8)
+        self.txtRangeEnd.setValidator(QIntValidator(common.SpectrumRange[0], common.SpectrumRange[1]))
+        boxRange = QHBoxLayout()
+        boxRange.addWidget(self.txtRangeStart)
+        boxRange.addWidget(QLabel("to"))
+        boxRange.addWidget(self.txtRangeEnd)
+        boxRange.addWidget(QLabel("(nm)"))
+        grpRange = QGroupBox("Spectral Range:", self)
+        grpRange.setLayout(boxRange)
+
         # spectrum resolution
         self.txtResolution = QLineEdit()
         self.txtResolution.setValidator(QIntValidator(1, 100))
-        lblResolution = QLabel("(nm)")
         boxResolution = QHBoxLayout()
         boxResolution.addWidget(self.txtResolution)
-        boxResolution.addWidget(lblResolution, 0, Qt.AlignRight)
-        grpResolution = QGroupBox("Spectrum Resolution:", self)
+        boxResolution.addWidget(QLabel("(nm)"), 0, Qt.AlignRight)
+        grpResolution = QGroupBox("Spectral Resolution:", self)
         grpResolution.setLayout(boxResolution)
 
         # add final row of options
         boxStuffOptions = QHBoxLayout()
         boxStuffOptions.addWidget(grpCoords, 0, Qt.AlignLeft)
+        boxStuffOptions.addWidget(grpRange, 0, Qt.AlignLeft)
         boxStuffOptions.addWidget(grpResolution, 1)
         boxStuffOptions.setContentsMargins(0, 0, 0, 0)
         pnlStuffOptions = QWidget()
@@ -235,6 +253,8 @@ class DialogExport(QDialog):
 
         # save other options
         self.exportOptions["CoordSystem"] = common.CoordSystem[self.cbxCoords.currentText()].value
+        self.exportOptions["SpectrumStart"] = int(self.txtRangeStart.text())
+        self.exportOptions["SpectrumEnd"] = int(self.txtRangeEnd.text())
         self.exportOptions["SpectrumResolution"] = int(self.txtResolution.text())
 
         # save selected sample features

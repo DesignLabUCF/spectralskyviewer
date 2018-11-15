@@ -6,10 +6,10 @@
 # @summary: Dialog for converting (importing/exporting) sky data.
 # ====================================================================
 import os
-from PyQt5.QtGui import QIcon, QStandardItem, QStandardItemModel, QIntValidator
+import csv
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
-import common
 
 
 class DialogConverter(QDialog):
@@ -17,12 +17,12 @@ class DialogConverter(QDialog):
     def __init__(self):
         super().__init__(None, Qt.WindowSystemMenuHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
 
-        # convert options - will be filled in with desired conversions
-        self.convertOptions = {}
+        self.datasetIn = ""
+        self.datasetOut = ""
 
         # init
         self.initWidgets()
-        self.setWindowTitle("Sample Convert Options")
+        self.setWindowTitle("Sample Dataset Converter")
         self.setWindowIcon(QIcon('res/icon.png'))
 
     def initWidgets(self):
@@ -30,154 +30,42 @@ class DialogConverter(QDialog):
         layout = QVBoxLayout()
         layout.setSpacing(5)
         layout.setContentsMargins(10, 10, 10, 10)
-        # layout.setSizeConstraint(QLayout.SetFixedSize)
 
-        # file
-        lblFile = QLabel("Sample Dataset:")
-        self.txtFile = QLineEdit()
-        self.txtFile.setMinimumWidth(400)
-        #self.txtFile.setText(self.exportOptions["Filename"])
+        # message
+        msg = "Run 'Setup Export File' first.\nExport dialog options will be used for this conversion.\n\n" \
+              "'Date' 'Time' and 'SamplePatternIndex' features are required for conversion.\n" \
+              "'Exposure' feature will be used if found, current exposure otherwise.\n"
+        lblMessage = QLabel()
+        lblMessage.setText(msg)
+        layout.addWidget(lblMessage, 0, Qt.AlignTop)
+
+        # file in
+        lblFile = QLabel("Re-export samples from:")
+        self.txtFileIn = QLineEdit()
+        self.txtFileIn.setMinimumWidth(400)
+        self.txtFileIn.setReadOnly(True)
         btnFile = QPushButton("...")
         btnFile.setMaximumWidth(btnFile.fontMetrics().boundingRect("   ...   ").width())
         btnFile.clicked.connect(self.browseForFile)
         boxFile = QGridLayout()
         boxFile.setContentsMargins(0, 0, 0, 0)
         boxFile.addWidget(lblFile, 0, 0, 1, 2)
-        boxFile.addWidget(self.txtFile, 1, 0, 1, 1)
+        boxFile.addWidget(self.txtFileIn, 1, 0, 1, 1)
         boxFile.addWidget(btnFile, 1, 1, 1, 1)
         pnlFile = QWidget()
         pnlFile.setLayout(boxFile)
         layout.addWidget(pnlFile, 0, Qt.AlignTop)
 
-        # sample features to convert
-        self.lstSampleFeatures = QListView()
-        model = QStandardItemModel()
-        model.itemChanged.connect(self.attributeSelected)
-        # pixel region
-        self.itmPixelRegion = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["PixelRegion"]][1])
-        self.itmPixelRegion.setEditable(False)
-        self.itmPixelRegion.setCheckable(True)
-        model.appendRow(self.itmPixelRegion)
-        # pixel weighting
-        self.itmPixelWeighting = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["PixelWeighting"]][1])
-        self.itmPixelWeighting.setEditable(False)
-        self.itmPixelWeighting.setCheckable(True)
-        model.appendRow(self.itmPixelWeighting)
-        # color model
-        self.itmColor = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["ColorModel"]][1])
-        self.itmColor.setEditable(False)
-        self.itmColor.setCheckable(True)
-        model.appendRow(self.itmColor)
-        # pixel exposure
-        self.itmExposure = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["Exposure"]][1])
-        self.itmExposure.setEditable(False)
-        self.itmExposure.setCheckable(True)
-        model.appendRow(self.itmExposure)
-        # spectral radiance
-        self.itmRadiance = QStandardItem(common.SampleFeatures[common.SampleFeatureIdxMap["Radiance"]][1])
-        self.itmRadiance.setEditable(False)
-        self.itmRadiance.setCheckable(True)
-        model.appendRow(self.itmRadiance)
-        # add features to list
-        self.lstSampleFeatures.setModel(model)
-        boxFeatures = QVBoxLayout()
-        boxFeatures.addWidget(self.lstSampleFeatures)
-        grpFeatures = QGroupBox("Sample Features To Convert:", self)
-        grpFeatures.setLayout(boxFeatures)
-        layout.addWidget(grpFeatures, 1)
-
-        # pixel region
-        self.chxPixRegCalc = QCheckBox()
-        self.chxPixRegCalc.stateChanged.connect(self.pixRegCalcChanged)
-        self.chxPixRegCalc.setEnabled(False)
-        lblPixRegCalc = QLabel("compute")
-        self.cbxPixRegFixed = QComboBox()
-        self.cbxPixRegFixed.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        self.cbxPixRegFixed.addItems([str(x) for x in range(common.PixelRegionMin, common.PixelRegionMax+1, 2)])
-        self.cbxPixRegFixed.setEnabled(False)
-        self.chxPixRegCalc.setChecked(True)
-        lblPixRegFixed = QLabel("fixed")
-        boxPixelRegion = QHBoxLayout()
-        boxPixelRegion.addWidget(self.chxPixRegCalc)
-        boxPixelRegion.addWidget(lblPixRegCalc)
-        boxPixelRegion.addWidget(self.cbxPixRegFixed)
-        boxPixelRegion.addWidget(lblPixRegFixed)
-        grpPixelRegion = QGroupBox("Pixel Region:", self)
-        grpPixelRegion.setLayout(boxPixelRegion)
-
-        # pixel weighting
-        self.radPixelMean = QRadioButton("Mean")
-        self.radPixelMedian = QRadioButton("Median")
-        self.radPixelGaussian = QRadioButton("Gaussian")
-        self.radPixelMean.setEnabled(False)
-        self.radPixelMedian.setEnabled(False)
-        self.radPixelGaussian.setEnabled(False)
-        self.radPixelGaussian.setChecked(True)
-        boxPixelWeighting = QHBoxLayout()
-        boxPixelWeighting.addWidget(self.radPixelMean)
-        boxPixelWeighting.addWidget(self.radPixelMedian)
-        boxPixelWeighting.addWidget(self.radPixelGaussian)
-        grpPixelWeighting = QGroupBox("Pixel Weighting:", self)
-        grpPixelWeighting.setLayout(boxPixelWeighting)
-
-        # add all pixel options to window
-        boxPixelOptions = QHBoxLayout()
-        boxPixelOptions.addWidget(grpPixelRegion, 0, Qt.AlignLeft)
-        boxPixelOptions.addWidget(grpPixelWeighting, 1)
-        boxPixelOptions.setContentsMargins(0,0,0,0)
-        pnlPixelOptions = QWidget()
-        pnlPixelOptions.setLayout(boxPixelOptions)
-        layout.addWidget(pnlPixelOptions, 0, Qt.AlignTop)
-
-        # HDR
-        self.chxHDR = QCheckBox()
-        self.chxHDR.stateChanged.connect(self.isHDRChanged)
-        boxHDR = QHBoxLayout()
-        boxHDR.addWidget(self.chxHDR)
-        grpHDR = QGroupBox("HDR", self)
-        grpHDR.setLayout(boxHDR)
-
-        # exposure
-        self.cbxExposure = QComboBox()
-        self.cbxExposure.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        self.cbxExposure.addItems([str(x) for x in common.Exposures])
-        self.cbxExposure.setEnabled(False)
-        boxExposure = QHBoxLayout()
-        boxExposure.addWidget(self.cbxExposure)
-        grpExposure = QGroupBox("Photo Exposure:", self)
-        grpExposure.setLayout(boxExposure)
-
-        # color model
-        self.cbxColorModel = QComboBox()
-        self.cbxColorModel.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        self.cbxColorModel.addItems([str(cm.name) for cm in common.ColorModel])
-        boxColor = QHBoxLayout()
-        boxColor.addWidget(self.cbxColorModel)
-        grpColor = QGroupBox("Color Model:", self)
-        grpColor.setLayout(boxColor)
-
-        # spectrum resolution
-        self.txtResolution = QLineEdit()
-        self.txtResolution.setText("1")
-        self.txtResolution.setValidator(QIntValidator(1, 100))
-        self.txtResolution.setEnabled(False)
-        lblResolution = QLabel("(nm)")
-        boxResolution = QHBoxLayout()
-        boxResolution.addWidget(self.txtResolution)
-        boxResolution.addWidget(lblResolution, 0, Qt.AlignRight)
-        grpResolution = QGroupBox("Spectrum Resolution:", self)
-        grpResolution.setLayout(boxResolution)
-
-        # add final row of options
-        boxStuffOptions = QHBoxLayout()
-        boxStuffOptions.addWidget(grpHDR)
-        boxStuffOptions.addWidget(grpExposure)
-        boxStuffOptions.addWidget(grpColor)
-        boxStuffOptions.addWidget(grpResolution, 1)
-        boxStuffOptions.setContentsMargins(0, 0, 0, 0)
-        pnlStuffOptions = QWidget()
-        pnlStuffOptions.setLayout(boxStuffOptions)
-        layout.addWidget(pnlStuffOptions, 0, Qt.AlignTop)
+        # file out
+        lblFile = QLabel("Re-export samples to:")
+        self.txtFileOut = QLineEdit()
+        boxFile = QGridLayout()
+        boxFile.setContentsMargins(0, 0, 0, 0)
+        boxFile.addWidget(lblFile, 0, 0, 1, 2)
+        boxFile.addWidget(self.txtFileOut, 1, 0, 1, 1)
+        pnlFile = QWidget()
+        pnlFile.setLayout(boxFile)
+        layout.addWidget(pnlFile, 0, Qt.AlignTop)
 
         # accept/decline buttons
         boxButtons = QDialogButtonBox()
@@ -190,75 +78,36 @@ class DialogConverter(QDialog):
         self.setLayout(layout)
 
     def browseForFile(self):
-        filename, filetype = QFileDialog.getOpenFileName(self, 'Select Sample Dataset', '')
+        filename, filetype = QFileDialog.getOpenFileName(self, 'Select Dataset', '')
         if filename is None or len(filename) <= 0:
+            QMessageBox.critical(self, "Error", "Invalid sample dataset filename.", QMessageBox.Ok)
             return
 
-        self.txtFile.setText(filename)
-
-    def pixRegCalcChanged(self, int):
-        if self.chxPixRegCalc.isChecked():
-            self.cbxPixRegFixed.setEnabled(False)
-        else:
-            self.cbxPixRegFixed.setEnabled(True)
-
-    def isHDRChanged(self, int):
-        if self.chxHDR.isChecked():
-            self.cbxExposure.setEnabled(False)
-        else:
-            self.cbxExposure.setEnabled(True)
-
-    def attributeSelected(self, item):
-        enabled = False
-        if item.checkState() > 0:
-            enabled = True
-
-        if item == self.itmPixelRegion:
-            self.chxPixRegCalc.setEnabled(enabled)
-            if not self.chxPixRegCalc.isChecked():
-                self.cbxPixRegFixed.setEnabled(enabled)
-        elif item == self.itmPixelWeighting:
-            self.radPixelMean.setEnabled(enabled)
-            self.radPixelMedian.setEnabled(enabled)
-            self.radPixelGaussian.setEnabled(enabled)
-        elif item == self.itmColor:
-            self.cbxColorModel.setEnabled(enabled)
-        elif item == self.itmExposure:
-            if not self.chxHDR.isChecked():
-                self.cbxExposure.setEnabled(enabled)
-        elif item == self.itmRadiance:
-            self.txtResolution.setEnabled(enabled)
+        self.txtFileIn.setText(filename)
+        name, ext = os.path.splitext(filename)
+        self.txtFileOut.setText(name + "_new" + ext)
 
     def convertPressed(self):
-        # validate dataset before proceeding
-        if self.txtFile.text() is None or len(self.txtFile.text()) <= 0:
-            QMessageBox.critical(self, "Error", "Invalid sample dataset filename!", QMessageBox.Ok)
+        # validate files before proceeding
+        if self.txtFileIn.text() is None or len(self.txtFileIn.text()) <= 0:
+            QMessageBox.critical(self, "Error", "Invalid sample dataset filename.", QMessageBox.Ok)
             return
-        if not os.path.exists(self.txtFile.text()):
-            QMessageBox.critical(self, "Error", "Sample dataset file not found!", QMessageBox.Ok)
+        if not os.path.exists(self.txtFileIn.text()):
+            QMessageBox.critical(self, "Error", "Sample dataset file not found.", QMessageBox.Ok)
             return
+        if self.txtFileIn.text() == self.txtFileOut.text():
+            QMessageBox.critical(self, "Error", "Dataset In and Out filenames cannot be the same.", QMessageBox.Ok)
+            return
+        # validate dataset before proceeding (required features)
+        with open(self.txtFileIn.text(), 'r') as filein:
+            reader = csv.reader(filein, delimiter=",")
+            header = next(reader, None)
+            if 'Date' not in header or 'Time' not in header or 'SamplePatternIndex' not in header:
+                QMessageBox.critical(self, "Error", "Dataset missing required features:\n'Date', 'Time', or 'SamplePatternIndex'.", QMessageBox.Ok)
+                return
 
-        # save convert filename
-        self.convertOptions["Filename"] = self.txtFile.text()
-
-        # save pixel options
-        self.convertOptions["ComputePixelRegion"] = self.chxPixRegCalc.isChecked()
-        self.convertOptions["PixelRegion"] = int(self.cbxPixRegFixed.currentText())
-        if self.radPixelMean.isChecked():
-            self.convertOptions["PixelWeighting"] = common.PixelWeighting.Mean.value
-        elif self.radPixelMedian.isChecked():
-            self.convertOptions["PixelWeighting"] = common.PixelWeighting.Median.value
-        elif self.radPixelGaussian.isChecked():
-            self.convertOptions["PixelWeighting"] = common.PixelWeighting.Gaussian.value
-
-        # save other options
-        self.convertOptions["IsHDR"] = self.chxHDR.isChecked()
-        if self.itmColor.checkState() > 0:
-            self.convertOptions["ColorModel"] = common.ColorModel[self.cbxColorModel.currentText()].value
-        if self.itmRadiance.checkState() > 0:
-            self.convertOptions["SpectrumResolution"] = int(self.txtResolution.text())
-
-        # save exposure
-        self.convertOptions["Exposure"] = float(self.cbxExposure.currentText())
+        # save filenames
+        self.datasetIn = self.txtFileIn.text()
+        self.datasetOut = self.txtFileOut.text()
 
         self.accept()

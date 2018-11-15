@@ -168,6 +168,10 @@ class SkyDataViewer(QMainWindow):
         self.actExportSelected.setStatusTip('Export selected samples')
         self.actExportSelected.setEnabled(False)
         self.actExportSelected.triggered.connect(lambda: self.exportSamples('selected'))
+        self.actConvertDataset = QAction(QIcon(), '&Convert Dataset', self)
+        self.actConvertDataset.setStatusTip('Re-export samples in dataset')
+        self.actConvertDataset.setEnabled(False)
+        self.actConvertDataset.triggered.connect(self.convertSamples)
         self.actSelectAll = QAction(QIcon(), 'Select &All', self)
         self.actSelectAll.setShortcut('Ctrl+A')
         self.actSelectAll.setStatusTip('Select all samples')
@@ -182,9 +186,7 @@ class SkyDataViewer(QMainWindow):
         self.actAvoidSun = QAction(QIcon(), 'Avoid Circumsolar', self)
         self.actAvoidSun.setStatusTip('Deselect samples around sun within a specified angle')
         self.actAvoidSun.triggered.connect(self.toggleAvoidSun)
-        self.actSampleConverter = QAction(QIcon(), 'Sample &Converter', self)
-        self.actSampleConverter.setStatusTip('Re-export samples with different properties')
-        self.actSampleConverter.triggered.connect(self.convertSamples)
+
 
         # help menu actions
         actAbout = QAction(QIcon(), '&About', self)
@@ -229,7 +231,7 @@ class SkyDataViewer(QMainWindow):
         menu.addAction(self.actExportSetup)
         menu.addSeparator()
         menu.addAction(self.actExportSelected)
-        menu.addAction(self.actSampleConverter)
+        menu.addAction(self.actConvertDataset)
         menu.addSeparator()
         menu.addAction(self.actSelectAll)
         menu.addAction(self.actSelectInv)
@@ -431,32 +433,13 @@ class SkyDataViewer(QMainWindow):
         self.resetGraph()
 
         # load data directory configuration
-        utility_data.loadDataConfig()
+        if not utility_data.loadDataConfig():
+            QMessageBox.critical(self, "Error", "Data directory config.json file did not load properly. This is a problem. Double-check the config file to make sure it is accurate, and then reload the data directory.", QMessageBox.Ok)
 
-        # # load sampling pattern
-        # common.SamplingPattern = utility_data.loadSamplingPattern(common.AppSettings["DataDirectory"])
-        # common.SamplingPatternRads = [(math.radians(s[0]), math.radians(s[1])) for s in common.SamplingPattern]
-        # common.SamplingPatternAlts = list(set([s[1] for s in common.SamplingPattern]))
-        # common.SamplingPatternAlts = sorted(common.SamplingPatternAlts)
-        #
-        # # load exposures
-        # common.Exposures = utility_data.loadExposures(common.AppSettings["DataDirectory"])
-        # common.ExposureIdxMap = {common.Exposures[i]: i for i in range(0, len(common.Exposures))}
-        # self.cbxExposure.addItems([str(x) for x in common.Exposures])
-        #
-        # # load lens warp data
-        # common.LensWarp = utility_data.loadLensWarp(common.AppSettings["DataDirectory"])
-        #
-        # # load site data
-        # common.SPASiteData = utility_data.loadSPASiteData(common.AppSettings["DataDirectory"])
-        #
-        # # load sky cover data
-        # common.SkyCoverData = utility_data.loadSkyCoverData(common.AppSettings["DataDirectory"])
-
-        # add exposures
+        # add exposures to GUI
         self.cbxExposure.addItems([str(x) for x in common.Exposures])
 
-        # find capture dates
+        # find and add capture dates to GUI
         captureDateDirs = utility.findFiles(common.AppSettings["DataDirectory"], mode=2)
         captureDateDirs[:] = [dir for dir in captureDateDirs if utility.verifyDateTime(os.path.basename(dir), "%Y-%m-%d")]
         captureDates = [os.path.basename(dir) for dir in captureDateDirs]
@@ -643,8 +626,8 @@ class SkyDataViewer(QMainWindow):
         if len(self.captureTimeASDFiles) <= 0:
             self.log("Error: No ASD .txt files found for: " + str(asdTime))
             return
-        if len(self.captureTimeASDFiles) < len(common.SamplingPattern):
-            self.log("Error: Found only " + str(len(self.captureTimeASDFiles)) + " ASD files. Sample pattern should have " + str(len(common.SamplingPattern)))
+        if len(self.captureTimeASDFiles) != len(common.SamplingPattern):
+            self.log("Error: Found " + str(len(self.captureTimeASDFiles)) + " ASD files. Sampling pattern should have " + str(len(common.SamplingPattern)))
             return
 
         # graph ASD data
@@ -684,83 +667,108 @@ class SkyDataViewer(QMainWindow):
     def selectSamples(self, message):
         self.wgtFisheye.selectSamples(message)
 
-    def exportSamples(self, message):
+    def exportSamples(self, message, extra=None):
         xoptions = common.AppSettings["ExportOptions"]
 
+        # handle differences between export and convert
+        if message != 'convert':
+            fileout = xoptions["Filename"]
+            samples = self.wgtFisheye.samplesSelected
+            capture = self.capture
+            exposure = common.Exposures[self.exposure]
+        else:
+            fileout = extra["DatasetOut"]
+            samples = extra["SamplesSelected"]
+            capture = extra["Capture"]
+            exposure = extra["Exposure"] if extra["Exposure"] > 0 else common.Exposures[self.exposure]
+
         # we shouldn't be here if export file hasn't been configured
-        if len(xoptions["Filename"]) <= 0:
+        if len(fileout) <= 0:
             QMessageBox.critical(self, "Error", "Please configure export file first.", QMessageBox.Ok)
             return
-
-        # nothing to export
-        if len(self.captureTimeHDRDirs) <= 0:          # no HDR photo
-            self.log("Info: No HDR directories found. Nothing to export.")
-            return
-        if len(self.captureTimeASDFiles) <= 0:         # no ASD files
-            self.log("Info: No ASD files found. Nothing to export.")
-            return
-        if len(self.wgtFisheye.samplesSelected) <= 0:  # nothing selected
+        # no samples to export
+        if len(samples) <= 0:
             self.log("Info: No samples selected. Nothing to export.")
             return
 
-        # make sure there are photos for every exposure we intend to export
+        if message != 'convert':
+            self.log("Export preparations... ")
+
+        # find photos for every exposure we intend to export
         exposures = []  # list of exposures to export
         expphotos = []  # list of photos per exposure
         if not xoptions["IsHDR"]:
-            photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], self.capture, self.exposure)
+            photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], capture, exposure)
             if not photo or len(photo) <= 0:
-                self.log("Error: Photo for " + self.exposure + "s exposure not found. Export canceled.")
+                self.log("Error: Photo for " + exposure + "s exposure not found. Export canceled.")
                 return
-            exposures.append(self.exposure)
+            exposures.append(exposure)
             expphotos.append(photo)
         else:
             for exp in common.Exposures:
-                photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], self.capture, exp)
+                photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], capture, exp)
                 if not photo or len(photo) <= 0:
-                    self.log("Error: Photo for exposure '" + str(exp) + "' not found. Canceled export.")
+                    self.log("Error: Photo for exposure '" + str(exp) + "' not found. Export canceled.")
                     return
                 exposures.append(exp)
                 expphotos.append(photo)
 
-        self.log("Exporting... ")
+        # find ASD files for every sample in sampling pattern (otherwise indexing will be off)
+        asdfiles = []  # list of asd files for current capture
+        if message != 'convert':
+            asdfiles = self.captureTimeASDFiles  # we already found them when user scrolled to capture time
+        else:
+            asdfiles = utility_data.findASDFiles(common.AppSettings["DataDirectory"], capture)
+        if len(asdfiles) <= 0:
+            self.log("Error: No ASD .txt files found for " + str(capture) + ". Export canceled.")
+            return
+        if len(asdfiles) != len(common.SamplingPattern):
+            self.log("Error: Found " + str(len(asdfiles)) + " ASD files for " + str(capture) +". Sample pattern should have " + str(len(common.SamplingPattern)) + ". Export canceled.")
+            return
 
-        # init / pre-compute
-        sampleidx = 0
-        delimiter = ","
-        sunpos = utility_data.computeSunPosition(common.SPASiteData)
-        skycover = utility_data.findCaptureSkyCover(self.capture, common.SkyCoverData)
-        resolution = xoptions["SpectrumResolution"]
-        coordsys = common.CoordSystem(xoptions["CoordSystem"])
-        coords = [common.SamplingPattern[i] for i in self.wgtFisheye.samplesSelected]
-        points = [self.wgtFisheye.samplePointsInFile[i] for i in self.wgtFisheye.samplesSelected]
+        # compute sun position
+        spa = utility_data.deepcopySPAData(common.SPASiteData)
+        if message == 'convert':
+            utility_data.fillSPADateTime(spa, capture)
+        sunpos = utility_data.computeSunPosition(spa)
+
+        # compute locations in photo to sample from
+        # NOTE: assumes same positions for all files! (speed up) could be recomputed per file
+        filesamplepoints = utility_data.computePointsInImage(expphotos[0], common.SamplingPattern)
+        points = [filesamplepoints[i] for i in samples]
+        coords = [common.SamplingPattern[i] for i in samples]  # sample coordinates
+
+        # determine pixel regions and weighting
         pixweight = common.PixelWeighting(xoptions["PixelWeighting"])
-        # pixel regions
+        pixregions = []
         if xoptions["ComputePixelRegion"]:
-            # TODO: this is hardcoded to our sampling pattern. compute it properly by projecting area and taking width and height!!
-            altitudeRegionMap = {90:1, 71.9187:3, 53.3665:5, 33.749:7, 12.1151:9}
-            pixregions = [altitudeRegionMap[c[1]] for c in coords]
+            pixregions = [common.AltitudeRegionMap[c[1]] for c in coords]
         else:
             reg = xoptions["PixelRegion"]
             pixregions = [reg for i in range(0, len(points))]
-        # pixels
+
+        # compute pixels
         exppixels = []  # list of lists of pixels per exposure
         for i in range(0, len(exposures)):
             exppixels.append(utility_data.collectPixels(points, pixregions, file=expphotos[i], weighting=pixweight))
-        # color model
+
+        # modify pixels per color model
         color = common.ColorModel(xoptions["ColorModel"])
         if color == common.ColorModel.HSV:
             for pixels in exppixels:
-                for i in range(0, len(self.wgtFisheye.samplesSelected)):
+                for i in range(0, len(samples)):
                     rgb = sRGBColor(pixels[i][0], pixels[i][1], pixels[i][2], is_upscaled=True)
                     hsv = convert_color(rgb, HSVColor)
                     pixels[i] = hsv.get_value_tuple()
         elif color == common.ColorModel.LAB:
             for pixels in exppixels:
-                for i in range(0, len(self.wgtFisheye.samplesSelected)):
+                for i in range(0, len(samples)):
                     rgb = sRGBColor(pixels[i][0], pixels[i][1], pixels[i][2], is_upscaled=True)
                     lab = convert_color(rgb, LabColor)
                     pixels[i] = lab.get_value_tuple()
-        # UV coordinate system
+
+        # modify coordinates per coordinate system
+        coordsys = common.CoordSystem(xoptions["CoordSystem"])
         if coordsys == common.CoordSystem.UV:
             coordsfinal = [(utility_angles.SkyCoord2FisheyeUV(c[0], c[1])) for c in coords]
             sunposfinal = (utility_angles.SkyCoord2FisheyeUV(sunpos[0], sunpos[1]))
@@ -768,13 +776,23 @@ class SkyDataViewer(QMainWindow):
             coordsfinal = coords
             sunposfinal = sunpos
 
+        if message != 'convert':
+            self.log("Exporting... ")
+
+        # init
+        sampleidx = 0
+        delimiter = ","
+        speccount = xoptions["SpectrumEnd"] - xoptions["SpectrumStart"] + 1
+        resolution = xoptions["SpectrumResolution"]
+        skycover = utility_data.findCaptureSkyCover(capture, common.SkyCoverData)
+
         # create file if not exists
-        if not os.path.exists(xoptions["Filename"]):
+        if not os.path.exists(fileout):
             # create dirs if not exists
-            if not os.path.exists(os.path.dirname(xoptions["Filename"])):
-                os.makedirs(os.path.dirname(xoptions["Filename"]))
+            if not os.path.exists(os.path.dirname(fileout)):
+                os.makedirs(os.path.dirname(fileout))
             # write header
-            with open(xoptions["Filename"], "w") as file:
+            with open(fileout, "w") as file:
                 for fidx in xoptions["Features"]:
                     feature = DialogExport.attributeFromIndex(fidx)
                     if feature == "Exposure":
@@ -790,8 +808,8 @@ class SkyDataViewer(QMainWindow):
                         else:
                             file.write("ColorA" + delimiter + "ColorB" + delimiter + "ColorC" + delimiter)
                     elif feature == "Radiance":
-                        file.write(str(350))  # first wavelength, no delimiter
-                        for w in range(350 + resolution, 2501, resolution):
+                        file.write(str(xoptions["SpectrumStart"]))  # first wavelength, no delimiter
+                        for w in range(xoptions["SpectrumStart"] + resolution, xoptions["SpectrumEnd"] + 1, resolution):
                             file.write(delimiter + str(w))  # delimiter plus next wavelength
                     else:
                         file.write(feature)
@@ -799,22 +817,22 @@ class SkyDataViewer(QMainWindow):
                 file.write("\n")
         # otherwise count existing samples
         else:
-            with open(xoptions["Filename"], 'r') as file:
+            with open(fileout, 'r') as file:
                 reader = csv.reader(file, delimiter=',')
                 next(reader, None) # skip header
                 sampleidx = sum(1 for row in reader)
 
         # append export to existing file
-        with open(xoptions["Filename"], "a") as file:
+        with open(fileout, "a") as file:
             # export each selected sample
-            for i, sIdx in enumerate(self.wgtFisheye.samplesSelected):
+            for i, sIdx in enumerate(samples):
 
                 # export each required attribute
                 # date
-                file.write(str(self.capture.date()))
+                file.write(str(capture.date()))
                 file.write(delimiter)
                 # time
-                file.write(str(self.capture.time()))
+                file.write(str(capture.time()))
                 file.write(delimiter)
                 # space
                 file.write(str(coordsys.value))
@@ -882,17 +900,17 @@ class SkyDataViewer(QMainWindow):
                             file.write(delimiter)
                     # export spectral radiance
                     elif feature == "Radiance":
-                        xs, ys = utility_data.loadASDFile(self.captureTimeASDFiles[sIdx])
-                        count = len(xs)
+                        xs, ys = utility_data.loadASDFile(asdfiles[sIdx])
                         file.write(str(max(ys[0],0)))  # first wavelength, no delimiter
-                        for j in range(resolution, count, resolution):
+                        for j in range(resolution, speccount, resolution):
                             file.write(delimiter + str(max(ys[j],0)))  # delimiter plus next wavelength
 
                 # next sample
                 file.write("\n")
                 sampleidx += 1
 
-        self.log("Exported " + str(len(self.wgtFisheye.samplesSelected)) + " sample(s) of capture " + str(self.capture))
+        if message != 'convert':
+            self.log("Exported " + str(len(samples)) + " sample(s) of capture " + str(capture))
 
     def convertSamples(self):
         dialog = DialogConverter()
@@ -900,171 +918,50 @@ class SkyDataViewer(QMainWindow):
         if (code != QDialog.Accepted):
             return
 
-        self.log("Converting... ")
-
         # init
-        fpath, fext = os.path.splitext(dialog.convertOptions["Filename"])
-        fnamein = dialog.convertOptions["Filename"]
-        fnameout = fpath + "_new" + fext
-        numrows = 0
-        pixregion = common.PixelRegionMin
-        pixweight = common.PixelWeighting.Mean
-        colormodel = common.ColorModel.RGB
-        resolution = 1
+        count = 0
+        currtime = datetime.min
+        extra = {
+            "DatasetOut": dialog.datasetOut,
+            "SamplesSelected": [],
+            "Capture": datetime.min,
+            "Exposure": 0
+        }
 
-        # open files
-        with open(fnamein, 'r') as filein:
-            with open(fnameout, 'w') as fileout:
-                reader = csv.reader(filein, delimiter=",")
-                writer = csv.writer(fileout, delimiter=",", lineterminator='\n')
+        # if output file exists - wipe it out, all of it
+        if os.path.exists(dialog.datasetOut):
+            os.unlink(dialog.datasetOut)
 
-                # read header
-                header = next(reader, None)
-                mapping = {header[i]: i for i in range(0, len(header))}
-
-                # read first row for taste of current values
-                firstrow = next(reader, None)
-
-                # what pixel region to use?
-                if "PixelRegion" in mapping:  # overwrite with value in file if exists
-                    pixregion = firstrow[mapping["PixelRegion"]]
-                if "PixelRegion" in dialog.convertOptions:  # overwrite with desired conversion
-                    pixregion = dialog.convertOptions["PixelRegion"]
-
-                # what pixel weighting to use?
-                if "PixelWeighting" in mapping:  # overwrite with value in file if exists
-                    pixweight = common.PixelWeighting(int(firstrow[mapping["PixelWeighting"]]))
-                if "PixelWeighting" in dialog.convertOptions:  # overwrite with desired conversion
-                    pixweight = common.PixelWeighting(dialog.convertOptions["PixelWeighting"])
-
-                # what color model to use?
-                if "ColorModel" in mapping:  # overwrite with value in file if exists
-                    colormodel = common.ColorModel(int(firstrow[mapping["ColorModel"]]))
-                if "ColorModel" in dialog.convertOptions:  # overwrite with desired conversion
-                    colormodel = common.ColorModel(dialog.convertOptions["ColorModel"])
-
-                # what spectrum resolution to use?
-                prevrez = int(((2500-350)+1) / (len(header) - mapping["350"]))
-                if "SpectrumResolution" not in dialog.convertOptions:  # use same resolution
-                    resolution = prevrez
-                else:  # overwrite with desired conversion
-                    resolution = dialog.convertOptions["SpectrumResolution"]
-
-                # reset read file
-                filein.seek(0)
-                next(reader, None)  # skip header
-
-                # init
-                currtime = datetime.min
-                currHDRfile = ''
-                currexposure = 0
-                currcoords = []
-                currrows = []
-                # TODO: this is hardcoded to our sampling pattern. compute it properly!!
-                altitudeRegionMap = {90: 1, 71.9187: 3, 53.3665: 5, 33.749: 7, 12.1151: 9}
-
-                # write header
-                if resolution == prevrez:
-                    writer.writerow(header)  # use exact same header
-                else:  # write new header to account for different spectrum resolution
-                    newheader = []
-                    newheader.extend(header[0:mapping["350"]])
-                    for w in range(350, 2501, resolution):
-                        newheader.append(str(w))
-                    writer.writerow(newheader)
-
-                # read and write rows
-                for row in reader:
-                    # is this row a new capture timestamp of samples?
-                    ts = datetime.strptime(row[mapping["Date"]] + " " + row[mapping["Time"]], "%Y-%m-%d %H:%M:%S")
-                    exp = float(row[mapping["Exposure"]])
-                    if ts != currtime or exp != currexposure:
-                        # if so, flush our cached rows read so far
-                        if os.path.exists(currHDRfile):
-                            if dialog.convertOptions["ComputePixelRegion"]:
-                                pixregions = [altitudeRegionMap[c[1]] for c in currcoords]
-                            else:
-                                pixregions = [pixregion for i in range(0, len(currcoords))]
-                            points = utility_data.computePointsInImage(currHDRfile, currcoords)
-                            pixels = utility_data.collectPixels(points, pixregions, file=currHDRfile, weighting=pixweight)
-                            if colormodel == common.ColorModel.HSV:
-                                for i, p in enumerate(pixels):
-                                    rgb = sRGBColor(p[0], p[1], p[2], is_upscaled=True)
-                                    hsv = convert_color(rgb, HSVColor)
-                                    pixels[i] = hsv.get_value_tuple()
-                            elif colormodel == common.ColorModel.LAB:
-                                for i, p in enumerate(pixels):
-                                    for i, p in enumerate(pixels):
-                                        rgb = sRGBColor(p[0], p[1], p[2], is_upscaled=True)
-                                        lab = convert_color(rgb, LabColor)
-                                        pixels[i] = lab.get_value_tuple()
-                            # update cached row with new values and write to convert file
-                            for i in range(0, len(currrows)):
-                                # update
-                                currrows[i][mapping["PixelRegion"]] = pixregions[i]
-                                currrows[i][mapping["PixelWeighting"]] = pixweight.value
-                                currrows[i][mapping["ColorModel"]] = colormodel.value
-                                currrows[i][mapping["ColorA"]] = pixels[i][0]
-                                currrows[i][mapping["ColorB"]] = pixels[i][1]
-                                currrows[i][mapping["ColorC"]] = pixels[i][2]
-                                # write
-                                writer.writerow(currrows[i])
-                                numrows += 1
-                        # get ready for a new capture timestamp of samples that this row kicked off
-                        currtime = ts
-                        currexposure = exp
-                        currHDRfile = utility_data.findHDRFile(common.AppSettings["DataDirectory"], currtime, currexposure)
-                        currrows = []
-                        currcoords = []
-
-                    # collect sample coordinate
-                    currcoords.append((float(row[mapping["SampleAzimuth"]]), float(row[mapping["SampleAltitude"]])))
-
-                    # collect sample row to be written
-                    if resolution == prevrez:
-                        currrows.append(row)
-                    else:
-                        newrow = []
-                        newrow.extend(row[0:mapping["350"]])
-                        currASDfile = utility_data.findASDFile(common.AppSettings["DataDirectory"], currtime, int(row[mapping["SamplePatternIndex"]]))
-                        ws, rs = utility_data.loadASDFile(currASDfile, resolution)
-                        rs[:] = [max(r, 0) for r in rs]
-                        newrow.extend(rs)
-                        currrows.append(newrow)
-
-                # flush any remaining cached rows
-                if len(currrows) > 0 and os.path.exists(currHDRfile):
-                    if dialog.convertOptions["ComputePixelRegion"]:
-                        pixregions = [altitudeRegionMap[c[1]] for c in currcoords]
-                    else:
-                        pixregions = [pixregion for i in range(0, len(currcoords))]
-                    points = utility_data.computePointsInImage(currHDRfile, currcoords)
-                    pixels = utility_data.collectPixels(points, pixregions, file=currHDRfile, weighting=pixweight)
-                    if colormodel == common.ColorModel.HSV:
-                        for i, p in enumerate(pixels):
-                            rgb = sRGBColor(p[0], p[1], p[2], is_upscaled=True)
-                            hsv = convert_color(rgb, HSVColor)
-                            pixels[i] = hsv.get_value_tuple()
-                    elif colormodel == common.ColorModel.LAB:
-                        for i, p in enumerate(pixels):
-                            for i, p in enumerate(pixels):
-                                rgb = sRGBColor(p[0], p[1], p[2], is_upscaled=True)
-                                lab = convert_color(rgb, LabColor)
-                                pixels[i] = lab.get_value_tuple()
-                    # update cached row with new values and write to convert file
-                    for i in range(0, len(currrows)):
-                        # update
-                        currrows[i][mapping["PixelRegion"]] = pixregions[i]
-                        currrows[i][mapping["PixelWeighting"]] = pixweight.value
-                        currrows[i][mapping["ColorModel"]] = colormodel.value
-                        currrows[i][mapping["ColorA"]] = pixels[i][0]
-                        currrows[i][mapping["ColorB"]] = pixels[i][1]
-                        currrows[i][mapping["ColorC"]] = pixels[i][2]
-                        # write
-                        writer.writerow(currrows[i])
-                        numrows += 1
-
-        self.log("Converted " + str(numrows) + " sample(s)")
+        self.log("Converting... ")
+        with open(dialog.datasetIn, 'r') as filein:
+            reader = csv.reader(filein, delimiter=",")
+            # read header
+            header = next(reader, None)
+            mapping = {header[i]: i for i in range(0, len(header))}
+            # read first row
+            row = next(reader, None)
+            currtime = datetime.strptime(row[mapping['Date']] + ' ' + row[mapping['Time']], "%m/%d/%Y %H:%M:%S")
+            # reset reader
+            filein.seek(0)
+            next(reader, None)  # skip header this time
+            # read each row/sample
+            for row in reader:
+                ts = datetime.strptime(row[mapping['Date']] + ' ' + row[mapping['Time']], "%m/%d/%Y %H:%M:%S")
+                # new capture timestamp of samples? flush current samples
+                if ts != currtime:
+                    self.exportSamples('convert', extra)
+                    currtime = ts
+                    extra["SamplesSelected"] = []
+                # collect samples to convert
+                count += 1
+                extra["SamplesSelected"].append(int(row[mapping["SamplePatternIndex"]]))
+                extra["Capture"] = ts
+                if "Exposure" in header:
+                    extra["Exposure"] = float(row[mapping["Exposure"]])
+            # flush any remaining samples
+            if len(extra["SamplesSelected"]) > 0:
+                self.exportSamples('convert', extra)
+        self.log("Converted " + str(count) + " sample(s)")
 
     def setupExportFile(self):
         dialog = DialogExport(common.AppSettings["ExportOptions"])
@@ -1075,8 +972,9 @@ class SkyDataViewer(QMainWindow):
         # save the export options in app settings
         common.AppSettings.update({"ExportOptions": dialog.exportOptions})
 
-        # now that export options are configured, enable export commands
+        # now that export options are configured, enable export and convert commands
         self.actExportSelected.setEnabled(True)
+        self.actConvertDataset.setEnabled(True)
 
     def triggerContextMenu(self, widget, event):
         if widget == self.wgtFisheye:
