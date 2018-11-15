@@ -22,6 +22,8 @@ PixelRegionMin = 1     # used for pixel convolution
 PixelRegionMax = 63    # used for pixel convolution
 HUDTextScaleMin = 10   # used for font resizing
 HUDTextScaleMax = 100  # used for font resizing
+# TODO: this is hardcoded to our sampling pattern. compute it properly by projecting area and taking width and height!!
+AltitudeRegionMap = {90:1, 71.9187:3, 53.3665:5, 33.749:7, 12.1151:9}  # pixel regions per altitude
 
 # sample export features
 SampleFeatures = [
@@ -56,6 +58,8 @@ DefDataConfig = {
     "Filename": "config.json",
     "RadianceFOV": 1,             # (degrees) field of view used when measuring radiance with spectroradiometer
     "CaptureEpsilon": 60,         # (seconds) max acceptable time delta between measurements of same capture
+    "SpectrumStart": 350,         # (nm) inclusive start of spectral range
+	"SpectrumEnd": 2500,          # (nm) inclusive end of spectral range
     "Exposures": [1],             # (seconds) exposures of photos found in data directory
     "Lens": {                     # lens used during data capture
         "Name": "Sigma 8mm f/3.5",# for identification
@@ -104,6 +108,8 @@ DefExportOptions = {
     "PixelRegion": PixelRegionMin,
     "PixelWeighting": PixelWeighting.Mean.value,
     "ColorModel": ColorModel.RGB.value,
+    "SpectrumStart": 350,
+    "SpectrumEnd": 2500,
     "SpectrumResolution": 1,
     "Features": [i for i in range(0, len(SampleFeatures))]
 }
@@ -147,6 +153,7 @@ DataConfig = dict(DefDataConfig)
 # main program application settings!
 AppSettings = dict(DefAppSettings)
 
+# pre-computed/loaded globals exposed to rest of program
 Exposures = []            # photo capture exposure times (in seconds)
 ExposureIdxMap = {}       # for convenience
 LensWarp = ()             # camera lens warp/linearity 4^th degree poly coefficients (used for sky to fisheye coords)
@@ -156,3 +163,5 @@ SamplingPattern = []      # sky sampling pattern coordinates (azimuth, altitude)
 SamplingPatternRads = []  # for convenience
 SamplingPatternAlts = []  # a sorted unique set of just the altitudes
 SkyCoverData = []         # sky cover ranges
+SpectrumRange = ()        # inclusive range of wavelengths of radiance data
+CaptureEpsilon = 0        # max acceptable time delta between measurements of same capture

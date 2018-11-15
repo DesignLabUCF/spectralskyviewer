@@ -2,6 +2,8 @@
     "Filename": "config.json",
     "RadianceFOV": 1,
     "CaptureEpsilon": 60,
+	"SpectrumStart": 350,
+	"SpectrumEnd": 2500,
     "Exposures": [
         0.000125,
         0.001,
