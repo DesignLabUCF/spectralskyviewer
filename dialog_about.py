@@ -19,7 +19,7 @@ class DialogAbout(QDialog):
 
         # init
         self.initWidgets()
-        self.setWindowTitle("About SkyDataViewer")
+        self.setWindowTitle("About SpectralSkyViewer")
         self.setWindowIcon(QIcon('res/icon.png'))
 
     def initWidgets(self):

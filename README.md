@@ -1,4 +1,4 @@
-# SkyDataViewer
+# SpectralSkyViewer
 
 A tool to view sky photos with corresponding multispectral radiance measurements side-by-side. Additionally, it can be used to export and convert datasets of sky samples inteaded to be used for machine learning.
 
@@ -25,13 +25,13 @@ decorator (4.3.0)   # used only for color model conversions
 Install Python and modules above.  
 Run the application.  
 Select a data directory (which must have data organized in a specific way).  
+
 Use the dropdowns and sliders to select desired capture date and time and exposure.    
 Click and drag to select sampling pattern coordinates.  
 View corresponding radiance measurements below.  
-
 Right-click (mouse-secondary) on canvas for more selection and HUD options.  
 
-To export, first run `Setup Export File` to specify parameters and output file. Exports will then be appended to the same file.
+To export or convert sample datasets, first run `Setup Export File` to specify parameters and output file. Exports will then be appended to the same file. Converter will use the same options.
 
 To make your own data directory, follow the format of the example public data linked below.      
 
@@ -57,7 +57,7 @@ Context menu -> `Graph Resolution` can be used to optimize plotting of radiance 
 
 `Pixel Region` and `Pixel Weighting` refers to pixel kernel used during convolution of final pixel color viewed and exported. The color can be seen in the bottom-right of the canvas.  
 
-`res/settings.json` - Is a settings file generated on execution and contains default and saved settings as you use the application, which can be edited by hand. There is a menu option in Help which can be toggled to prevent overwriting of settings.
+`res/settings.json` - Settings file generated on execution and contains default and saved settings as you use the application, which can be edited by hand. There is a menu option in Help which can be toggled to prevent overwriting of settings.
 
-`res/dsetfix.py` - Is a script for searching/operating on exported sample datasets.  
-`res/ddirfix.py` - Is a script for cleaning/organizing a data directory with corresponding sky photos and radiance measurements.  
+`res/dsetfix.py` - Script for searching/operating on exported sample datasets.  
+`res/ddirfix.py` - Script for cleaning/organizing a data directory with corresponding sky photos and radiance measurements.  

@@ -3,7 +3,7 @@
 # ====================================================================
 # @author: Joe Del Rocco
 # @since: 06/25/2018
-# @summary: Script to search/tweak SkyDataViewer exported datasets.
+# @summary: Script to search/tweak SpectralSkyViewer exported datasets.
 # ====================================================================
 import sys
 import os
@@ -58,7 +58,7 @@ def PrintRow(args, row):
 
 def main():
     # handle command line args
-    parser = argparse.ArgumentParser(description='Script to search/tweak SkyDataViewer exported datasets. This script does not make any changes to the original file. All results are written to standard out.', formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description='Script to search/tweak SpectralSkyViewer exported datasets. This script does not make any changes to the original file. All results are written to standard out.', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_help = True
     parser.add_argument('file', help='a sky data export file')
     parser.add_argument('-w', '--hidewaves', dest='hidewaves', action='store_true', help='hide wavelength data (easier to read)')

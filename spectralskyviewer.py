@@ -3,7 +3,7 @@
 # ====================================================================
 # @author: Joe Del Rocco
 # @since: 10/06/2017
-# @summary: SkyDataViewer main program file
+# @summary: SpectralSkyViewer main program file
 # ====================================================================
 import sys
 import os
@@ -27,7 +27,7 @@ from dialog_converter import DialogConverter
 from dialog_slider import DialogSlider
 
 
-class SkyDataViewer(QMainWindow):
+class SpectralSkyViewer(QMainWindow):
 
     def __init__(self):
         super().__init__()
@@ -49,7 +49,7 @@ class SkyDataViewer(QMainWindow):
         self.initWidgets()
         # self.setGeometry(0, 0, 1024, 768)
         self.resize(common.AppSettings["WindowWidth"], common.AppSettings["WindowHeight"])
-        self.setWindowTitle("SkyDataViewer")
+        self.setWindowTitle("SpectralSkyViewer")
         self.setWindowIcon(QIcon('res/icon.png'))
         self.statusBar().showMessage('Ready')
         if common.AppSettings["ShowStatusBar"]:
@@ -1148,7 +1148,7 @@ class SkyDataViewer(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
-    w = SkyDataViewer()
+    w = SpectralSkyViewer()
     w.center()
     w.show()
 

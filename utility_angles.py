@@ -29,7 +29,6 @@ Note that images in this application were taken with North facing downward, so w
 Note sampling pattern coordinates in this application were measured in altitude, but calculation below requires zenith.
 Note altering of zenith to account for warp of lens used:
 http://paulbourke.net/dome/fisheyecorrect/
-http://michel.thoby.free.fr/Fisheye_history_short/Projections/Models_of_classical_projections.html
 '''
 def SkyCoord2FisheyeUV(azimuth, altitude, lenswarp=True):
     # 1) sky photos were saved as (North down, South up), so rotate "North" to polar coordinate system (0 deg East)
