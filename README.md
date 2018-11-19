@@ -1,12 +1,18 @@
 # SpectralSkyViewer
 
-A tool to view sky photos with corresponding multispectral radiance measurements side-by-side. Additionally, it can be used to export and convert datasets of sky samples inteaded to be used for machine learning.
+[![img1](/res/img1p.jpg)](/res/img1.jpg) 
+[![img2](/res/img2p.jpg)](/res/img2.jpg) 
+[![img3](/res/img3p.jpg)](/res/img3.jpg) 
+[![img4](/res/img4p.jpg)](/res/img4.jpg) 
+[![img5](/res/img5p.jpg)](/res/img5.jpg)  
 
-The original viewer was [clearskydataviewer](https://github.com/ProgramofComputerGraphics/clearskydataviewer), written by [Dan Knowlton](https://github.com/knowlonix) for the [Program Of Computer Graphics at Cornell](http://www.graphics.cornell.edu). Parts of his sky coordinate to UV angle calculations are retained in [`utility_angles.py`](utility_angles.py).
+A tool for viewing sky photos with correlated spectral radiance measurements side-by-side. Additionally, it can be used to export and convert datasets of sky samples for machine learning.
+
+A prior viewer is [clearskydataviewer](https://github.com/ProgramofComputerGraphics/clearskydataviewer), written by [Dan Knowlton](https://github.com/knowlonix) for the [Program Of Computer Graphics at Cornell](http://www.graphics.cornell.edu). Parts of his sky coordinate to UV angle calculations are retained in [`utility_angles.py`](utility_angles.py).
 
 ### Prerequisites
 
-The software developed in Python on a Windows box and intended to be cross-platform.  
+This software was developed in Python on a Windows 10 box and is intended to be cross-platform.  
 Python modules required (version used at time of development):  
 ```
 Python    (3.5.2)  
@@ -24,11 +30,11 @@ decorator (4.3.0)   # used only for color model conversions
 
 Install Python and modules above.  
 Run the application.  
-Select a data directory (which must have data organized in a specific way).  
+Select a data directory (which must have data organized in a very specific way).  
 
-Use the dropdowns and sliders to select desired capture date and time and exposure.    
+Use the dropdowns and sliders to select desired capture datetime and exposure.    
 Click and drag to select sampling pattern coordinates.  
-View corresponding radiance measurements below.  
+View corresponding spectral radiance measurements.  
 Right-click (mouse-secondary) on canvas for more selection and HUD options.  
 
 To export or convert sample datasets, first run `Setup Export File` to specify parameters and output file. Exports will then be appended to the same file. Converter will use the same options.
