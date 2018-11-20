@@ -680,7 +680,7 @@ class SpectralSkyViewer(QMainWindow):
             fileout = extra["DatasetOut"]
             samples = extra["SamplesSelected"]
             capture = extra["Capture"]
-            exposure = extra["Exposure"] if extra["Exposure"] > 0 else common.Exposures[self.exposure]
+            exposure = extra["Exposure"] if extra["Exposure"] > 0 else common.Exposures[self.exposure] if self.exposure > -1 else common.Exposures[0]
 
         # we shouldn't be here if export file hasn't been configured
         if len(fileout) <= 0:
