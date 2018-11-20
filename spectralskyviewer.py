@@ -769,13 +769,15 @@ class SpectralSkyViewer(QMainWindow):
 
         # modify coordinates per coordinate system
         coordsys = common.CoordSystem(xoptions["CoordSystem"])
-        if coordsys == common.CoordSystem.UV:
-            coordsfinal = [(utility_angles.SkyCoord2FisheyeUV(c[0], c[1])) for c in coords]
-            sunposfinal = (utility_angles.SkyCoord2FisheyeUV(sunpos[0], sunpos[1]))
-        else:
+        if coordsys == common.CoordSystem.Polar:
             coordsfinal = coords
             sunposfinal = sunpos
-
+        elif coordsys == common.CoordSystem.PolarNorm:
+            coordsfinal = [(c[0]/360.0, c[1]/90.0) for c in coords]
+            sunposfinal = (sunpos[0]/360.0, sunpos[1]/90.0)
+        elif coordsys == common.CoordSystem.UV:
+            coordsfinal = [(utility_angles.SkyCoord2FisheyeUV(c[0], c[1])) for c in coords]
+            sunposfinal = (utility_angles.SkyCoord2FisheyeUV(sunpos[0], sunpos[1]))
         if message != 'convert':
             self.log("Exporting... ")
 
@@ -844,11 +846,11 @@ class SpectralSkyViewer(QMainWindow):
 
                     # export sun azimuth
                     if feature == "SunAzimuth":
-                        file.write('{0:07.04f}'.format(sunposfinal[0]))
+                        file.write('{0:.4f}'.format(sunposfinal[0]))
                         file.write(delimiter)
                     # export sun altitude
                     elif feature == "SunAltitude":
-                        file.write('{0:07.04f}'.format(sunposfinal[1]))
+                        file.write('{0:.4f}'.format(sunposfinal[1]))
                         file.write(delimiter)
                     # export sky cover
                     elif feature == "SkyCover":
@@ -860,17 +862,17 @@ class SpectralSkyViewer(QMainWindow):
                         file.write(delimiter)
                     # export sample azimuth
                     elif feature == "SampleAzimuth":
-                        file.write('{0:07.04f}'.format(coordsfinal[i][0]))
+                        file.write('{0:.4f}'.format(coordsfinal[i][0]))
                         file.write(delimiter)
                     # export sample altitude
                     elif feature == "SampleAltitude":
-                        file.write('{0:07.04f}'.format(coordsfinal[i][1]))
+                        file.write('{0:.4f}'.format(coordsfinal[i][1]))
                         file.write(delimiter)
                     # export sun point/sample angle
                     elif feature == "SunPointAngle":
                         angle = utility_angles.CentralAngle(sunpos, coords[i])
                         angle = math.degrees(angle)
-                        file.write('{0:07.03f}'.format(angle))
+                        file.write('{0:.3f}'.format(angle))
                         file.write(delimiter)
                     # export pixel neighborhood
                     elif (feature == "PixelRegion"):
