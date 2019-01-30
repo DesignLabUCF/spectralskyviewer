@@ -1,10 +1,10 @@
 # SpectralSkyViewer
 
-[![img1](/res/img1p.jpg)](/res/img1.jpg) 
-[![img2](/res/img2p.jpg)](/res/img2.jpg) 
-[![img3](/res/img3p.jpg)](/res/img3.jpg) 
-[![img4](/res/img4p.jpg)](/res/img4.jpg) 
-[![img5](/res/img5p.jpg)](/res/img5.jpg)  
+[![img1](/img/img1p.jpg)](/img/img1.jpg) 
+[![img2](/img/img2p.jpg)](/img/img2.jpg) 
+[![img3](/img/img3p.jpg)](/img/img3.jpg) 
+[![img4](/img/img4p.jpg)](/img/img4.jpg) 
+[![img5](/img/img5p.jpg)](/img/img5.jpg)  
 
 A tool for viewing sky photos with correlated spectral radiance measurements side-by-side. Additionally, it can be used to export and convert datasets of sky samples for machine learning.
 

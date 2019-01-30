@@ -9,6 +9,9 @@ import sys
 import os
 import csv
 import argparse
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def CountSamples(args):
@@ -48,6 +51,26 @@ def FindBySky(args):
             if int(row[isc]) == args.skycover:
                 PrintRow(args, row)
 
+def DataDistribution(args):
+    values = []
+    with open(args.file, 'r') as f:
+        reader = csv.reader(f, delimiter=',')
+        header = next(reader, None)
+        idx = header.index(args.variance)
+        for row in reader:
+            values.append(float(row[idx]))
+
+    variance = np.var(values, ddof=1)
+    stddev = np.std(values, ddof=1)
+    print('Variance: {0:.4f}'.format(variance))
+    print('StdDev  : {0:.4f}'.format(stddev))
+
+    fig = plt.figure()
+    sns.distplot(values)
+    plt.suptitle(args.variance + ' Distribution')
+    plt.savefig('dist_'+args.variance, dpi=600, bbox_inches='tight')
+    plt.close(fig)
+
 def PrintRow(args, row):
     if args.hidewaves:
         print(*row[0:args.wavesidx], sep=',')
@@ -65,6 +88,7 @@ def main():
     parser.add_argument('-n', '--count', dest='count', action='store_true', help='count number of samples')
     parser.add_argument('-d', '--dups', dest='dups', action='store_true', help='find duplicates')
     parser.add_argument('-s', '--skycover', dest='skycover', type=int, help='find data by skycover')
+    parser.add_argument('-v', '--variance', dest='variance', type=str, help='compute variance, stddev, distibution')
     args = parser.parse_args()
 
     # file required as parameter
@@ -83,6 +107,8 @@ def main():
         FindDuplicates(args)
     elif args.skycover:
         FindBySky(args)
+    elif args.variance:
+        DataDistribution(args)
 
 
 if __name__ == "__main__":

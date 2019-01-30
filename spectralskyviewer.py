@@ -50,7 +50,7 @@ class SpectralSkyViewer(QMainWindow):
         # self.setGeometry(0, 0, 1024, 768)
         self.resize(common.AppSettings["WindowWidth"], common.AppSettings["WindowHeight"])
         self.setWindowTitle("SpectralSkyViewer")
-        self.setWindowIcon(QIcon('res/icon.png'))
+        self.setWindowIcon(QIcon('img/icon.png'))
         self.statusBar().showMessage('Ready')
         if common.AppSettings["ShowStatusBar"]:
             self.statusBar().show()
