@@ -14,14 +14,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def CountSamples(args):
-    n = 0
-    with open(args.file, 'r') as f:
-        reader = csv.reader(f, delimiter=',')
-        next(reader, None)
-        n = sum(1 for row in reader)
-    print("Samples: " + str(n))
-
 def FindDuplicates(args):
     samples = {}
     with open(args.file, 'r') as f:
@@ -46,10 +38,15 @@ def FindBySky(args):
         header = next(reader, None)
         args.wavesidx = header.index("350")
         isc = header.index("SkyCover")
-        PrintRow(args, header)
-        for row in reader:
-            if int(row[isc]) == args.skycover:
-                PrintRow(args, row)
+        if args.count:
+            n = 0
+            n = sum(1 for row in reader if int(row[isc]) == args.skycover)
+            print("Samples: " + str(n))
+        else:
+            PrintRow(args, header)
+            for row in reader:
+                if int(row[isc]) == args.skycover:
+                    PrintRow(args, row)
 
 def DataDistribution(args):
     values = []
@@ -70,6 +67,14 @@ def DataDistribution(args):
     plt.suptitle(args.variance + ' Distribution')
     plt.savefig('dist_'+args.variance, dpi=600, bbox_inches='tight')
     plt.close(fig)
+
+def CountSamples(args):
+    n = 0
+    with open(args.file, 'r') as f:
+        reader = csv.reader(f, delimiter=',')
+        next(reader, None)
+        n = sum(1 for row in reader)
+    print("Samples: " + str(n))
 
 def PrintRow(args, row):
     if args.hidewaves:
@@ -101,14 +106,14 @@ def main():
         sys.exit(2)
 
     # do it
-    if args.count:
-        CountSamples(args)
-    elif args.dups:
+    if args.dups:
         FindDuplicates(args)
     elif args.skycover:
         FindBySky(args)
     elif args.variance:
         DataDistribution(args)
+    elif args.count:
+        CountSamples(args)
 
 
 if __name__ == "__main__":
