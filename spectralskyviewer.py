@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt, QDir
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import *
 import pyqtgraph as pg
-from colormath.color_objects import sRGBColor, HSVColor, LabColor
+from colormath.color_objects import sRGBColor, HSVColor, HSLColor, LabColor
 from colormath.color_conversions import convert_color
 import common
 import utility
@@ -760,6 +760,12 @@ class SpectralSkyViewer(QMainWindow):
                     rgb = sRGBColor(pixels[i][0], pixels[i][1], pixels[i][2], is_upscaled=True)
                     hsv = convert_color(rgb, HSVColor)
                     pixels[i] = hsv.get_value_tuple()
+        elif color == common.ColorModel.HSL:
+            for pixels in exppixels:
+                for i in range(0, len(samples)):
+                    rgb = sRGBColor(pixels[i][0], pixels[i][1], pixels[i][2], is_upscaled=True)
+                    hsl = convert_color(rgb, HSLColor)
+                    pixels[i] = hsl.get_value_tuple()
         elif color == common.ColorModel.LAB:
             for pixels in exppixels:
                 for i in range(0, len(samples)):

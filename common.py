@@ -13,7 +13,7 @@ from enum import Enum
 # constants -------------------------------------------------------------------
 
 CoordSystem = Enum('CoordSystem', 'Polar PolarNorm UV')          # used for sky coordinates
-ColorModel = Enum('ColorModel', 'RGB HSV LAB')                   # used for pixel color components
+ColorModel = Enum('ColorModel', 'RGB HSV HSL LAB')               # used for pixel color components
 PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')  # used during pixel convolution
 SkyCover = Enum('SkyCover', 'UNK CLR SCT OVC')
 SkyCoverDesc = {SkyCover.UNK: "Unknown", SkyCover.CLR: "Clear", SkyCover.SCT: "Scattered", SkyCover.OVC: "Overcast"}
