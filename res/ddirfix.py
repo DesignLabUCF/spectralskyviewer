@@ -11,6 +11,8 @@ import shutil
 import argparse
 from datetime import datetime, timedelta
 from PIL import Image
+import imageio
+import rawpy
 # we need our utilities
 sys.path.insert(0, '../')
 import utility
@@ -332,22 +334,57 @@ def HDRRotatePhotos(args):
     if (not os.path.exists(args.directory)):
         return
 
+    args.hdrextension = args.hdrextension.lower()
+
     # grab all photos
-    photos = utility.findFiles(args.directory, mode=1, recursive=True, ext=["jpg"]) # NOTE: .cr2 ignored atm!!
+    photos = utility.findFiles(args.directory, mode=1, recursive=True, ext=[args.hdrextension])
     if (len(photos) <= 0):
         print("No photos found in this directory.")
         return
     for p in photos:
-        # pName, pExt = os.path.basename(p).split(".")
-        # pNameNew = pName + "_new." + pExt
-        # pNew = os.path.join(os.path.dirname(p), pNameNew)
         print("Rotate (" + str(args.hdrrotate) + "°): " + p)
         if (not args.readonly):
             img = Image.open(p)
-            dpi = img.info.get('dpi')
-            exif = img.info['exif']
             img2 = img.rotate(args.hdrrotate)
-            img2.save(p, dpi=dpi, subsampling=-1, quality=100, exif=exif)
+            dpi = img.info.get('dpi')
+            if (args.hdrextension == 'jpg'):
+                exif = img.info['exif']
+                img2.save(p, dpi=dpi, subsampling=-1, quality=100, exif=exif)
+            elif (args.hdrextension == 'tiff'):
+                img2.save(p, dpi=dpi)
+            img2.close()
+            img.close()
+
+'''
+Function that postprocesses RAW (CR2) photos to digital positives, with minimal processing options.
+:param args: ArgumentParser arguments parsed at program startup
+'''
+def HDRPostProcessPhotos(args):
+    print("Postprocess raw photos in:\n" + args.directory)
+    # ensure directory exists
+    if (not os.path.exists(args.directory)):
+        return
+
+    # grab all raw photos
+    photos = utility.findFiles(args.directory, mode=1, recursive=True, ext=["cr2"])
+    if (len(photos) <= 0):
+        print("No photos found in this directory.")
+        return
+
+    prevdir = os.path.dirname(photos[0])
+    print(prevdir)
+    for p in photos:
+        pName, pExt = os.path.basename(p).split(".")
+        pNameNew = pName + ".tiff"
+        pNew = os.path.join(os.path.dirname(p), pNameNew)
+        if (os.path.dirname(p) != prevdir):
+            prevdir = os.path.dirname(p)
+            print(prevdir)
+        print("Postprocess " + p)
+        if (not args.readonly):
+            with rawpy.imread(p) as raw:
+                rgb = raw.postprocess(no_auto_bright=True, user_wb=raw.camera_whitebalance, gamma=(1, 1))
+                imageio.imsave(pNew, rgb)
 
 '''
 Function that reorganizes HDR photos into capture directories (timestamps) based on a capture interval.
@@ -626,6 +663,8 @@ def main():
     # arguments specific to HDR
     parser.add_argument('-hc', '--hdrcounter', dest='hdrcounter', type=int, help='rename HDR photos starting from counter')
     parser.add_argument('-hr', '--hdrrotate', dest='hdrrotate', type=int, help='rotate HDR photos by some +/- degrees')
+    parser.add_argument('-hp', '--hdrpositive', dest='hdrpositive', action='store_true', help='postprocess raw photos to digital positive')
+    parser.add_argument('-hx', '--hdrextension', dest='hdrextension', type=str, help='file extension of image', default='jpg')
     # arguments specific to ASD
     parser.add_argument('-af', '--asdfill', dest='asdfill', type=float, help='fill a new .asd.rad.txt file w/ literal')
     args = parser.parse_args()
@@ -651,6 +690,8 @@ def main():
             HDRRenameFilesCounter(args)
         elif (args.hdrrotate):
             HDRRotatePhotos(args)
+        elif (args.hdrpositive):
+            HDRPostProcessPhotos(args)
         elif (args.organize):
             HDROrganizePhotos(args)
     elif (args.asd):

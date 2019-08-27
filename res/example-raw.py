@@ -7,14 +7,14 @@
 # ====================================================================
 import sys
 import argparse
+from PIL import Image as Img
+import imageio
+import numpy as np
 # rawpy
-#import rawpy
-#import imageio
-# rawkit
-# import numpy as np
-# from PIL import Image
+import rawpy
+# # rawkit
 # from rawkit.raw import Raw
-# wand
+# # wand
 # from wand.image import Image
 # from wand.display import display
 
@@ -50,9 +50,23 @@ def main():
     # rawpy (libraw, dcraw)
     # with rawpy.imread(args.filepath) as raw:
     #     #print(raw.raw_type)
-    #     rgb = raw.postprocess(use_auto_wb=False, use_camera_wb=False, no_auto_bright=True, exp_shift=2.0)
+    #     rgb = raw.postprocess()
+    #     #rgb = raw.postprocess(use_auto_wb=False, use_camera_wb=False, no_auto_bright=True, exp_shift=2.0)
     #     #demosaic_algorithm=rawpy.DemosaicAlgorithm.AHD, no_auto_bright=False, use_camera_wb=True, output_bps=16) #gamma=(1, 1)
     #     imageio.imsave(args.filepath + '.tiff', rgb)
+
+    # rawpy (libraw, dcraw)
+    raw = rawpy.imread(args.filepath)
+    #rgb = raw.postprocess(use_auto_wb=True)
+    # rgb = raw.postprocess(use_camera_wb=True)
+    #rgb = raw.postprocess(no_auto_bright=True, user_wb=raw.daylight_whitebalance) #POST1 # gamma=(1, 1), output_bps=8
+    #rgb = raw.postprocess(no_auto_bright=True, user_wb=raw.camera_whitebalance)  # POST2
+    #rgb = raw.postprocess(no_auto_bright=True, use_camera_wb=False, user_wb=[1.0, 1.0, 1.0, 1.0], bright=1.0, gamma=(1, 1), output_bps=8)  # POST3
+    rgb = raw.postprocess(no_auto_bright=True, user_wb=raw.camera_whitebalance, gamma=(1, 1), output_bps=8)  # POST4
+    #Img.fromarray(rgb).save(args.filepath + '.tiff')
+    #save(args.filepath + ".POST.tiff", rgb)
+    imageio.imsave(args.filepath + ".POST.tiff", rgb)
+    raw.close()
 
     # rawkit (libraw)
     # raw_image = Raw(args.filepath)
