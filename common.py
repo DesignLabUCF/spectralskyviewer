@@ -13,6 +13,7 @@ from enum import Enum
 # constants -------------------------------------------------------------------
 
 CoordSystem = Enum('CoordSystem', 'Polar PolarNorm UV')          # used for sky coordinates
+SourceExt = Enum('SourceExt', 'JPG TIFF')                        # used for pixel extraction
 ColorModel = Enum('ColorModel', 'RGB HSV HSL LAB')               # used for pixel color components
 PixelWeighting = Enum('PixelWeighting', 'Mean Median Gaussian')  # used during pixel convolution
 SkyCover = Enum('SkyCover', 'UNK CLR SCT OVC')
@@ -104,6 +105,7 @@ DefExportOptions = {
     "Filename": "",
     "CoordSystem": CoordSystem.Polar.value,
     "IsHDR": False,
+    "SourceExt": SourceExt.JPG.value,
     "ComputePixelRegion": True,
     "PixelRegion": PixelRegionMin,
     "PixelWeighting": PixelWeighting.Mean.value,

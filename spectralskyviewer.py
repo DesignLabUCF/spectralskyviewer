@@ -698,7 +698,7 @@ class SpectralSkyViewer(QMainWindow):
         exposures = []  # list of exposures to export
         expphotos = []  # list of photos per exposure
         if not xoptions["IsHDR"]:
-            photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], capture, exposure)
+            photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], capture, exposure, common.SourceExt(xoptions["SourceExt"]).name.lower())
             if not photo or len(photo) <= 0:
                 self.log("Error: Photo for " + exposure + "s exposure not found. Export canceled.")
                 return
@@ -706,7 +706,7 @@ class SpectralSkyViewer(QMainWindow):
             expphotos.append(photo)
         else:
             for exp in common.Exposures:
-                photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], capture, exp)
+                photo = utility_data.findHDRFile(common.AppSettings["DataDirectory"], capture, exp, common.SourceExt(xoptions["SourceExt"]).name.lower())
                 if not photo or len(photo) <= 0:
                     self.log("Error: Photo for exposure '" + str(exp) + "' not found. Export canceled.")
                     return

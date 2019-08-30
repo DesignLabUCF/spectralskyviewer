@@ -41,6 +41,7 @@ class DialogExport(QDialog):
         self.setWindowTitle("Export Options")
         self.setWindowIcon(QIcon('res/icon.png'))
         self.chxHDR.setChecked(self.exportOptions["IsHDR"])
+        self.cbxSourceExt.setCurrentText(common.SourceExt(self.exportOptions["SourceExt"]).name)
         self.cbxColorModel.setCurrentText(common.ColorModel(self.exportOptions["ColorModel"]).name)
         self.chxPixRegCalc.setChecked(self.exportOptions["ComputePixelRegion"])
         self.cbxPixRegFixed.setEnabled(not self.exportOptions["ComputePixelRegion"])
@@ -108,6 +109,15 @@ class DialogExport(QDialog):
         grpHDR = QGroupBox("HDR", self)
         grpHDR.setLayout(boxHDR)
 
+        # source extension
+        self.cbxSourceExt = QComboBox()
+        self.cbxSourceExt.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.cbxSourceExt.addItems([str(cm.name) for cm in common.SourceExt])
+        boxSource = QHBoxLayout()
+        boxSource.addWidget(self.cbxSourceExt)
+        grpSource = QGroupBox("Source:", self)
+        grpSource.setLayout(boxSource)
+
         # color model
         self.cbxColorModel = QComboBox()
         self.cbxColorModel.setSizeAdjustPolicy(QComboBox.AdjustToContents)
@@ -146,6 +156,7 @@ class DialogExport(QDialog):
         # add all pixel options to window
         boxPixelOptions = QHBoxLayout()
         boxPixelOptions.addWidget(grpHDR, 0, Qt.AlignLeft)
+        boxPixelOptions.addWidget(grpSource, 0, Qt.AlignLeft)
         boxPixelOptions.addWidget(grpColor, 0, Qt.AlignLeft)
         boxPixelOptions.addWidget(grpPixelRegion, 0, Qt.AlignLeft)
         boxPixelOptions.addWidget(grpPixelWeighting, 1)
@@ -246,6 +257,7 @@ class DialogExport(QDialog):
 
         # save pixel options
         self.exportOptions["IsHDR"] = self.chxHDR.isChecked()
+        self.exportOptions["SourceExt"] = common.SourceExt[self.cbxSourceExt.currentText()].value
         self.exportOptions["ColorModel"] = common.ColorModel[self.cbxColorModel.currentText()].value
         self.exportOptions["ComputePixelRegion"] = self.chxPixRegCalc.isChecked()
         self.exportOptions["PixelRegion"] = int(self.cbxPixRegFixed.currentText())

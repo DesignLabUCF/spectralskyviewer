@@ -165,9 +165,10 @@ Function to search for and retrieve the filepath of a capture image.
 :param datadir: The data directory to search in.
 :param capture: The (datetime) capture timestamp.
 :param exposure: The exposure value of the image.
+:param extension: The extension of the image.
 :return: A filepath of the specific image.
 '''
-def findHDRFile(datadir, capture, exposure):
+def findHDRFile(datadir, capture, exposure, extension):
     datestr = datetime.strftime(capture, "%Y-%m-%d")
     timestr = datetime.strftime(capture, "%H.%M.%S")
     expidx = common.ExposureIdxMap[exposure]
@@ -178,7 +179,7 @@ def findHDRFile(datadir, capture, exposure):
         return ''
 
     # gather all exposure photos taken at capture timestamp
-    photos = utility.findFiles(path, mode=1, ext=["jpg"])
+    photos = utility.findFiles(path, mode=1, ext=[extension])
     if len(photos) <= 0:
         return ''
 
