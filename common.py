@@ -24,7 +24,7 @@ PixelRegionMax = 63    # used for pixel convolution
 HUDTextScaleMin = 10   # used for font resizing
 HUDTextScaleMax = 100  # used for font resizing
 # TODO: this is hardcoded to our sampling pattern. compute it properly by projecting area and taking width and height!!
-AltitudeRegionMap = {90:1, 71.9187:3, 53.3665:5, 33.749:7, 12.1151:9}  # pixel regions per altitude
+AltitudeRegionMap = {90:9, 71.9187:7, 53.3665:7, 33.749:7, 12.1151:5}  # pixel regions per altitude
 
 # sample export features
 SampleFeatures = [
