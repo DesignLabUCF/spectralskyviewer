@@ -349,7 +349,7 @@ class SpectralSkyViewer(QMainWindow):
 
         # energy graph
         self.wgtGraph = pg.PlotWidget(name='ASD')
-        self.wgtGraph.setLabel('left', 'Radiance', units='W/m²/sr/nm')
+        self.wgtGraph.setLabel('left', 'Radiance', units='W/m²/nm/sr')
         self.wgtGraph.setLabel('bottom', 'Wavelength', units='nm')
         self.resetGraph()
         #self.wgtGraphErrors = QLabel()
